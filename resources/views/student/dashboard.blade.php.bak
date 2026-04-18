@@ -1,0 +1,363 @@
+<x-layouts::app :title="__('Student Dashboard')">
+    <div class="space-y-6">
+        {{-- Header --}}
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <flux:heading size="xl">{{ __('Welcome back, :name', ['name' => $student->name]) }}</flux:heading>
+                @if ($currentSession && $currentTerm)
+                    <flux:text class="mt-1">
+                        {{ $currentSession->name }} &mdash; {{ $currentTerm->name }}
+                    </flux:text>
+                @else
+                    <flux:text class="mt-1 text-amber-600 dark:text-amber-400">
+                        {{ __('No active session/term set.') }}
+                    </flux:text>
+                @endif
+            </div>
+        </div>
+
+        {{-- Class Info Card --}}
+        @if ($class)
+            <div class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                        <flux:icon.building-library class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-semibold text-zinc-900 dark:text-white">{{ $class->name }}</p>
+                        <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                            {{ $class->level?->name }}
+                            @if ($class->teacher)
+                                &mdash; {{ __('Class Teacher: :name', ['name' => $class->teacher->name]) }}
+                            @endif
+                        </flux:text>
+                    </div>
+                    @if ($profile?->admission_number)
+                        <flux:badge size="sm" color="zinc" class="hidden sm:inline-flex">
+                            {{ $profile->admission_number }}
+                        </flux:badge>
+                    @endif
+                </div>
+            </div>
+        @else
+            <div class="p-4 rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+                <div class="flex items-center gap-3">
+                    <flux:icon.exclamation-triangle class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <flux:text class="text-sm text-amber-700 dark:text-amber-300">
+                        {{ __('You have not been assigned to a class yet. Please contact your school admin.') }}
+                    </flux:text>
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Stats Cards (5 cols) ───────────────────────────────── --}}
+        <section aria-label="{{ __('Your statistics') }}">
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                <a href="{{ route('student.results.index') }}" wire:navigate class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                            <flux:icon.document-text class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Results') }}</flux:text>
+                            <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($resultsCount) }}</p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{{ route('student.assignments.index') }}" wire:navigate class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                            <flux:icon.clipboard-document-list class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Assignments') }}</flux:text>
+                            <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($assignmentsCount) }}</p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{{ route('student.notices.index') }}" wire:navigate class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
+                            <flux:icon.megaphone class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                        </div>
+                        <div>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Notices') }}</flux:text>
+                            <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($noticesCount) }}</p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{{ route('student.quizzes.index') }}" wire:navigate class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                            <flux:icon.academic-cap class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Quizzes') }}</flux:text>
+                            <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($availableQuizzes) }}</p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{{ route('student.games.index') }}" wire:navigate class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors col-span-2 sm:col-span-1">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-pink-100 dark:bg-pink-900/30">
+                            <flux:icon.puzzle-piece class="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                        </div>
+                        <div>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Games') }}</flux:text>
+                            <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($availableGames) }}</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        {{-- ── Quiz Performance Summary ───────────────────────────── --}}
+        @if ($quizzesTaken > 0)
+            <section aria-label="{{ __('Quiz performance summary') }}" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
+                <flux:heading size="sm" class="mb-3">{{ __('My Quiz Performance') }}</flux:heading>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $quizzesTaken }}</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Quizzes Taken') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold {{ $quizAvgScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($quizAvgScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                            {{ number_format((float) $quizAvgScore, 0) }}%
+                        </p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Average Score') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold {{ $quizPassRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($quizPassRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                            {{ $quizPassRate }}%
+                        </p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Pass Rate') }}</p>
+                    </div>
+                </div>
+            </section>
+        @endif
+
+        {{-- ── Upcoming Deadlines ─────────────────────────────────── --}}
+        @if ($upcomingDeadlines->isNotEmpty())
+            <section aria-labelledby="deadlines-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="p-4 border-b border-zinc-200 dark:border-zinc-700">
+                    <flux:heading size="sm" id="deadlines-heading">{{ __('Upcoming Deadlines') }}</flux:heading>
+                </div>
+                <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @foreach ($upcomingDeadlines as $deadline)
+                        @php
+                            $daysLeft = (int) now()->diffInDays($deadline->due_date, false);
+                            $urgent = $daysLeft <= 2;
+                        @endphp
+                        <div class="flex items-center gap-3 p-4">
+                            <div class="flex items-center justify-center w-8 h-8 rounded-full shrink-0 {{ $urgent ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30' }}">
+                                <flux:icon.calendar class="w-4 h-4 {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400' }}" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                                    {{ $deadline->title ?? __('Week :week Assignment', ['week' => $deadline->week_number]) }}
+                                </p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-medium {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300' }}">
+                                    {{ $deadline->due_date->format('M j') }}
+                                </p>
+                                <p class="text-xs {{ $urgent ? 'text-red-500 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400' }}">
+                                    @if ($daysLeft == 0) {{ __('Today') }}
+                                    @elseif ($daysLeft == 1) {{ __('Tomorrow') }}
+                                    @else {{ __(':days days', ['days' => $daysLeft]) }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
+        {{-- ── Available Quizzes + Available Games ────────────────── --}}
+        @if ($upcomingQuizzes->isNotEmpty() || $upcomingGames->isNotEmpty())
+            <div class="grid gap-6 lg:grid-cols-2">
+                {{-- Available Quizzes --}}
+                @if ($upcomingQuizzes->isNotEmpty())
+                    <section aria-labelledby="available-quizzes-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                        <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+                            <flux:heading size="sm" id="available-quizzes-heading">{{ __('Available Quizzes') }}</flux:heading>
+                            <flux:link href="{{ route('student.quizzes.index') }}" class="text-sm" wire:navigate>
+                                {{ __('View all') }}
+                            </flux:link>
+                        </div>
+                        <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                            @foreach ($upcomingQuizzes as $quiz)
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="font-medium text-zinc-900 dark:text-white text-sm">{{ $quiz->title }}</p>
+                                            <div class="flex flex-wrap gap-2 mt-1">
+                                                <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $quiz->total_questions }} {{ __('questions') }}</span>
+                                                @if ($quiz->time_limit_minutes)
+                                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">&middot; {{ $quiz->time_limit_minutes }} {{ __('min') }}</span>
+                                                @endif
+                                                @if ($quiz->expires_at)
+                                                    <span class="text-xs text-amber-600 dark:text-amber-400">&middot; {{ __('Due :date', ['date' => $quiz->expires_at->format('M j')]) }}</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <flux:button variant="filled" size="xs" href="{{ route('student.quizzes.index') }}" wire:navigate>
+                                            {{ __('Start') }}
+                                        </flux:button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
+                {{-- Available Games --}}
+                @if ($upcomingGames->isNotEmpty())
+                    <section aria-labelledby="available-games-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                        <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+                            <flux:heading size="sm" id="available-games-heading">{{ __('Available Games') }}</flux:heading>
+                            <flux:link href="{{ route('student.games.index') }}" class="text-sm" wire:navigate>
+                                {{ __('View all') }}
+                            </flux:link>
+                        </div>
+                        <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                            @foreach ($upcomingGames as $game)
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="font-medium text-zinc-900 dark:text-white text-sm">{{ $game->title }}</p>
+                                            <div class="flex flex-wrap gap-2 mt-1">
+                                                <flux:badge size="sm" color="zinc">{{ $game->gameTypeLabel() }}</flux:badge>
+                                                <flux:badge size="sm" color="zinc" class="capitalize">{{ $game->difficulty }}</flux:badge>
+                                            </div>
+                                        </div>
+                                        <flux:button variant="filled" size="xs" href="{{ route('student.games.play', $game) }}" wire:navigate>
+                                            {{ __('Play') }}
+                                        </flux:button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+            </div>
+        @endif
+
+        {{-- ── Recent Results + Recent Assignments ────────────────── --}}
+        <div class="grid gap-6 lg:grid-cols-2">
+            {{-- Recent Results --}}
+            <section aria-labelledby="recent-results-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+                    <flux:heading size="sm" id="recent-results-heading">{{ __('Recent Results') }}</flux:heading>
+                    @if ($resultsCount > 0)
+                        <flux:link href="{{ route('student.results.index') }}" class="text-sm" wire:navigate>
+                            {{ __('View all') }}
+                        </flux:link>
+                    @endif
+                </div>
+                <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @forelse ($recentResults as $result)
+                        <a href="{{ route('student.results.show', $result) }}" wire:navigate class="flex items-center justify-between p-4 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors">
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-zinc-900 dark:text-white">
+                                    {{ $result->session?->name }} &mdash; {{ $result->term?->name }}
+                                </p>
+                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                                    {{ $result->created_at->format('M j, Y') }}
+                                </flux:text>
+                            </div>
+                            <flux:icon.chevron-right class="w-4 h-4 text-zinc-400 shrink-0" />
+                        </a>
+                    @empty
+                        <div class="p-8 text-center">
+                            <flux:icon.document-text class="w-8 h-8 mx-auto text-zinc-400" />
+                            <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                {{ __('No results available yet.') }}
+                            </flux:text>
+                        </div>
+                    @endforelse
+                </div>
+            </section>
+
+            {{-- Recent Assignments --}}
+            <section aria-labelledby="recent-assignments-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+                    <flux:heading size="sm" id="recent-assignments-heading">{{ __('Recent Assignments') }}</flux:heading>
+                    @if ($assignmentsCount > 0)
+                        <flux:link href="{{ route('student.assignments.index') }}" class="text-sm" wire:navigate>
+                            {{ __('View all') }}
+                        </flux:link>
+                    @endif
+                </div>
+                <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @forelse ($recentAssignments as $assignment)
+                        <div class="p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-medium text-zinc-900 dark:text-white">
+                                        {{ $assignment->title ?? __('Week :week Assignment', ['week' => $assignment->week_number]) }}
+                                    </p>
+                                    <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                                        {{ __('Week :week', ['week' => $assignment->week_number]) }}
+                                        @if ($assignment->due_date)
+                                            &mdash; {{ __('Due: :date', ['date' => $assignment->due_date->format('M j, Y')]) }}
+                                        @endif
+                                    </flux:text>
+                                </div>
+                                @if ($assignment->file_url)
+                                    <flux:button variant="subtle" size="xs" icon="arrow-down-tray" href="{{ $assignment->file_url }}" target="_blank" rel="noopener noreferrer">
+                                        <span class="sr-only">{{ __('Download') }}</span>
+                                    </flux:button>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div class="p-8 text-center">
+                            <flux:icon.clipboard-document-list class="w-8 h-8 mx-auto text-zinc-400" />
+                            <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                {{ __('No assignments for this term yet.') }}
+                            </flux:text>
+                        </div>
+                    @endforelse
+                </div>
+            </section>
+        </div>
+
+        {{-- ── Latest Notices ─────────────────────────────────────── --}}
+        @if ($recentNotices->isNotEmpty())
+            <section aria-labelledby="notices-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+                    <flux:heading size="sm" id="notices-heading">{{ __('Latest Notices') }}</flux:heading>
+                    <flux:link href="{{ route('student.notices.index') }}" class="text-sm" wire:navigate>
+                        {{ __('View all') }}
+                    </flux:link>
+                </div>
+                <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @foreach ($recentNotices as $notice)
+                        <a href="{{ route('student.notices.show', $notice) }}" wire:navigate class="flex items-start gap-3 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors">
+                            @if ($notice->image_url)
+                                <img src="{{ $notice->image_url }}" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />
+                            @else
+                                <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 shrink-0">
+                                    <flux:icon.megaphone class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                                </div>
+                            @endif
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-zinc-900 dark:text-white text-sm">{{ $notice->title }}</p>
+                                <flux:text class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+                                    {{ $notice->published_at->format('M j, Y') }}
+                                </flux:text>
+                            </div>
+                            <flux:icon.chevron-right class="w-4 h-4 text-zinc-400 mt-1 shrink-0" />
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+    </div>
+</x-layouts::app>

@@ -1,0 +1,154 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Result;
+use App\Models\SchoolClass;
+use App\Models\Term;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+
+class BulkResultController extends Controller
+{
+    /**
+     * Show the bulk upload form.
+     */
+    public function create(): View
+    {
+        $school = app('current.school');
+        $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
+        $currentSession = $school->currentSession();
+        $currentTerm = $school->currentTerm();
+
+        return view('admin.results.bulk-upload', compact('classes', 'currentSession', 'currentTerm'));
+    }
+
+    /**
+     * Process and preview the bulk upload. Files are matched by username.
+     */
+    public function preview(Request $request): View
+    {
+        $request->validate([
+            'class_id' => ['required', 'exists:classes,id'],
+            'session_id' => ['required', 'exists:academic_sessions,id'],
+            'term_id' => ['required', 'exists:terms,id'],
+            'result_files' => ['required', 'array', 'min:1'],
+            'result_files.*' => ['file', 'mimes:pdf', 'max:10240'],
+        ]);
+
+        $classId = $request->input('class_id');
+        $sessionId = $request->input('session_id');
+        $termId = $request->input('term_id');
+
+        // Get students in the selected class
+        $students = User::where('role', 'student')
+            ->whereHas('studentProfile', fn ($q) => $q->where('class_id', $classId))
+            ->get()
+            ->keyBy(fn ($s) => strtolower($s->username));
+
+        $matches = [];
+        $unmatched = [];
+
+        foreach ($request->file('result_files') as $file) {
+            $filename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $normalizedName = strtolower(trim($filename));
+
+            if ($students->has($normalizedName)) {
+                $student = $students->get($normalizedName);
+
+                // Check if result already exists for this student/session/term
+                $existing = Result::where('student_id', $student->id)
+                    ->where('session_id', $sessionId)
+                    ->where('term_id', $termId)
+                    ->exists();
+
+                // Store temp file
+                $tempPath = $file->storeAs('bulk-results', $file->getClientOriginalName(), 'local');
+
+                $matches[] = [
+                    'student_id' => $student->id,
+                    'student_name' => $student->name,
+                    'username' => $student->username,
+                    'filename' => $file->getClientOriginalName(),
+                    'temp_path' => $tempPath,
+                    'already_exists' => $existing,
+                ];
+            } else {
+                $unmatched[] = $file->getClientOriginalName();
+            }
+        }
+
+        $class = SchoolClass::find($classId);
+        $term = Term::find($termId);
+
+        return view('admin.results.bulk-preview', compact(
+            'matches',
+            'unmatched',
+            'classId',
+            'sessionId',
+            'termId',
+            'class',
+            'term',
+        ));
+    }
+
+    /**
+     * Import the matched results.
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'class_id' => ['required', 'exists:classes,id'],
+            'session_id' => ['required', 'exists:academic_sessions,id'],
+            'term_id' => ['required', 'exists:terms,id'],
+            'imports' => ['required', 'array', 'min:1'],
+            'imports.*.student_id' => ['required', 'exists:users,id'],
+            'imports.*.temp_path' => ['required', 'string'],
+        ]);
+
+        $imported = 0;
+
+        DB::transaction(function () use ($request, &$imported) {
+            foreach ($request->input('imports') as $item) {
+                $fullPath = storage_path('app/private/'.$item['temp_path']);
+
+                if (! file_exists($fullPath)) {
+                    continue;
+                }
+
+                // TODO: Upload to Cloudinary and get URL
+                // For now, use a placeholder URL
+                $fileUrl = 'pending://cloudinary/'.$item['temp_path'];
+
+                Result::updateOrCreate(
+                    [
+                        'student_id' => $item['student_id'],
+                        'session_id' => $request->input('session_id'),
+                        'term_id' => $request->input('term_id'),
+                    ],
+                    [
+                        'class_id' => $request->input('class_id'),
+                        'file_url' => $fileUrl,
+                        'uploaded_by' => auth()->id(),
+                        'approved_by' => auth()->id(),
+                        'approved_at' => now(),
+                        'status' => 'approved',
+                    ],
+                );
+
+                // Clean up temp file
+                @unlink($fullPath);
+                $imported++;
+            }
+        });
+
+        return redirect()->route('admin.results.index')
+            ->with('success', __(':count results uploaded successfully.', ['count' => $imported]));
+    }
+}

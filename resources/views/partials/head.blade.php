@@ -1,16 +1,35 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+@php
+    $school = app()->bound('current.school') ? app('current.school') : null;
+    $appName = $school?->name ?? config('app.name', 'SchoolPortal');
+@endphp
+
+<meta name="description" content="{{ $school?->name ? $school->name . ' - School Portal' : 'SchoolPortal - Multi-Tenant School Management Platform' }}" />
+<meta name="theme-color" content="{{ $school?->setting('branding.primary_color') ?? '#000c99' }}" />
+
 <title>
-    {{ filled($title ?? null) ? $title.' - '.config('app.name', 'Laravel') : config('app.name', 'Laravel') }}
+    {{ filled($title ?? null) ? $title.' - '.$appName : $appName }}
 </title>
 
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ $school?->setting('branding.favicon_url') ?? '/favicon.ico' }}" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
 <link rel="preconnect" href="https://fonts.bunny.net">
-<link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+<link rel="dns-prefetch" href="https://res.cloudinary.com">
+<link href="https://fonts.bunny.net/css?family=montserrat:300,400,500,600,700,800,900" rel="stylesheet" />
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
+
+{{-- Per-school branding colors --}}
+@if ($school)
+<style>
+    :root {
+        --color-primary: {{ $school->setting('branding.primary_color') ?? '#4F46E5' }};
+        --color-secondary: {{ $school->setting('branding.secondary_color') ?? '#F59E0B' }};
+        --color-accent: {{ $school->setting('branding.accent_color') ?? '#10B981' }};
+    }
+</style>
+@endif

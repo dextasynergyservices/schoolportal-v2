@@ -38,14 +38,22 @@ trait ProfileValidationRules
      */
     protected function emailRules(?int $userId = null): array
     {
-        return [
-            'required',
+        $user = auth()->user();
+        $isAdminRole = $user && in_array($user->role, ['super_admin', 'school_admin']);
+
+        $rules = [
+            $isAdminRole ? 'required' : 'nullable',
             'string',
             'email',
             'max:255',
-            $userId === null
-                ? Rule::unique(User::class)
-                : Rule::unique(User::class)->ignore($userId),
         ];
+
+        if ($userId !== null) {
+            $rules[] = Rule::unique(User::class)->ignore($userId)->where('school_id', $user->school_id);
+        } else {
+            $rules[] = Rule::unique(User::class)->where('school_id', $user?->school_id);
+        }
+
+        return $rules;
     }
 }

@@ -3,13 +3,24 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "dev": "vite",
         "build": "vite build",
-        "dev": "vite"
+        "prepare": "husky",
+        "check": "biome check .",
+        "check:fix": "biome check --write .",
+        "format": "biome format .",
+        "format:fix": "biome format --write .",
+        "lint": "biome lint .",
+        "lint:fix": "biome lint --write .",
+        "ci": "biome ci .",
+        "pint": "php ./vendor/bin/pint",
+        "pint:check": "php ./vendor/bin/pint --test"
     },
     "dependencies": {
         "@tailwindcss/vite": "^4.1.11",
         "autoprefixer": "^10.4.20",
         "concurrently": "^9.0.1",
+        "gsap": "^3.15.0",
         "laravel-vite-plugin": "^3.0.0",
         "tailwindcss": "^4.0.7",
         "vite": "^8.0.0"
@@ -18,5 +29,20 @@
         "@rollup/rollup-linux-x64-gnu": "4.9.5",
         "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
         "lightningcss-linux-x64-gnu": "^1.29.1"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.11",
+        "@commitlint/cli": "^20.5.0",
+        "@commitlint/config-conventional": "^20.5.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.4.0"
+    },
+    "lint-staged": {
+        "*.php": [
+            "./vendor/bin/pint"
+        ],
+        "*.{js,ts,jsx,tsx,css,json}": [
+            "biome check --write --no-errors-on-unmatched"
+        ]
     }
 }

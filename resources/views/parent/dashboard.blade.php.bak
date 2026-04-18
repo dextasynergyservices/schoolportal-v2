@@ -1,0 +1,244 @@
+<x-layouts::app :title="__('Parent Dashboard')">
+    <div class="space-y-6">
+        {{-- Header --}}
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <flux:heading size="xl">{{ __('Welcome, :name', ['name' => $parent->name]) }}</flux:heading>
+                @if ($currentSession && $currentTerm)
+                    <flux:text class="mt-1">
+                        {{ $currentSession->name }} &mdash; {{ $currentTerm->name }}
+                    </flux:text>
+                @endif
+            </div>
+        </div>
+
+        {{-- ── Summary Stats ──────────────────────────────────────── --}}
+        @if ($children->isNotEmpty())
+            <section aria-label="{{ __('Summary statistics') }}">
+                <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    <div class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                                <flux:icon.users class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Children') }}</flux:text>
+                                <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $children->count() }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                                <flux:icon.document-text class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div>
+                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Total Results') }}</flux:text>
+                                <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($totalResults) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                                <flux:icon.academic-cap class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <div>
+                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Quizzes Taken') }}</flux:text>
+                                <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ number_format($totalQuizzesTaken) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                                <flux:icon.chart-bar class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <div>
+                                <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Avg Quiz Score') }}</flux:text>
+                                <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $overallQuizAvg !== null ? $overallQuizAvg . '%' : '—' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        @endif
+
+        {{-- ── Children Section ───────────────────────────────────── --}}
+        <div>
+            <flux:heading size="lg" class="mb-4">{{ __('Your Children') }}</flux:heading>
+
+            @if ($children->isNotEmpty())
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($children as $child)
+                        @php
+                            $profile = $child->studentProfile;
+                            $class = $profile?->class;
+                            $stats = $childrenStats[$child->id] ?? [];
+                        @endphp
+                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
+                            {{-- Child Header --}}
+                            <div class="p-4 border-b border-zinc-100 dark:border-zinc-700/50">
+                                <div class="flex items-center gap-3">
+                                    <flux:avatar size="lg" :name="$child->name" :initials="$child->initials()" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold text-zinc-900 dark:text-white truncate">{{ $child->name }}</p>
+                                        <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                                            {{ $class?->name ?? __('No class assigned') }}
+                                        </flux:text>
+                                        @if ($class?->level)
+                                            <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                                                {{ $class->level->name }}
+                                            </flux:text>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Per-Child Quick Stats --}}
+                            <div class="grid grid-cols-3 divide-x divide-zinc-100 dark:divide-zinc-700/50 border-b border-zinc-100 dark:border-zinc-700/50">
+                                <div class="p-3 text-center">
+                                    <p class="text-lg font-bold text-zinc-900 dark:text-white">{{ $stats['results_count'] ?? 0 }}</p>
+                                    <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Results') }}</p>
+                                </div>
+                                <div class="p-3 text-center">
+                                    <p class="text-lg font-bold text-zinc-900 dark:text-white">{{ $stats['quizzes_taken'] ?? 0 }}</p>
+                                    <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Quizzes') }}</p>
+                                </div>
+                                <div class="p-3 text-center">
+                                    @php $childAvg = $stats['quiz_avg'] ?? null; @endphp
+                                    <p class="text-lg font-bold {{ $childAvg !== null && $childAvg >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($childAvg !== null && $childAvg >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-white') }}">
+                                        {{ $childAvg !== null ? number_format((float) $childAvg, 0) . '%' : '—' }}
+                                    </p>
+                                    <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Avg') }}</p>
+                                </div>
+                            </div>
+
+                            {{-- Latest Result --}}
+                            @if (!empty($stats['latest_result']))
+                                <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-700/50">
+                                    <flux:text class="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {{ __('Latest result:') }}
+                                        <span class="font-medium text-zinc-700 dark:text-zinc-300">
+                                            {{ $stats['latest_result']->session?->name }} &mdash; {{ $stats['latest_result']->term?->name }}
+                                        </span>
+                                    </flux:text>
+                                </div>
+                            @endif
+
+                            {{-- Class Teacher --}}
+                            @if ($class?->teacher)
+                                <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-700/50">
+                                    <flux:text class="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {{ __('Class Teacher: :name', ['name' => $class->teacher->name]) }}
+                                    </flux:text>
+                                </div>
+                            @endif
+
+                            {{-- Quick Actions --}}
+                            <div class="p-3 grid grid-cols-2 gap-2">
+                                <flux:button variant="subtle" size="sm" icon="document-text" href="{{ route('parent.children.results', $child) }}" wire:navigate class="justify-start">
+                                    {{ __('Results') }}
+                                </flux:button>
+                                <flux:button variant="subtle" size="sm" icon="clipboard-document-list" href="{{ route('parent.children.assignments', $child) }}" wire:navigate class="justify-start">
+                                    {{ __('Assignments') }}
+                                </flux:button>
+                                <flux:button variant="subtle" size="sm" icon="academic-cap" href="{{ route('parent.children.quizzes', $child) }}" wire:navigate class="justify-start">
+                                    {{ __('Quizzes') }}
+                                </flux:button>
+                                <flux:button variant="subtle" size="sm" icon="puzzle-piece" href="{{ route('parent.children.games', $child) }}" wire:navigate class="justify-start">
+                                    {{ __('Games') }}
+                                </flux:button>
+                                <flux:button variant="subtle" size="sm" icon="user" href="{{ route('parent.children.show', $child) }}" wire:navigate class="justify-start col-span-2">
+                                    {{ __('View Profile') }}
+                                </flux:button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-8 text-center">
+                    <flux:icon.users class="w-12 h-12 mx-auto text-zinc-300 dark:text-zinc-600" />
+                    <flux:heading size="sm" class="mt-4">{{ __('No children linked') }}</flux:heading>
+                    <flux:text class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                        {{ __('Your school admin will link your children to your account. Please contact the school if you believe this is an error.') }}
+                    </flux:text>
+                </div>
+            @endif
+        </div>
+
+        {{-- ── Latest Notices ─────────────────────────────────────── --}}
+        @if ($recentNotices->isNotEmpty())
+            <section aria-labelledby="notices-heading" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+                    <flux:heading size="sm" id="notices-heading">{{ __('School Notices') }}</flux:heading>
+                    <flux:link href="{{ route('parent.notices.index') }}" class="text-sm" wire:navigate>
+                        {{ __('View all') }}
+                    </flux:link>
+                </div>
+                <div class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @foreach ($recentNotices as $notice)
+                        <a href="{{ route('parent.notices.show', $notice) }}" wire:navigate class="flex items-start gap-3 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors">
+                            @if ($notice->image_url)
+                                <img src="{{ $notice->image_url }}" alt="" class="w-10 h-10 rounded-lg object-cover shrink-0" loading="lazy" />
+                            @else
+                                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 shrink-0">
+                                    <flux:icon.megaphone class="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                                </div>
+                            @endif
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-zinc-900 dark:text-white text-sm">{{ $notice->title }}</p>
+                                <flux:text class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+                                    {{ $notice->published_at->format('M j, Y') }}
+                                </flux:text>
+                            </div>
+                            <flux:icon.chevron-right class="w-4 h-4 text-zinc-400 mt-1 shrink-0" />
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
+        {{-- ── School Contact Info ────────────────────────────────── --}}
+        <section aria-label="{{ __('School contact information') }}" class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-700">
+                    @if ($school->logo_url)
+                        <img src="{{ $school->logo_url }}" alt="{{ $school->name }}" class="w-8 h-8 rounded object-contain" />
+                    @else
+                        <flux:icon.building-office-2 class="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+                    @endif
+                </div>
+                <div>
+                    <p class="font-semibold text-zinc-900 dark:text-white text-sm">{{ $school->name }}</p>
+                    @if ($school->motto)
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 italic">{{ $school->motto }}</p>
+                    @endif
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                @if ($school->phone)
+                    <span class="flex items-center gap-1">
+                        <flux:icon.phone class="w-3.5 h-3.5" />
+                        <a href="tel:{{ $school->phone }}" class="hover:underline">{{ $school->phone }}</a>
+                    </span>
+                @endif
+                @if ($school->email)
+                    <span class="flex items-center gap-1">
+                        <flux:icon.envelope class="w-3.5 h-3.5" />
+                        <a href="mailto:{{ $school->email }}" class="hover:underline">{{ $school->email }}</a>
+                    </span>
+                @endif
+                @if ($school->address)
+                    <span class="flex items-center gap-1">
+                        <flux:icon.map-pin class="w-3.5 h-3.5" />
+                        {{ $school->address }}
+                    </span>
+                @endif
+            </div>
+        </section>
+    </div>
+</x-layouts::app>

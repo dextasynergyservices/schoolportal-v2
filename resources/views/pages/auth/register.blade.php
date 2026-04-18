@@ -31,25 +31,20 @@
             />
 
             <!-- Password -->
-            <flux:input
+            <x-password-input
                 name="password"
                 :label="__('Password')"
-                type="password"
                 required
-                autocomplete="new-password"
                 :placeholder="__('Password')"
-                viewable
             />
 
             <!-- Confirm Password -->
-            <flux:input
+            <x-password-input
                 name="password_confirmation"
                 :label="__('Confirm password')"
-                type="password"
                 required
-                autocomplete="new-password"
                 :placeholder="__('Confirm password')"
-                viewable
+                :with-strength-meter="false"
             />
 
             <div class="flex items-center justify-end">
@@ -57,6 +52,8 @@
                     {{ __('Create account') }}
                 </flux:button>
             </div>
+
+            <x-recaptcha action="register" />
         </form>
 
         <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-zinc-400">

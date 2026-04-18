@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,9 +11,9 @@ class ExampleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_returns_a_successful_response(): void
+    public function test_welcome_page_returns_a_successful_response(): void
     {
-        $response = $this->get(route('home'));
+        $response = $this->get('/');
 
         $response->assertOk();
     }

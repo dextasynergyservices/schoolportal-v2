@@ -1,0 +1,364 @@
+<x-layouts::app :title="__('Platform Dashboard')">
+    <div class="space-y-6">
+        {{-- Header + New-This-Month Summary --}}
+        <x-admin-header
+            :title="__('Platform Overview')"
+            :description="__('Welcome back, :name', ['name' => auth()->user()->name])"
+            :action="route('super-admin.schools.create')"
+            :actionLabel="__('New School')"
+            actionIcon="plus"
+        />
+
+        @if ($newSchoolsThisMonth > 0 || $newStudentsThisMonth > 0 || $newTeachersThisMonth > 0)
+            <div class="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300" role="status" aria-label="{{ __('Growth this month') }}">
+                <span class="font-medium">{{ __('This month:') }}</span>
+                @if ($newSchoolsThisMonth > 0)
+                    <span>+{{ $newSchoolsThisMonth }} {{ trans_choice('school|schools', $newSchoolsThisMonth) }}</span>
+                @endif
+                @if ($newStudentsThisMonth > 0)
+                    <span>+{{ $newStudentsThisMonth }} {{ trans_choice('student|students', $newStudentsThisMonth) }}</span>
+                @endif
+                @if ($newTeachersThisMonth > 0)
+                    <span>+{{ $newTeachersThisMonth }} {{ trans_choice('teacher|teachers', $newTeachersThisMonth) }}</span>
+                @endif
+            </div>
+        @endif
+
+        {{-- ─── Primary Stats ───────────────────────────────────────── --}}
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {{-- Schools --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.building-office-2 class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('Schools') }}</span>
+                </div>
+                <div class="mt-2 text-3xl font-semibold text-zinc-900 dark:text-white">{{ number_format($totalSchools) }}</div>
+                <div class="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+                    <span>{{ __(':active active · :inactive inactive', ['active' => $activeSchools, 'inactive' => $inactiveSchools]) }}</span>
+                    @if ($newSchoolsThisMonth > 0)
+                        <span class="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400" aria-label="{{ __(':count new this month', ['count' => $newSchoolsThisMonth]) }}">
+                            <flux:icon.arrow-trending-up class="size-3" />
+                            +{{ $newSchoolsThisMonth }}
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Students --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.academic-cap class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('Students') }}</span>
+                </div>
+                <div class="mt-2 text-3xl font-semibold text-zinc-900 dark:text-white">{{ number_format($totalStudents) }}</div>
+                <div class="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+                    <span>{{ __('Across all schools') }}</span>
+                    @if ($newStudentsThisMonth > 0)
+                        <span class="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400" aria-label="{{ __(':count new this month', ['count' => $newStudentsThisMonth]) }}">
+                            <flux:icon.arrow-trending-up class="size-3" />
+                            +{{ $newStudentsThisMonth }}
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Staff & Parents --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.user-group class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('Staff & Parents') }}</span>
+                </div>
+                <div class="mt-2 text-3xl font-semibold text-zinc-900 dark:text-white">{{ number_format($totalTeachers + $totalParents + $totalAdmins) }}</div>
+                <div class="mt-1 text-xs text-zinc-500">
+                    {{ __(':a admins · :t teachers · :p parents', ['a' => $totalAdmins, 't' => $totalTeachers, 'p' => $totalParents]) }}
+                </div>
+            </div>
+
+            {{-- Revenue --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.banknotes class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('Revenue') }}</span>
+                </div>
+                <div class="mt-2 text-3xl font-semibold text-zinc-900 dark:text-white">₦{{ number_format((float) $totalRevenue) }}</div>
+                <div class="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+                    <span>₦{{ number_format((float) $monthlyRevenue) }} {{ __('this month') }}</span>
+                    @if ($revenueChangePercent != 0)
+                        <span class="inline-flex items-center gap-0.5 {{ $revenueChangePercent > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' }}" aria-label="{{ __(':pct% vs last month', ['pct' => abs($revenueChangePercent)]) }}">
+                            @if ($revenueChangePercent > 0)
+                                <flux:icon.arrow-trending-up class="size-3" />
+                            @else
+                                <flux:icon.arrow-trending-down class="size-3" />
+                            @endif
+                            {{ $revenueChangePercent > 0 ? '+' : '' }}{{ $revenueChangePercent }}%
+                        </span>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- ─── Secondary Stats ─────────────────────────────────────── --}}
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {{-- AI Credits Used --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.sparkles class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('AI Credits Used') }}</span>
+                </div>
+                <div class="mt-2 text-2xl font-semibold text-zinc-900 dark:text-white">{{ number_format($creditsUsedThisMonth) }}</div>
+                <div class="mt-1 text-xs text-zinc-500">{{ __('This month') }}</div>
+            </div>
+
+            {{-- Credits Purchased (lifetime) --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.shopping-cart class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('Credits Purchased') }}</span>
+                </div>
+                <div class="mt-2 text-2xl font-semibold text-zinc-900 dark:text-white">{{ number_format($totalPurchasedCredits) }}</div>
+                <div class="mt-1 text-xs text-zinc-500">{{ __('Lifetime total') }}</div>
+            </div>
+
+            {{-- Pending Payments --}}
+            @if ($pendingPayments > 0)
+                <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+                    <div class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                        <flux:icon.exclamation-triangle class="size-4" />
+                        <span class="text-xs font-medium uppercase tracking-wide">{{ __('Pending Payments') }}</span>
+                    </div>
+                    <div class="mt-2 text-2xl font-semibold text-amber-700 dark:text-amber-300">{{ $pendingPayments }}</div>
+                    <div class="mt-1 text-xs text-amber-600 dark:text-amber-400">{{ __('Awaiting verification') }}</div>
+                </div>
+            @else
+                <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                    <div class="flex items-center gap-2 text-zinc-500">
+                        <flux:icon.check-badge class="size-4" />
+                        <span class="text-xs font-medium uppercase tracking-wide">{{ __('Payments') }}</span>
+                    </div>
+                    <div class="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{{ __('All clear') }}</div>
+                    <div class="mt-1 text-xs text-zinc-500">{{ __('No pending payments') }}</div>
+                </div>
+            @endif
+
+            {{-- Login Activity --}}
+            <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-center gap-2 text-zinc-500">
+                    <flux:icon.finger-print class="size-4" />
+                    <span class="text-xs font-medium uppercase tracking-wide">{{ __('Logins') }}</span>
+                </div>
+                <div class="mt-2 text-2xl font-semibold text-zinc-900 dark:text-white">{{ number_format($loginsThisMonth) }}</div>
+                <div class="mt-1 text-xs text-zinc-500">
+                    {{ __(':weekly this week · :monthly this month', ['weekly' => number_format($loginsThisWeek), 'monthly' => number_format($loginsThisMonth)]) }}
+                </div>
+            </div>
+        </div>
+
+        {{-- ─── School Health Alerts ────────────────────────────────── --}}
+        @if ($healthAlerts->isNotEmpty())
+            <section class="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20" aria-labelledby="health-alerts-heading">
+                <div class="flex items-center gap-2 border-b border-amber-200 px-4 py-3 dark:border-amber-800">
+                    <flux:icon.exclamation-triangle class="size-5 text-amber-600 dark:text-amber-400" />
+                    <h2 id="health-alerts-heading" class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                        {{ __('School Health Alerts') }}
+                        <span class="ml-1 inline-flex items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-800 dark:text-amber-200">{{ $healthAlerts->count() }}</span>
+                    </h2>
+                </div>
+                <ul class="divide-y divide-amber-200 dark:divide-amber-800">
+                    @foreach ($healthAlerts->take(8) as $alert)
+                        <li class="flex items-center justify-between gap-3 px-4 py-2.5">
+                            <div class="flex min-w-0 items-center gap-2">
+                                @if ($alert['type'] === 'no_session')
+                                    <flux:icon.calendar-days class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                @elseif ($alert['type'] === 'no_login')
+                                    <flux:icon.clock class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                @else
+                                    <flux:icon.user-minus class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                @endif
+                                <span class="truncate text-sm font-medium text-amber-900 dark:text-amber-200">{{ $alert['school']->name }}</span>
+                            </div>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <span class="text-xs text-amber-700 dark:text-amber-400">{{ $alert['message'] }}</span>
+                                <a href="{{ route('super-admin.schools.show', $alert['school']) }}" wire:navigate class="text-xs font-medium text-amber-800 underline hover:no-underline dark:text-amber-300">{{ __('View') }}</a>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+                @if ($healthAlerts->count() > 8)
+                    <div class="border-t border-amber-200 px-4 py-2 text-center dark:border-amber-800">
+                        <span class="text-xs text-amber-700 dark:text-amber-400">{{ __('And :count more...', ['count' => $healthAlerts->count() - 8]) }}</span>
+                    </div>
+                @endif
+            </section>
+        @endif
+
+        {{-- ─── Quick Actions ───────────────────────────────────────── --}}
+        <div class="grid grid-cols-3 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <flux:button variant="subtle" href="{{ route('super-admin.schools.create') }}" wire:navigate class="flex-col gap-1 py-3">
+                <flux:icon.building-office-2 class="size-5 text-zinc-500" />
+                <span class="text-xs">{{ __('New School') }}</span>
+            </flux:button>
+            <flux:button variant="subtle" href="{{ route('super-admin.students.index') }}" wire:navigate class="flex-col gap-1 py-3">
+                <flux:icon.academic-cap class="size-5 text-zinc-500" />
+                <span class="text-xs">{{ __('All Students') }}</span>
+            </flux:button>
+            <flux:button variant="subtle" href="{{ route('super-admin.teachers.index') }}" wire:navigate class="flex-col gap-1 py-3">
+                <flux:icon.user-group class="size-5 text-zinc-500" />
+                <span class="text-xs">{{ __('All Teachers') }}</span>
+            </flux:button>
+            <flux:button variant="subtle" href="{{ route('super-admin.parents.index') }}" wire:navigate class="flex-col gap-1 py-3">
+                <flux:icon.users class="size-5 text-zinc-500" />
+                <span class="text-xs">{{ __('All Parents') }}</span>
+            </flux:button>
+            <flux:button variant="subtle" href="{{ route('super-admin.credits.index') }}" wire:navigate class="flex-col gap-1 py-3">
+                <flux:icon.sparkles class="size-5 text-zinc-500" />
+                <span class="text-xs">{{ __('AI Credits') }}</span>
+            </flux:button>
+            <flux:button variant="subtle" href="{{ route('super-admin.schools.index') }}" wire:navigate class="flex-col gap-1 py-3">
+                <flux:icon.cog-6-tooth class="size-5 text-zinc-500" />
+                <span class="text-xs">{{ __('All Schools') }}</span>
+            </flux:button>
+        </div>
+
+        {{-- ─── Two-column: Top Schools + Recent Schools ────────────── --}}
+        <div class="grid gap-6 lg:grid-cols-2">
+            {{-- Top Schools by Student Count --}}
+            <section class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900" aria-labelledby="top-schools-heading">
+                <div class="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                    <h2 id="top-schools-heading" class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Top Schools') }}</h2>
+                    <span class="text-xs text-zinc-500">{{ __('By student count') }}</span>
+                </div>
+                @if ($topSchools->isEmpty())
+                    <div class="p-6 text-center">
+                        <flux:text class="text-zinc-500">{{ __('No schools yet.') }}</flux:text>
+                    </div>
+                @else
+                    <ol class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        @foreach ($topSchools as $index => $school)
+                            <li>
+                                <a href="{{ route('super-admin.schools.show', $school) }}" wire:navigate
+                                    class="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none dark:hover:bg-zinc-800 dark:focus:bg-zinc-800">
+                                    <span class="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold
+                                        {{ $index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' }}">
+                                        {{ $index + 1 }}
+                                    </span>
+                                    <span class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $school->name }}</span>
+                                    <span class="shrink-0 text-sm tabular-nums text-zinc-500">{{ number_format($school->student_count) }} {{ __('students') }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ol>
+                @endif
+            </section>
+
+            {{-- Recent Schools --}}
+            <section class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900" aria-labelledby="recent-schools-heading">
+                <div class="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                    <h2 id="recent-schools-heading" class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Recent Schools') }}</h2>
+                    <flux:button variant="ghost" size="sm" href="{{ route('super-admin.schools.index') }}" wire:navigate>
+                        {{ __('View all') }}
+                    </flux:button>
+                </div>
+                @if ($recentSchools->isEmpty())
+                    <div class="p-6 text-center">
+                        <flux:text class="text-zinc-500">{{ __('No schools yet. Create your first school to get started.') }}</flux:text>
+                    </div>
+                @else
+                    <ul class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        @foreach ($recentSchools as $school)
+                            <li>
+                                <a href="{{ route('super-admin.schools.show', $school) }}" wire:navigate
+                                    class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none dark:hover:bg-zinc-800 dark:focus:bg-zinc-800">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate font-medium text-zinc-900 dark:text-white">{{ $school->name }}</div>
+                                        <div class="mt-0.5 text-xs text-zinc-500">
+                                            {{ $school->custom_domain ?? $school->email }} · {{ number_format($school->student_count) }} {{ __('students') }} · {{ $school->created_at->diffForHumans() }}
+                                        </div>
+                                    </div>
+                                    @if ($school->is_active)
+                                        <flux:badge color="green" size="sm">{{ __('Active') }}</flux:badge>
+                                    @else
+                                        <flux:badge color="zinc" size="sm">{{ __('Inactive') }}</flux:badge>
+                                    @endif
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
+        </div>
+
+        {{-- ─── Recent Purchases + Recent Activity ──────────────────── --}}
+        <div class="grid gap-6 lg:grid-cols-2">
+            {{-- Recent Purchases --}}
+            <section class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900" aria-labelledby="recent-purchases-heading">
+                <div class="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                    <h2 id="recent-purchases-heading" class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Recent Purchases') }}</h2>
+                    <flux:button variant="ghost" size="sm" href="{{ route('super-admin.credits.index') }}" wire:navigate>
+                        {{ __('View all') }}
+                    </flux:button>
+                </div>
+                @if ($recentPurchases->isEmpty())
+                    <div class="p-6 text-center">
+                        <flux:text class="text-zinc-500">{{ __('No credit purchases yet.') }}</flux:text>
+                    </div>
+                @else
+                    <ul class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        @foreach ($recentPurchases as $purchase)
+                            <li class="flex items-center justify-between gap-3 px-4 py-3">
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm font-medium text-zinc-900 dark:text-white">
+                                        {{ $purchase->school?->name ?? __('Unknown School') }}
+                                    </div>
+                                    <div class="mt-0.5 text-xs text-zinc-500">
+                                        {{ $purchase->credits }} {{ __('credits') }} · {{ $purchase->purchaser?->name ?? __('Unknown') }} · {{ $purchase->created_at->diffForHumans() }}
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <span class="text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">₦{{ number_format((float) $purchase->amount_naira) }}</span>
+                                    @if ($purchase->status === 'completed')
+                                        <flux:badge color="green" size="sm">{{ __('Paid') }}</flux:badge>
+                                    @elseif ($purchase->status === 'pending')
+                                        <flux:badge color="amber" size="sm">{{ __('Pending') }}</flux:badge>
+                                    @else
+                                        <flux:badge color="red" size="sm">{{ __('Failed') }}</flux:badge>
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
+
+            {{-- Recent Platform Activity --}}
+            <section class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900" aria-labelledby="recent-activity-heading">
+                <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                    <h2 id="recent-activity-heading" class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Recent Platform Activity') }}</h2>
+                </div>
+                @if ($recentActivity->isEmpty())
+                    <div class="p-6 text-center">
+                        <flux:text class="text-zinc-500">{{ __('No activity recorded yet.') }}</flux:text>
+                    </div>
+                @else
+                    <ul class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        @foreach ($recentActivity as $log)
+                            <li class="flex items-center gap-3 px-4 py-3">
+                                <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                                    <flux:icon.clock class="size-4 text-zinc-400" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm text-zinc-900 dark:text-white">
+                                        <span class="font-medium">{{ $log->user?->name ?? __('System') }}</span>
+                                        <span class="text-zinc-500">{{ str_replace('.', ' ', $log->action) }}</span>
+                                    </div>
+                                    <div class="mt-0.5 text-xs text-zinc-500">
+                                        {{ $log->school?->name ?? '' }}{{ $log->school ? ' · ' : '' }}{{ $log->created_at->diffForHumans() }}
+                                    </div>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
+        </div>
+    </div>
+</x-layouts::app>
