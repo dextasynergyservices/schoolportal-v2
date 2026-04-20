@@ -77,6 +77,18 @@
                             @endif
                         </div>
                     </div>
+
+                    @if ($game->status === 'rejected' && $game->latestTeacherAction?->rejection_reason)
+                        <div class="mt-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2">
+                            <div class="flex items-start gap-2">
+                                <flux:icon name="x-circle" class="size-4 text-red-500 mt-0.5 shrink-0" />
+                                <div>
+                                    <p class="text-xs font-medium text-red-800 dark:text-red-200">{{ __('Rejection reason:') }}</p>
+                                    <p class="text-xs text-red-700 dark:text-red-300 mt-0.5">{{ $game->latestTeacherAction->rejection_reason }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <flux:button variant="subtle" size="sm" href="{{ route('teacher.games.show', $game) }}" wire:navigate>{{ __('Preview') }}</flux:button>
                         @if (in_array($game->status, ['draft', 'pending', 'rejected']))

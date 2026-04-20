@@ -17,7 +17,7 @@ class NoticeController extends Controller
     {
         $notices = Notice::with('creator:id,name')
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(10);
 
         return view('admin.notices.index', compact('notices'));
     }

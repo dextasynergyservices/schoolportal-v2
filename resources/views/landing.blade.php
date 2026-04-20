@@ -3,14 +3,16 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SchoolPortal — Modern School Management Platform</title>
-    <meta name="description" content="SchoolPortal is a professional multi-tenant school management platform with AI-powered quizzes, educational games, result management, and parent portals.">
+    <title>DX-SchoolPortal — Modern School Management Platform</title>
+    <meta name="description" content="DX-SchoolPortal is a professional multi-tenant school management platform with AI-powered quizzes, educational games, result management, and parent portals.">
 
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=montserrat:300,400,500,600,700,800,900" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/landing.js'])
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -431,7 +433,7 @@
     </style>
 </head>
 <body>
-<div style="overflow-x: hidden; width: 100%; max-width: 100vw;">
+<div x-data style="overflow-x: hidden; width: 100%; max-width: 100vw;">
 
     {{-- ══════════════════════════════════════════════════════
          NAVIGATION
@@ -445,7 +447,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
                     </svg>
                 </div>
-                <span class="text-lg font-bold tracking-tight hidden sm:inline">SchoolPortal</span>
+                <span class="text-lg font-bold tracking-tight hidden sm:inline">DX-SchoolPortal</span>
             </a>
 
             {{-- Desktop nav links --}}
@@ -514,13 +516,13 @@
                         A professional multi-tenant school management platform with AI-powered quizzes, real-time results, educational games, and seamless parent-teacher collaboration.
                     </p>
                     <div class="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
-                        <a href="https://wa.me/2348103208297" target="_blank" rel="noopener noreferrer" class="btn-primary justify-center">
+                        <button type="button" x-on:click="$dispatch('open-video-modal')" class="btn-primary justify-center">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            Learn More
+                        </button>
+                        <a href="https://wa.me/2348103208297" target="_blank" rel="noopener noreferrer" class="btn-secondary justify-center">
                             Get Started
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
-                        </a>
-                        <a href="#features" class="btn-secondary justify-center">
-                            Learn More
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
                         </a>
                     </div>
                 </div>
@@ -637,7 +639,7 @@
                     <span style="color: var(--sp-navy);">in one platform.</span>
                 </h2>
                 <p class="text-gray-500 leading-relaxed reveal">
-                    From student enrollment to AI-powered quizzes, SchoolPortal streamlines every aspect of school management with a professional, mobile-first experience.
+                    From student enrollment to AI-powered quizzes, DX-SchoolPortal streamlines every aspect of school management with a professional, mobile-first experience.
                 </p>
             </div>
 
@@ -695,6 +697,21 @@
                     <h3 class="text-lg font-bold text-gray-900 mb-2">Teacher Approval Workflow</h3>
                     <p class="text-sm text-gray-500 leading-relaxed">Teachers upload content that flows through admin approval. Full audit trail with transparency at every step.</p>
                 </div>
+            </div>
+
+            {{-- Watch Video CTA --}}
+            <div class="mt-10 sm:mt-14 text-center reveal">
+                <button
+                    type="button"
+                    x-on:click="$dispatch('open-video-modal')"
+                    class="group inline-flex items-center gap-3 px-6 py-3.5 rounded-full bg-[var(--sp-navy)] text-white font-semibold text-sm shadow-lg shadow-[var(--sp-navy)]/20 hover:shadow-xl hover:shadow-[var(--sp-navy)]/30 hover:-translate-y-0.5 transition-all duration-300"
+                >
+                    <span class="flex items-center justify-center w-10 h-10 rounded-full bg-white/15 group-hover:bg-white/25 transition-colors">
+                        <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </span>
+                    Watch How It Works
+                    <svg class="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+                </button>
             </div>
         </div>
     </section>
@@ -927,7 +944,7 @@
                 Ready to transform<br>your school?
             </h2>
             <p class="text-white/60 text-lg max-w-xl mx-auto mb-10 reveal-scale">
-                Join schools already using SchoolPortal to deliver results, create AI quizzes, and connect with parents — all from one platform.
+                Join schools already using DX-SchoolPortal to deliver results, create AI quizzes, and connect with parents — all from one platform.
             </p>
             <div class="flex flex-col sm:flex-row flex-wrap justify-center gap-4 reveal-scale">
                 <a href="https://wa.me/2348103208297" target="_blank" rel="noopener noreferrer" class="btn-primary !py-4 !px-8 !text-base justify-center">
@@ -956,7 +973,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
                             </svg>
                         </div>
-                        <span class="text-lg font-bold text-white tracking-tight">SchoolPortal</span>
+                        <span class="text-lg font-bold text-white tracking-tight">DX-SchoolPortal</span>
                     </div>
                     <p class="text-white/50 text-sm leading-relaxed max-w-sm">
                         A professional multi-tenant school management platform with AI-powered learning tools, built for Nigerian schools and beyond.
@@ -990,7 +1007,7 @@
 
             {{-- Bottom bar --}}
             <div class="border-t border-white/10 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <p class="text-white/40 text-sm">&copy; {{ date('Y') }} SchoolPortal. All rights reserved.</p>
+                <p class="text-white/40 text-sm">&copy; {{ date('Y') }} DX-SchoolPortal. All rights reserved.</p>
                 <div class="flex items-center gap-6">
                     <a href="#" class="text-white/40 hover:text-white/70 text-sm transition-colors">Privacy Policy</a>
                     <a href="#" class="text-white/40 hover:text-white/70 text-sm transition-colors">Terms of Service</a>
@@ -1000,6 +1017,9 @@
     </footer>
 
 </div>
+
+{{-- Video Modal (reusable) --}}
+@include('partials.video-modal', ['videoUrl' => 'https://www.youtube.com/embed/dQw4w9WgXcQ'])
 
 </body>
 </html>

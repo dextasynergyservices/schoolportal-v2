@@ -32,6 +32,13 @@ class Result extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'student_id' => 'integer',
+            'session_id' => 'integer',
+            'term_id' => 'integer',
+            'class_id' => 'integer',
+            'uploaded_by' => 'integer',
+            'approved_by' => 'integer',
             'approved_at' => 'datetime',
         ];
     }

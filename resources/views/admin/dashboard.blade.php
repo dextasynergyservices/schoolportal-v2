@@ -173,6 +173,61 @@
             </div>
         </section>
 
+        {{-- ── Quick Actions ──────────────────────────────────────── --}}
+        <section aria-labelledby="quick-actions-heading" class="dash-animate dash-animate-delay-3">
+            <h2 id="quick-actions-heading" class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Quick Actions') }}</h2>
+            <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+                <a href="{{ route('admin.students.create') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-blue-100 dark:bg-blue-900/30">
+                        <flux:icon.plus class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Student') }}</span>
+                </a>
+                <a href="{{ route('admin.teachers.create') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-emerald-100 dark:bg-emerald-900/30">
+                        <flux:icon.plus class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Teacher') }}</span>
+                </a>
+                <a href="{{ route('admin.parents.create') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-purple-100 dark:bg-purple-900/30">
+                        <flux:icon.plus class="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Parent') }}</span>
+                </a>
+                <a href="{{ route('admin.results.create') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-cyan-100 dark:bg-cyan-900/30">
+                        <flux:icon.arrow-up-tray class="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Result') }}</span>
+                </a>
+                <a href="{{ route('admin.assignments.create') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-teal-100 dark:bg-teal-900/30">
+                        <flux:icon.clipboard-document-list class="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Assignment') }}</span>
+                </a>
+                <a href="{{ route('admin.notices.create') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-pink-100 dark:bg-pink-900/30">
+                        <flux:icon.megaphone class="w-4 h-4 text-pink-600 dark:text-pink-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Notice') }}</span>
+                </a>
+                <a href="{{ route('admin.students.import') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-amber-100 dark:bg-amber-900/30">
+                        <flux:icon.arrow-up-on-square-stack class="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Import') }}</span>
+                </a>
+                <a href="{{ route('admin.settings.index') }}" wire:navigate class="quick-action">
+                    <div class="quick-action-icon bg-zinc-100 dark:bg-zinc-700">
+                        <flux:icon.cog-6-tooth class="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                    </div>
+                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Settings') }}</span>
+                </a>
+            </div>
+        </section>
+
         {{-- ── Results Progress + Students by Level ───────────────── --}}
         <div class="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <div class="dash-panel dash-animate dash-animate-delay-3">
@@ -232,7 +287,13 @@
         </div>
 
         {{-- ── Class Occupancy + Assignments Coverage ─────────────── --}}
-        <div class="grid gap-4 sm:gap-6 lg:grid-cols-2">
+        <div x-data="{ open: window.innerWidth >= 768 }" x-init="window.addEventListener('resize', () => { if (window.innerWidth >= 768) open = true })" class="dash-animate dash-animate-delay-4">
+            <button @click="open = !open" class="flex items-center justify-between w-full text-left md:hidden mb-3">
+                <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Class Occupancy & Assignments') }}</h2>
+                <flux:icon.chevron-down class="w-4 h-4 text-zinc-500 transition-transform" ::class="open ? 'rotate-180' : ''" />
+            </button>
+            <div x-show="open" x-collapse>
+                <div class="grid gap-4 sm:gap-6 lg:grid-cols-2">
             @if ($classOccupancy->isNotEmpty())
                 <div class="dash-panel dash-animate dash-animate-delay-4">
                     <div class="dash-panel-header">
@@ -294,8 +355,21 @@
                 </div>
             @endif
         </div>
+            </div>
+        </div>
 
         {{-- ── Pending Approvals + Recent Activity ────────────────── --}}
+        <div x-data="{ open: window.innerWidth >= 768 }" x-init="window.addEventListener('resize', () => { if (window.innerWidth >= 768) open = true })" class="dash-animate dash-animate-delay-5">
+            <button @click="open = !open" class="flex items-center justify-between w-full text-left md:hidden mb-3">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Approvals & Activity') }}</h2>
+                    @if ($pendingCount > 0)
+                        <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-amber-500 rounded-full">{{ $pendingCount }}</span>
+                    @endif
+                </div>
+                <flux:icon.chevron-down class="w-4 h-4 text-zinc-500 transition-transform" ::class="open ? 'rotate-180' : ''" />
+            </button>
+            <div x-show="open" x-collapse>
         <div class="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <div class="dash-panel dash-animate dash-animate-delay-5">
                 <div class="dash-panel-header">
@@ -380,11 +454,19 @@
                 </div>
             </div>
         </div>
+            </div>
+        </div>
 
         {{-- ── Recent Logins ──────────────────────────────────────── --}}
         @if ($recentLogins->isNotEmpty())
-            <div class="dash-panel dash-animate dash-animate-delay-6">
-                <div class="dash-panel-header">
+            <div x-data="{ open: window.innerWidth >= 768 }" x-init="window.addEventListener('resize', () => { if (window.innerWidth >= 768) open = true })" class="dash-animate dash-animate-delay-6">
+                <button @click="open = !open" class="flex items-center justify-between w-full text-left md:hidden mb-3">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Recent Staff Logins') }}</h2>
+                    <flux:icon.chevron-down class="w-4 h-4 text-zinc-500 transition-transform" ::class="open ? 'rotate-180' : ''" />
+                </button>
+                <div x-show="open" x-collapse>
+            <div class="dash-panel">
+                <div class="dash-panel-header hidden md:flex">
                     <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Recent Staff Logins') }}</h2>
                 </div>
                 <div class="overflow-x-auto">
@@ -425,61 +507,8 @@
                     </table>
                 </div>
             </div>
-        @endif
-
-        {{-- ── Quick Actions ──────────────────────────────────────── --}}
-        <section aria-labelledby="quick-actions-heading" class="dash-animate dash-animate-delay-6">
-            <h2 id="quick-actions-heading" class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Quick Actions') }}</h2>
-            <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-                <a href="{{ route('admin.students.create') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-blue-100 dark:bg-blue-900/30">
-                        <flux:icon.plus class="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Student') }}</span>
-                </a>
-                <a href="{{ route('admin.teachers.create') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-emerald-100 dark:bg-emerald-900/30">
-                        <flux:icon.plus class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Teacher') }}</span>
-                </a>
-                <a href="{{ route('admin.parents.create') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-purple-100 dark:bg-purple-900/30">
-                        <flux:icon.plus class="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Parent') }}</span>
-                </a>
-                <a href="{{ route('admin.results.create') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-cyan-100 dark:bg-cyan-900/30">
-                        <flux:icon.arrow-up-tray class="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Result') }}</span>
-                </a>
-                <a href="{{ route('admin.assignments.create') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-teal-100 dark:bg-teal-900/30">
-                        <flux:icon.clipboard-document-list class="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Assignment') }}</span>
-                </a>
-                <a href="{{ route('admin.notices.create') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-pink-100 dark:bg-pink-900/30">
-                        <flux:icon.megaphone class="w-4 h-4 text-pink-600 dark:text-pink-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Notice') }}</span>
-                </a>
-                <a href="{{ route('admin.students.import') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-amber-100 dark:bg-amber-900/30">
-                        <flux:icon.arrow-up-on-square-stack class="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Import') }}</span>
-                </a>
-                <a href="{{ route('admin.settings.index') }}" wire:navigate class="quick-action">
-                    <div class="quick-action-icon bg-zinc-100 dark:bg-zinc-700">
-                        <flux:icon.cog-6-tooth class="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-                    </div>
-                    <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Settings') }}</span>
-                </a>
+                </div>
             </div>
-        </section>
+        @endif
     </div>
 </x-layouts::app>

@@ -56,6 +56,6 @@ class SubmissionReviewed extends Notification implements ShouldQueue
 
         return $message
             ->action(__('View My Submissions'), url('/portal/teacher/submissions'))
-            ->salutation(__('Regards, SchoolPortal'));
+            ->salutation(__('Regards, DX-SchoolPortal'));
     }
 }

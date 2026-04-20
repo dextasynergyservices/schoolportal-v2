@@ -53,7 +53,7 @@ class ResultController extends Controller
             $query->where('term_id', $selectedTermId);
         }
 
-        $results = $query->latest()->paginate(20)->withQueryString();
+        $results = $query->latest()->paginate(10)->withQueryString();
 
         return view('student.results.index', compact(
             'results',

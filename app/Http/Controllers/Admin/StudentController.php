@@ -46,7 +46,7 @@ class StudentController extends Controller
             $query->where('is_active', $request->input('status') === 'active');
         }
 
-        $students = $query->orderBy('name')->paginate(20)->withQueryString();
+        $students = $query->orderBy('name')->paginate(10)->withQueryString();
         $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
         $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
 

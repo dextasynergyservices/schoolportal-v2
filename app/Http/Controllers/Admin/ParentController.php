@@ -32,7 +32,7 @@ class ParentController extends Controller
             });
         }
 
-        $parents = $query->orderBy('name')->paginate(20)->withQueryString();
+        $parents = $query->orderBy('name')->paginate(10)->withQueryString();
 
         return view('admin.parents.index', compact('parents'));
     }

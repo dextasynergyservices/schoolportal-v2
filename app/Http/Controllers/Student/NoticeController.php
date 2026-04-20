@@ -32,7 +32,7 @@ class NoticeController extends Controller
             })
             ->with('creator:id,name')
             ->latest('published_at')
-            ->paginate(15);
+            ->paginate(10);
 
         return view('student.notices.index', compact('notices'));
     }

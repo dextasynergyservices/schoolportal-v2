@@ -25,6 +25,12 @@
             </div>
         </div>
 
+        @if ($quiz->status === 'rejected' && $quiz->latestTeacherAction?->rejection_reason)
+            <flux:callout variant="danger" icon="x-circle">
+                <strong>{{ __('Rejection reason:') }}</strong> {{ $quiz->latestTeacherAction->rejection_reason }}
+            </flux:callout>
+        @endif
+
         {{-- Quiz Info --}}
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 sm:p-5">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">

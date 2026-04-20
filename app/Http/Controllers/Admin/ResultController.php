@@ -38,7 +38,7 @@ class ResultController extends Controller
             $query->whereHas('student', fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('username', 'like', "%{$search}%"));
         }
 
-        $results = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $results = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
         $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
         $terms = Term::orderByDesc('id')->take(6)->get();
 

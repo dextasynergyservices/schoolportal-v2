@@ -297,8 +297,19 @@
         </div>
 
         {{-- ── Recent Submissions ─────────────────────────────────── --}}
-        <div class="dash-panel dash-animate dash-animate-delay-5">
-            <div class="dash-panel-header">
+        <div x-data="{ open: window.innerWidth >= 768 }" x-init="window.addEventListener('resize', () => { if (window.innerWidth >= 768) open = true })" class="dash-animate dash-animate-delay-5">
+            <button @click="open = !open" class="flex items-center justify-between w-full text-left md:hidden mb-3">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Recent Submissions') }}</h2>
+                    @if ($pendingCount > 0)
+                        <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-amber-500 rounded-full">{{ $pendingCount }}</span>
+                    @endif
+                </div>
+                <flux:icon.chevron-down class="w-4 h-4 text-zinc-500 transition-transform" ::class="open ? 'rotate-180' : ''" />
+            </button>
+            <div x-show="open" x-collapse>
+        <div class="dash-panel">
+            <div class="dash-panel-header hidden md:flex">
                 <div class="flex items-center gap-2">
                     <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Recent Submissions') }}</h2>
                     @if ($pendingCount > 0)
@@ -350,6 +361,8 @@
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('No submissions yet. Upload a result, assignment, or post a notice to get started.') }}</p>
                     </div>
                 @endforelse
+            </div>
+        </div>
             </div>
         </div>
 

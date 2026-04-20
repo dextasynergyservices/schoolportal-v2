@@ -27,6 +27,8 @@ class AiCreditPurchase extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'purchased_by' => 'integer',
             'amount_naira' => 'decimal:2',
         ];
     }

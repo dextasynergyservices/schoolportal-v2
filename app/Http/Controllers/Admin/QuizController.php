@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Quiz;
 use App\Models\SchoolClass;
+use App\Models\TeacherAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,7 +18,7 @@ class QuizController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Quiz::with(['class:id,name', 'creator:id,name', 'session:id,name', 'term:id,name'])
+        $query = Quiz::with(['class:id,name', 'creator:id,name', 'session:id,name', 'term:id,name', 'latestTeacherAction'])
             ->withCount('questions');
 
         if ($request->filled('class_id')) {
@@ -28,7 +29,7 @@ class QuizController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $quizzes = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $quizzes = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
         $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
 
         return view('admin.quizzes.index', compact('quizzes', 'classes'));
@@ -38,7 +39,12 @@ class QuizController extends Controller
     {
         $quiz->load(['class:id,name', 'creator:id,name', 'questions', 'session:id,name', 'term:id,name']);
 
-        return view('admin.quizzes.show', compact('quiz'));
+        $teacherAction = TeacherAction::where('entity_type', 'quiz')
+            ->where('entity_id', $quiz->id)
+            ->latest()
+            ->first();
+
+        return view('admin.quizzes.show', compact('quiz', 'teacherAction'));
     }
 
     public function publish(Quiz $quiz): RedirectResponse
@@ -71,21 +77,22 @@ class QuizController extends Controller
     {
         $quiz->load('class:id,name');
 
-        $attempts = $quiz->attempts()
-            ->with('student:id,name,username')
-            ->where('status', '!=', 'in_progress')
-            ->orderByDesc('percentage')
-            ->get();
+        $baseQuery = $quiz->attempts()->where('status', '!=', 'in_progress');
 
         $stats = [
-            'total_attempts' => $attempts->count(),
-            'unique_students' => $attempts->pluck('student_id')->unique()->count(),
-            'average' => $attempts->avg('percentage') ? round($attempts->avg('percentage'), 1) : 0,
-            'highest' => $attempts->max('percentage') ?? 0,
-            'lowest' => $attempts->min('percentage') ?? 0,
-            'passed' => $attempts->where('passed', true)->count(),
-            'failed' => $attempts->where('passed', false)->count(),
+            'total_attempts' => (clone $baseQuery)->count(),
+            'unique_students' => (clone $baseQuery)->distinct('student_id')->count('student_id'),
+            'average' => round((float) (clone $baseQuery)->avg('percentage'), 1),
+            'highest' => (float) ((clone $baseQuery)->max('percentage') ?? 0),
+            'lowest' => (float) ((clone $baseQuery)->min('percentage') ?? 0),
+            'passed' => (clone $baseQuery)->where('passed', true)->count(),
+            'failed' => (clone $baseQuery)->where('passed', false)->count(),
         ];
+
+        $attempts = $baseQuery
+            ->with('student:id,name,username')
+            ->orderByDesc('percentage')
+            ->paginate(10);
 
         return view('admin.quizzes.results', compact('quiz', 'attempts', 'stats'));
     }

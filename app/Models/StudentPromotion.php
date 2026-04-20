@@ -28,6 +28,13 @@ class StudentPromotion extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'student_id' => 'integer',
+            'from_class_id' => 'integer',
+            'to_class_id' => 'integer',
+            'from_session_id' => 'integer',
+            'to_session_id' => 'integer',
+            'promoted_by' => 'integer',
             'promoted_at' => 'datetime',
         ];
     }

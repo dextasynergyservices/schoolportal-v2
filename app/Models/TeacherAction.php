@@ -29,6 +29,10 @@ class TeacherAction extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'teacher_id' => 'integer',
+            'entity_id' => 'integer',
+            'reviewed_by' => 'integer',
             'created_at' => 'datetime',
             'reviewed_at' => 'datetime',
         ];

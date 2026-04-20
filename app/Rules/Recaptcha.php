@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 class Recaptcha implements ValidationRule
 {
     public function __construct(
-        private readonly string $action = 'login',
+        private readonly ?string $action = null,
         private readonly ?float $threshold = null,
     ) {}
 
@@ -57,8 +57,8 @@ class Recaptcha implements ValidationRule
                 return;
             }
 
-            // For v3: check action matches
-            if (isset($data['action']) && $data['action'] !== $this->action) {
+            // For v3: check action matches (only when an expected action is specified)
+            if ($this->action !== null && isset($data['action']) && $data['action'] !== $this->action) {
                 $fail(__('reCAPTCHA verification failed. Please try again.'));
 
                 return;

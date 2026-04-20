@@ -4,7 +4,7 @@
 
 @php
     $school = app()->bound('current.school') ? app('current.school') : null;
-    $name = $school?->name ?? config('app.name', 'SchoolPortal');
+    $name = $school?->name ?? config('app.name', 'DX-SchoolPortal');
 @endphp
 
 @if($sidebar)

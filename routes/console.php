@@ -10,6 +10,10 @@ Artisan::command('inspire', function () {
 
 // ── Scheduled Tasks ──
 
+// Process queued jobs every minute (emails, notifications)
+// Required for shared hosting where persistent queue workers can't run
+Schedule::command('queue:work --stop-when-empty --max-time=55')->everyMinute()->withoutOverlapping();
+
 // Daily database backup at 2:00 AM
 Schedule::command('db:backup')->dailyAt('02:00')->onOneServer();
 

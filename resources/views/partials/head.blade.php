@@ -3,10 +3,10 @@
 
 @php
     $school = app()->bound('current.school') ? app('current.school') : null;
-    $appName = $school?->name ?? config('app.name', 'SchoolPortal');
+    $appName = $school?->name ?? config('app.name', 'DX-SchoolPortal');
 @endphp
 
-<meta name="description" content="{{ $school?->name ? $school->name . ' - School Portal' : 'SchoolPortal - Multi-Tenant School Management Platform' }}" />
+<meta name="description" content="{{ $school?->name ? $school->name . ' - School Portal' : 'DX-SchoolPortal - Multi-Tenant School Management Platform' }}" />
 <meta name="theme-color" content="{{ $school?->setting('branding.primary_color') ?? '#000c99' }}" />
 
 <title>

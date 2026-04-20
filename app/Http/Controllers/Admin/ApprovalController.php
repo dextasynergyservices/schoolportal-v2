@@ -28,7 +28,7 @@ class ApprovalController extends Controller
             $query->where('status', $status);
         }
 
-        $actions = $query->paginate(20)->withQueryString();
+        $actions = $query->paginate(10)->withQueryString();
         $pendingCount = TeacherAction::where('status', 'pending')->count();
 
         return view('admin.approvals.index', compact('actions', 'pendingCount', 'status'));

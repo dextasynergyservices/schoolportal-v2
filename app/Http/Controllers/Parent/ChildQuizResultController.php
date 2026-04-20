@@ -24,7 +24,7 @@ class ChildQuizResultController extends Controller
             ->where('student_id', $child->id)
             ->where('status', '!=', 'in_progress')
             ->orderByDesc('submitted_at')
-            ->get();
+            ->paginate(10);
 
         return view('parent.quizzes.results', compact('child', 'attempts'));
     }

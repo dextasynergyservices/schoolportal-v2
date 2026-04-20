@@ -90,6 +90,9 @@
                         </div>
                     @endforeach
                 </div>
+                @if ($purchases->hasPages())
+                    <div class="mt-3">{{ $purchases->links() }}</div>
+                @endif
             </div>
         @endif
 
@@ -110,6 +113,9 @@
                         </div>
                     @endforeach
                 </div>
+                @if ($recentUsage->hasPages())
+                    <div class="mt-3">{{ $recentUsage->links() }}</div>
+                @endif
             </div>
         @endif
     </div>

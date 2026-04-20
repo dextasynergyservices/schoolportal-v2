@@ -39,7 +39,7 @@ class TeacherController extends Controller
             $query->where('school_id', $request->input('school_id'));
         }
 
-        $teachers = $query->orderBy('name')->paginate(20)->withQueryString();
+        $teachers = $query->orderBy('name')->paginate(10)->withQueryString();
 
         $schools = School::tenants()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 

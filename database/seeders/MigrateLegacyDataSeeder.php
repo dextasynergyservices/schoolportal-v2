@@ -333,50 +333,51 @@ class MigrateLegacyDataSeeder extends Seeder
     }
 
     /**
-     * Step 5: Migrate admin users from both databases.
-     * De-duplicates by username (keeps first occurrence).
+     * Step 5: Create school admin users.
+     * Only 2 admin accounts are created. The school admin will manually
+     * create teacher accounts and assign them to classes post-migration.
      */
     private function migrateAdmins(): void
     {
-        $this->command->info('Migrating admin users...');
+        $this->command->info('Creating school admin users...');
 
-        $seenUsernames = [];
+        $admins = [
+            [
+                'name' => 'School Admin',
+                'username' => 'admin',
+                'email' => null, // School admin can update this later
+            ],
+            [
+                'name' => 'Director',
+                'username' => 'director',
+                'email' => null,
+            ],
+        ];
+
         $count = 0;
 
-        foreach (['legacy_nursery', 'legacy_primary'] as $connection) {
-            $admins = DB::connection($connection)->table('admin')->get();
+        foreach ($admins as $adminData) {
+            // Skip if already exists in new DB
+            $exists = User::where('school_id', $this->school->id)
+                ->where('username', $adminData['username'])
+                ->exists();
 
-            foreach ($admins as $admin) {
-                $username = Str::lower(trim($admin->username));
-
-                // Skip duplicates
-                if (isset($seenUsernames[$username])) {
-                    continue;
-                }
-                $seenUsernames[$username] = true;
-
-                // Skip if already exists in new DB
-                $exists = User::where('school_id', $this->school->id)
-                    ->where('username', $username)
-                    ->exists();
-
-                if ($exists) {
-                    continue;
-                }
-
-                User::create([
-                    'school_id' => $this->school->id,
-                    'name' => ucfirst($username), // Old system has no display name
-                    'username' => $username,
-                    'password' => $this->tempPassword,
-                    'role' => 'school_admin',
-                    'is_active' => true,
-                    'must_change_password' => true,
-                    'created_at' => $admin->update_date,
-                ]);
-
-                $count++;
+            if ($exists) {
+                continue;
             }
+
+            User::create([
+                'school_id' => $this->school->id,
+                'name' => $adminData['name'],
+                'username' => $adminData['username'],
+                'email' => $adminData['email'],
+                'password' => $this->tempPassword,
+                'role' => 'school_admin',
+                'is_active' => true,
+                'must_change_password' => true,
+            ]);
+
+            $count++;
         }
 
         $this->command->info("  Admin users created: {$count}");

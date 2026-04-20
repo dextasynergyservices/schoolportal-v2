@@ -29,6 +29,9 @@ class AuditLog extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'user_id' => 'integer',
+            'entity_id' => 'integer',
             'old_values' => 'array',
             'new_values' => 'array',
             'created_at' => 'datetime',

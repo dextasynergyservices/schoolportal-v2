@@ -40,7 +40,7 @@ class SchoolController extends Controller
             $query->where('is_active', $status === 'active');
         }
 
-        $schools = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $schools = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
 
         return view('super-admin.schools.index', compact('schools'));
     }
@@ -90,7 +90,13 @@ class SchoolController extends Controller
             ->orderBy('id')
             ->first();
 
-        return view('super-admin.schools.show', compact('school', 'primaryAdmin'));
+        $schoolAdmins = User::withoutGlobalScopes()
+            ->where('school_id', $school->id)
+            ->where('role', 'school_admin')
+            ->orderBy('id')
+            ->get();
+
+        return view('super-admin.schools.show', compact('school', 'primaryAdmin', 'schoolAdmins'));
     }
 
     public function edit(School $school): View
@@ -194,5 +200,87 @@ class SchoolController extends Controller
         ]);
 
         return back()->with('success', __('Password reset for :name. They will be prompted to change it on next login.', ['name' => $admin->name]));
+    }
+
+    /**
+     * Show form to create an additional school admin.
+     */
+    public function createAdmin(School $school): View
+    {
+        return view('super-admin.schools.create-admin', compact('school'));
+    }
+
+    /**
+     * Store a new school admin for the given school.
+     */
+    public function storeAdmin(Request $request, School $school): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:100', 'regex:/^[a-zA-Z0-9._-]+$/'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'password' => ['required', 'string', Password::defaults()],
+            'phone' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        // Ensure username is unique within the school
+        $exists = User::withoutGlobalScopes()
+            ->where('school_id', $school->id)
+            ->where('username', $validated['username'])
+            ->exists();
+
+        if ($exists) {
+            return back()->withInput()->withErrors(['username' => __('This username is already taken in this school.')]);
+        }
+
+        // Ensure email is unique within the school (if provided)
+        if (! empty($validated['email'])) {
+            $emailExists = User::withoutGlobalScopes()
+                ->where('school_id', $school->id)
+                ->where('email', $validated['email'])
+                ->exists();
+
+            if ($emailExists) {
+                return back()->withInput()->withErrors(['email' => __('This email is already in use in this school.')]);
+            }
+        }
+
+        User::withoutEvents(fn () => User::create([
+            'school_id' => $school->id,
+            'name' => $validated['name'],
+            'username' => $validated['username'],
+            'email' => $validated['email'] ?? null,
+            'password' => Hash::make($validated['password']),
+            'role' => 'school_admin',
+            'phone' => $validated['phone'] ?? null,
+            'is_active' => true,
+            'must_change_password' => true,
+        ]));
+
+        return redirect()
+            ->route('super-admin.schools.show', $school)
+            ->with('success', __('Admin ":name" created successfully.', ['name' => $validated['name']]));
+    }
+
+    /**
+     * Remove a school admin (cannot remove the last one).
+     */
+    public function destroyAdmin(School $school, User $admin): RedirectResponse
+    {
+        abort_if($admin->school_id !== $school->id || $admin->role !== 'school_admin', 404);
+
+        $adminCount = User::withoutGlobalScopes()
+            ->where('school_id', $school->id)
+            ->where('role', 'school_admin')
+            ->count();
+
+        if ($adminCount <= 1) {
+            return back()->withErrors(['admin' => __('Cannot remove the last admin. A school must have at least one admin.')]);
+        }
+
+        $name = $admin->name;
+        $admin->delete();
+
+        return back()->with('success', __('Admin ":name" removed.', ['name' => $name]));
     }
 }

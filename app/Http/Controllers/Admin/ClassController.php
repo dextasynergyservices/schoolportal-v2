@@ -21,7 +21,7 @@ class ClassController extends Controller
             ->withCount(['students'])
             ->orderBy('level_id')
             ->orderBy('sort_order')
-            ->paginate(20);
+            ->paginate(10);
 
         return view('admin.classes.index', compact('classes'));
     }

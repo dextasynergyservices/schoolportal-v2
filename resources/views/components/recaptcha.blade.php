@@ -8,6 +8,7 @@
 
 @if ($siteKey)
     <input type="hidden" name="g-recaptcha-response" id="recaptcha-token-{{ $action }}">
+    <input type="hidden" name="recaptcha_action" value="{{ $action }}">
 
     <script src="https://www.google.com/recaptcha/api.js?render={{ $siteKey }}" async defer></script>
     <script>

@@ -19,6 +19,12 @@
             </p>
         </div>
 
+        @if ($game->status === 'rejected' && $game->latestTeacherAction?->rejection_reason)
+            <flux:callout variant="danger" icon="x-circle">
+                <strong>{{ __('Rejection reason:') }}</strong> {{ $game->latestTeacherAction->rejection_reason }}
+            </flux:callout>
+        @endif
+
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 sm:p-5">
             <h3 class="text-base font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Game Content') }}</h3>
 

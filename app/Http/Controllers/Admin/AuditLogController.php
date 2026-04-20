@@ -24,7 +24,7 @@ class AuditLogController extends Controller
             $query->where('user_id', $request->input('user_id'));
         }
 
-        $logs = $query->paginate(30)->withQueryString();
+        $logs = $query->paginate(10)->withQueryString();
 
         return view('admin.audit-logs.index', compact('logs'));
     }

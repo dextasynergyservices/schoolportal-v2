@@ -30,6 +30,8 @@ class QuizQuestion extends Model
     protected function casts(): array
     {
         return [
+            'quiz_id' => 'integer',
+            'school_id' => 'integer',
             'options' => 'array',
         ];
     }

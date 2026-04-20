@@ -45,6 +45,6 @@ class SubmissionPendingApproval extends Notification implements ShouldQueue
             ]))
             ->action(__('Review Submissions'), url('/portal/admin/approvals'))
             ->line(__('Please review and approve or reject this submission.'))
-            ->salutation(__('Regards, SchoolPortal'));
+            ->salutation(__('Regards, DX-SchoolPortal'));
     }
 }

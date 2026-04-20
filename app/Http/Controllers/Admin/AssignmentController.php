@@ -27,7 +27,7 @@ class AssignmentController extends Controller
             $query->where('term_id', $request->input('term_id'));
         }
 
-        $assignments = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $assignments = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
         $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
         $terms = Term::where('is_current', true)->orWhere('status', 'active')->get();
 

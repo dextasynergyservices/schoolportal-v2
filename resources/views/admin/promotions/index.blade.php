@@ -61,6 +61,10 @@
                         @endforeach
                     </flux:table.rows>
                 </flux:table>
+
+                @if ($recentPromotions->hasPages())
+                    <div class="mt-4">{{ $recentPromotions->links() }}</div>
+                @endif
             </div>
         @endif
     </div>
