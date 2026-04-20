@@ -31,6 +31,9 @@ class GamePlay extends Model
     protected function casts(): array
     {
         return [
+            'game_id' => 'integer',
+            'student_id' => 'integer',
+            'school_id' => 'integer',
             'percentage' => 'decimal:2',
             'completed' => 'boolean',
             'game_state' => 'array',

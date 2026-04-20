@@ -27,6 +27,7 @@ class AcademicSession extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
             'start_date' => 'date',
             'end_date' => 'date',
             'is_current' => 'boolean',

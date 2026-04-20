@@ -9,10 +9,10 @@
 
         @if ($attempts->isNotEmpty())
             @php
-                $totalAttempts = $attempts->count();
-                $passedCount = $attempts->where('passed', true)->count();
-                $avgPercentage = $attempts->avg('percentage') ?? 0;
-                $bestPercentage = $attempts->max('percentage') ?? 0;
+                $totalAttempts = $attempts->total();
+                $passedCount = $attempts->getCollection()->where('passed', true)->count();
+                $avgPercentage = $attempts->getCollection()->avg('percentage') ?? 0;
+                $bestPercentage = $attempts->getCollection()->max('percentage') ?? 0;
             @endphp
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
@@ -61,6 +61,10 @@
                     </div>
                 @endforeach
             </div>
+
+            @if ($attempts->hasPages())
+                <div class="mt-4">{{ $attempts->links() }}</div>
+            @endif
         @else
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-8 text-center">
                 <flux:icon name="academic-cap" class="mx-auto h-12 w-12 text-zinc-400" />

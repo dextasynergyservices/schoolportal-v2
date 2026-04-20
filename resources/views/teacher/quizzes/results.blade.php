@@ -89,5 +89,9 @@
                 @endforelse
             </flux:table.rows>
         </flux:table>
+
+        @if ($attempts->hasPages())
+            <div class="mt-4">{{ $attempts->links() }}</div>
+        @endif
     </div>
 </x-layouts::app>

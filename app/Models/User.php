@@ -60,6 +60,8 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'deactivated_at' => 'datetime',
             'must_change_password' => 'boolean',
+            'school_id' => 'integer',
+            'level_id' => 'integer',
         ];
     }
 

@@ -26,6 +26,7 @@ class SchoolLevel extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
             'is_active' => 'boolean',
         ];
     }

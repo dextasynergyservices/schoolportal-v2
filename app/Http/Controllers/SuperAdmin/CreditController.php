@@ -24,7 +24,7 @@ class CreditController extends Controller
             $query->where('name', 'like', "%{$search}%");
         }
 
-        $schools = $query->paginate(20)->withQueryString();
+        $schools = $query->paginate(10)->withQueryString();
 
         return view('super-admin.credits.index', compact('schools'));
     }

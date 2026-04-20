@@ -42,7 +42,7 @@ class StudentController extends Controller
 
         $students = $query->with('studentProfile.class:id,name')
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate(10)
             ->withQueryString();
 
         return view('teacher.students.index', compact('students', 'classes', 'selectedClassId'));

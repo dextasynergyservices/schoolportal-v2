@@ -30,6 +30,10 @@ class StudentProfile extends Model
     protected function casts(): array
     {
         return [
+            'user_id' => 'integer',
+            'school_id' => 'integer',
+            'class_id' => 'integer',
+            'enrolled_session_id' => 'integer',
             'date_of_birth' => 'date',
         ];
     }

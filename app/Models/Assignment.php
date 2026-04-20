@@ -34,6 +34,12 @@ class Assignment extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'class_id' => 'integer',
+            'session_id' => 'integer',
+            'term_id' => 'integer',
+            'uploaded_by' => 'integer',
+            'approved_by' => 'integer',
             'approved_at' => 'datetime',
             'due_date' => 'date',
         ];

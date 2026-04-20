@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Quiz extends Model
 {
@@ -45,6 +46,12 @@ class Quiz extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'class_id' => 'integer',
+            'session_id' => 'integer',
+            'term_id' => 'integer',
+            'created_by' => 'integer',
+            'approved_by' => 'integer',
             'shuffle_questions' => 'boolean',
             'shuffle_options' => 'boolean',
             'show_correct_answers' => 'boolean',
@@ -88,6 +95,13 @@ class Quiz extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(QuizAttempt::class);
+    }
+
+    public function latestTeacherAction(): HasOne
+    {
+        return $this->hasOne(TeacherAction::class, 'entity_id')
+            ->where('entity_type', 'quiz')
+            ->latestOfMany();
     }
 
     // ── Scopes ──

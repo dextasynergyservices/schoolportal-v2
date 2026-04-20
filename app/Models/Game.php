@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Game extends Model
 {
@@ -42,6 +43,12 @@ class Game extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'class_id' => 'integer',
+            'session_id' => 'integer',
+            'term_id' => 'integer',
+            'created_by' => 'integer',
+            'approved_by' => 'integer',
             'game_data' => 'array',
             'is_published' => 'boolean',
             'published_at' => 'datetime',
@@ -78,6 +85,13 @@ class Game extends Model
     public function plays(): HasMany
     {
         return $this->hasMany(GamePlay::class);
+    }
+
+    public function latestTeacherAction(): HasOne
+    {
+        return $this->hasOne(TeacherAction::class, 'entity_id')
+            ->where('entity_type', 'game')
+            ->latestOfMany();
     }
 
     // ── Scopes ──

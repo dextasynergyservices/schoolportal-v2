@@ -12,11 +12,11 @@ class VerifyEmail extends BaseVerifyEmail
     protected function buildMailMessage($url): MailMessage
     {
         return (new MailMessage)
-            ->subject(__('Verify Your SchoolPortal Email Address'))
+            ->subject(__('Verify Your DX-SchoolPortal Email Address'))
             ->greeting(__('Hello!'))
             ->line(__('Please click the button below to verify your email address.'))
             ->action(__('Verify Email Address'), $url)
             ->line(__('If you did not create an account, no further action is required.'))
-            ->salutation(__('Regards, SchoolPortal'));
+            ->salutation(__('Regards, DX-SchoolPortal'));
     }
 }

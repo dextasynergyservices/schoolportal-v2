@@ -51,7 +51,7 @@ class AssignmentController extends Controller
             $query->where('week_number', $selectedWeek);
         }
 
-        $assignments = $query->orderByDesc('week_number')->paginate(20)->withQueryString();
+        $assignments = $query->orderByDesc('week_number')->paginate(10)->withQueryString();
 
         // Get available sessions/terms for filters
         $sessions = $school->academicSessions()->orderByDesc('start_date')->get();

@@ -16,7 +16,7 @@ class SuperAdminSeeder extends Seeder
         $platform = School::withoutGlobalScopes()->firstOrCreate(
             ['slug' => 'platform'],
             [
-                'name' => 'SchoolPortal Platform',
+                'name' => 'DX-SchoolPortal Platform',
                 'email' => 'platform@schoolportal.test',
                 'country' => 'Nigeria',
                 'is_active' => true,

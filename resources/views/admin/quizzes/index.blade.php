@@ -62,6 +62,61 @@
                     </div>
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <flux:button variant="subtle" size="sm" href="{{ route('admin.quizzes.show', $quiz) }}" wire:navigate>{{ __('Preview') }}</flux:button>
+
+                        @if ($quiz->status === 'pending' && $quiz->latestTeacherAction && $quiz->latestTeacherAction->status === 'pending')
+                            <form method="POST" action="{{ route('admin.approvals.approve', $quiz->latestTeacherAction) }}" class="inline" x-data="{ submitting: false }" @submit="submitting = true">
+                                @csrf
+                                <flux:button type="submit" variant="primary" size="sm" x-bind:disabled="submitting">
+                                    <span x-show="!submitting">{{ __('Approve') }}</span>
+                                    <span x-show="submitting" x-cloak class="inline-flex items-center gap-1">
+                                        <flux:icon name="arrow-path" class="size-3 animate-spin" /> {{ __('Approving...') }}
+                                    </span>
+                                </flux:button>
+                            </form>
+
+                            <div x-data="{ showRejectModal: false, rejecting: false }">
+                                <flux:button @click="showRejectModal = true" variant="danger" size="sm">{{ __('Reject') }}</flux:button>
+
+                                <div x-show="showRejectModal" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showRejectModal = false" @keydown.escape.window="showRejectModal = false">
+                                    <div class="bg-white dark:bg-zinc-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4" @click.stop>
+                                        <div class="flex items-center gap-3 mb-4">
+                                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                                                <flux:icon name="x-circle" class="size-5 text-red-600" />
+                                            </div>
+                                            <div>
+                                                <h3 class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Reject Quiz') }}</h3>
+                                                <p class="text-xs text-zinc-500">{{ $quiz->title }}</p>
+                                            </div>
+                                        </div>
+                                        <form method="POST" action="{{ route('admin.approvals.reject', $quiz->latestTeacherAction) }}" @submit="rejecting = true">
+                                            @csrf
+                                            <div class="mb-4">
+                                                <label for="rejection_reason_quiz_{{ $quiz->id }}" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Reason for rejection') }}</label>
+                                                <textarea
+                                                    id="rejection_reason_quiz_{{ $quiz->id }}"
+                                                    name="rejection_reason"
+                                                    rows="3"
+                                                    required
+                                                    maxlength="500"
+                                                    placeholder="{{ __('Explain why this quiz is being rejected...') }}"
+                                                    class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                                ></textarea>
+                                            </div>
+                                            <div class="flex justify-end gap-2">
+                                                <flux:button type="button" variant="subtle" size="sm" @click="showRejectModal = false">{{ __('Cancel') }}</flux:button>
+                                                <flux:button type="submit" variant="danger" size="sm" x-bind:disabled="rejecting">
+                                                    <span x-show="!rejecting">{{ __('Reject') }}</span>
+                                                    <span x-show="rejecting" x-cloak class="inline-flex items-center gap-1">
+                                                        <flux:icon name="arrow-path" class="size-3 animate-spin" /> {{ __('Rejecting...') }}
+                                                    </span>
+                                                </flux:button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         @if ($quiz->status === 'approved' && ! $quiz->is_published)
                             <form method="POST" action="{{ route('admin.quizzes.publish', $quiz) }}" class="inline" x-data="{ submitting: false }" @submit="submitting = true">
                                 @csrf

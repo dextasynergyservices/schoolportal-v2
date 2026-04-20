@@ -4,7 +4,8 @@
         $primaryColor = $branding['primary_color'] ?? '#4F46E5';
         $secondaryColor = $branding['secondary_color'] ?? '#F59E0B';
         $accentColor = $branding['accent_color'] ?? '#10B981';
-        $serverIp = config('schoolportal.server_ip', '203.0.113.10');
+        $serverIp = env('SERVER_IP', '');
+        $platformDomain = parse_url(config('app.url'), PHP_URL_HOST) ?: 'your-platform-domain.com';
     @endphp
 
     <div class="space-y-6">
@@ -137,60 +138,93 @@
                 </dl>
             </div>
 
-            {{-- Primary admin --}}
+            {{-- School admins --}}
             <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
-                <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
-                    <flux:heading size="lg">{{ __('Primary Admin') }}</flux:heading>
+                <div class="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                    <flux:heading size="lg">{{ __('School Admins') }} ({{ $schoolAdmins->count() }})</flux:heading>
+                    <flux:button variant="primary" size="sm" icon="plus" href="{{ route('super-admin.schools.create-admin', $school) }}" wire:navigate>
+                        {{ __('Add Admin') }}
+                    </flux:button>
                 </div>
-                <div class="p-4">
-                    @if ($primaryAdmin)
-                        <div class="flex items-center gap-3">
-                            <flux:avatar :name="$primaryAdmin->name" size="md" />
-                            <div class="min-w-0">
-                                <div class="truncate font-medium">{{ $primaryAdmin->name }}</div>
-                                <flux:text size="sm" class="text-zinc-500">
-                                    {{ $primaryAdmin->email }} · @{{ $primaryAdmin->username }}
-                                </flux:text>
-                                @if ($primaryAdmin->last_login_at)
-                                    <flux:text size="xs" class="text-zinc-500">
-                                        {{ __('Last login: :ago', ['ago' => $primaryAdmin->last_login_at->diffForHumans()]) }}
+                <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @forelse ($schoolAdmins as $admin)
+                        <div class="flex items-center justify-between gap-3 p-4">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <flux:avatar :name="$admin->name" size="md" />
+                                <div class="min-w-0">
+                                    <div class="truncate font-medium">{{ $admin->name }}</div>
+                                    <flux:text size="sm" class="text-zinc-500">
+                                        {{ $admin->email ?? '—' }} · {{ $admin->username }}
                                     </flux:text>
-                                @else
-                                    <flux:text size="xs" class="text-zinc-500">{{ __('Never logged in') }}</flux:text>
-                                @endif
+                                    @if ($admin->last_login_at)
+                                        <flux:text size="xs" class="text-zinc-500">
+                                            {{ __('Last login: :ago', ['ago' => $admin->last_login_at->diffForHumans()]) }}
+                                        </flux:text>
+                                    @else
+                                        <flux:text size="xs" class="text-zinc-500">{{ __('Never logged in') }}</flux:text>
+                                    @endif
+                                </div>
                             </div>
+                            @if ($schoolAdmins->count() > 1)
+                                <x-confirm-delete
+                                    :action="route('super-admin.schools.destroy-admin', [$school, $admin])"
+                                    :title="__('Remove Admin')"
+                                    :message="__('Remove :name as admin? They will no longer be able to manage this school.', ['name' => $admin->name])"
+                                    :confirmLabel="__('Remove')"
+                                    buttonVariant="danger"
+                                    buttonSize="xs"
+                                    :buttonLabel="__('Remove')"
+                                    :ariaLabel="__('Remove :name', ['name' => $admin->name])"
+                                />
+                            @endif
                         </div>
-
-                        {{-- Reset admin password --}}
-                        <div class="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700" x-data="{ showForm: false }">
-                            <flux:button variant="subtle" size="sm" icon="key" x-on:click="showForm = !showForm" aria-controls="reset-pw-form" x-bind:aria-expanded="showForm">
-                                {{ __('Reset Password') }}
-                            </flux:button>
-
-                            <form
-                                method="POST"
-                                action="{{ route('super-admin.schools.reset-admin-password', $school) }}"
-                                x-show="showForm"
-                                x-cloak
-                                x-transition
-                                id="reset-pw-form"
-                                class="mt-3 space-y-3"
-                            >
-                                @csrf
-                                <input type="hidden" name="admin_id" value="{{ $primaryAdmin->id }}">
-                                <flux:field>
-                                    <flux:label for="admin-new-pw">{{ __('New Password') }}</flux:label>
-                                    <flux:input id="admin-new-pw" name="password" type="password" required viewable />
-                                    <flux:description>{{ __('The admin will be forced to change this on their next login.') }}</flux:description>
-                                    @error('password') <flux:error>{{ $message }}</flux:error> @enderror
-                                </flux:field>
-                                <flux:button type="submit" variant="primary" size="sm">{{ __('Reset Password') }}</flux:button>
-                            </form>
+                    @empty
+                        <div class="p-4">
+                            <flux:text class="text-zinc-500">{{ __('No admin accounts found for this school.') }}</flux:text>
                         </div>
-                    @else
-                        <flux:text class="text-zinc-500">{{ __('No admin account found for this school.') }}</flux:text>
-                    @endif
+                    @endforelse
                 </div>
+
+                {{-- Reset admin password (for primary admin) --}}
+                @if ($primaryAdmin)
+                    <div class="border-t border-zinc-200 p-4 dark:border-zinc-700" x-data="{ showForm: false, selectedAdmin: '' }">
+                        <flux:button variant="subtle" size="sm" icon="key" x-on:click="showForm = !showForm" aria-controls="reset-pw-form" x-bind:aria-expanded="showForm">
+                            {{ __('Reset Admin Password') }}
+                        </flux:button>
+
+                        <form
+                            method="POST"
+                            action="{{ route('super-admin.schools.reset-admin-password', $school) }}"
+                            x-show="showForm"
+                            x-cloak
+                            x-transition
+                            id="reset-pw-form"
+                            class="mt-3 space-y-3"
+                        >
+                            @csrf
+                            <flux:field>
+                                <flux:label for="admin-select">{{ __('Select Admin') }}</flux:label>
+                                <select
+                                    id="admin-select"
+                                    name="admin_id"
+                                    required
+                                    class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+                                >
+                                    @foreach ($schoolAdmins as $admin)
+                                        <option value="{{ $admin->id }}">{{ $admin->name }} ({{ $admin->username }})</option>
+                                    @endforeach
+                                </select>
+                            </flux:field>
+                            <flux:field>
+                                <flux:label for="admin-new-pw">{{ __('New Password') }}</flux:label>
+                                <flux:input id="admin-new-pw" name="password" type="password" required viewable />
+                                <flux:description>{{ __('The admin will be forced to change this on their next login.') }}</flux:description>
+                                @error('password') <flux:error>{{ $message }}</flux:error> @enderror
+                            </flux:field>
+                            <flux:button type="submit" variant="primary" size="sm">{{ __('Reset Password') }}</flux:button>
+                        </form>
+                    </div>
+                @endif
             </div>
 
             {{-- Branding preview --}}
@@ -268,35 +302,79 @@
                     <flux:callout variant="secondary" icon="information-circle">
                         <flux:heading size="sm">{{ __('DNS setup required') }}</flux:heading>
                         <flux:text size="sm" class="mt-1">
-                            {{ __('Have the school add this A record at their domain registrar so the portal resolves on their domain.') }}
+                            {{ __('Have the school add ONE of the following options at their domain registrar so the portal resolves on their domain.') }}
                         </flux:text>
                     </flux:callout>
 
-                    <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                        <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
-                            <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
-                                <tr>
-                                    <th scope="col" class="px-3 py-2">{{ __('Type') }}</th>
-                                    <th scope="col" class="px-3 py-2">{{ __('Name') }}</th>
-                                    <th scope="col" class="px-3 py-2">{{ __('Value') }}</th>
-                                    <th scope="col" class="px-3 py-2">{{ __('TTL') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-zinc-100 font-mono dark:divide-zinc-800">
-                                <tr>
-                                    <td class="px-3 py-2">A</td>
-                                    <td class="px-3 py-2">@</td>
-                                    <td class="px-3 py-2">{{ $serverIp }}</td>
-                                    <td class="px-3 py-2">3600</td>
-                                </tr>
-                                <tr>
-                                    <td class="px-3 py-2">A</td>
-                                    <td class="px-3 py-2">www</td>
-                                    <td class="px-3 py-2">{{ $serverIp }}</td>
-                                    <td class="px-3 py-2">3600</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    {{-- Option A: CNAME records (recommended) --}}
+                    <div class="space-y-2">
+                        <flux:text size="sm" class="font-semibold">{{ __('Option A — CNAME Records (Recommended)') }}</flux:text>
+                        <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                            <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
+                                <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
+                                    <tr>
+                                        <th scope="col" class="px-3 py-2">{{ __('Type') }}</th>
+                                        <th scope="col" class="px-3 py-2">{{ __('Name') }}</th>
+                                        <th scope="col" class="px-3 py-2">{{ __('Value') }}</th>
+                                        <th scope="col" class="px-3 py-2">{{ __('TTL') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-zinc-100 font-mono dark:divide-zinc-800">
+                                    <tr>
+                                        <td class="px-3 py-2">CNAME</td>
+                                        <td class="px-3 py-2">@</td>
+                                        <td class="px-3 py-2">{{ $platformDomain }}</td>
+                                        <td class="px-3 py-2">3600</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2">CNAME</td>
+                                        <td class="px-3 py-2">www</td>
+                                        <td class="px-3 py-2">{{ $platformDomain }}</td>
+                                        <td class="px-3 py-2">3600</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <flux:text size="xs" class="text-zinc-500">
+                            {{ __('Note: Some registrars do not support CNAME on the root (@). In that case, use a CNAME for www only and redirect @ to www, or use Option B.') }}
+                        </flux:text>
+                    </div>
+
+                    {{-- Option B: A records --}}
+                    <div class="space-y-2">
+                        <flux:text size="sm" class="font-semibold">{{ __('Option B — A Records (if CNAME on root is not supported)') }}</flux:text>
+                        @if ($serverIp)
+                            <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
+                                    <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
+                                        <tr>
+                                            <th scope="col" class="px-3 py-2">{{ __('Type') }}</th>
+                                            <th scope="col" class="px-3 py-2">{{ __('Name') }}</th>
+                                            <th scope="col" class="px-3 py-2">{{ __('Value') }}</th>
+                                            <th scope="col" class="px-3 py-2">{{ __('TTL') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-zinc-100 font-mono dark:divide-zinc-800">
+                                        <tr>
+                                            <td class="px-3 py-2">A</td>
+                                            <td class="px-3 py-2">@</td>
+                                            <td class="px-3 py-2">{{ $serverIp }}</td>
+                                            <td class="px-3 py-2">3600</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-3 py-2">A</td>
+                                            <td class="px-3 py-2">www</td>
+                                            <td class="px-3 py-2">{{ $serverIp }}</td>
+                                            <td class="px-3 py-2">3600</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <flux:callout variant="warning" icon="exclamation-triangle">
+                                <flux:text size="sm">{{ __('Server IP not configured. Add SERVER_IP to your .env file to display A record instructions.') }}</flux:text>
+                            </flux:callout>
+                        @endif
                     </div>
 
                     <flux:text size="sm" class="text-zinc-500">

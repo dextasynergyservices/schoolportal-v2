@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\SchoolClass;
+use App\Models\TeacherAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,7 +16,7 @@ class GameController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Game::with(['class:id,name', 'creator:id,name', 'session:id,name', 'term:id,name']);
+        $query = Game::with(['class:id,name', 'creator:id,name', 'session:id,name', 'term:id,name', 'latestTeacherAction']);
 
         if ($request->filled('class_id')) {
             $query->where('class_id', $request->input('class_id'));
@@ -29,7 +30,7 @@ class GameController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $games = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $games = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
         $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
 
         return view('admin.games.index', compact('games', 'classes'));
@@ -39,7 +40,12 @@ class GameController extends Controller
     {
         $game->load(['class:id,name', 'creator:id,name', 'session:id,name', 'term:id,name']);
 
-        return view('admin.games.show', compact('game'));
+        $teacherAction = TeacherAction::where('entity_type', 'game')
+            ->where('entity_id', $game->id)
+            ->latest()
+            ->first();
+
+        return view('admin.games.show', compact('game', 'teacherAction'));
     }
 
     public function publish(Game $game): RedirectResponse
@@ -72,18 +78,19 @@ class GameController extends Controller
     {
         $game->load('class:id,name');
 
-        $plays = $game->plays()
-            ->with('student:id,name,username')
-            ->where('completed', true)
-            ->orderByDesc('percentage')
-            ->get();
+        $baseQuery = $game->plays()->where('completed', true);
 
         $stats = [
-            'total_plays' => $plays->count(),
-            'unique_players' => $plays->pluck('student_id')->unique()->count(),
-            'average_score' => $plays->avg('percentage') ? round($plays->avg('percentage'), 1) : 0,
-            'highest_score' => $plays->max('percentage') ?? 0,
+            'total_plays' => (clone $baseQuery)->count(),
+            'unique_players' => (clone $baseQuery)->distinct('student_id')->count('student_id'),
+            'average_score' => round((float) (clone $baseQuery)->avg('percentage'), 1),
+            'highest_score' => (float) ((clone $baseQuery)->max('percentage') ?? 0),
         ];
+
+        $plays = $baseQuery
+            ->with('student:id,name,username')
+            ->orderByDesc('percentage')
+            ->paginate(10);
 
         return view('admin.games.stats', compact('game', 'plays', 'stats'));
     }

@@ -86,12 +86,31 @@ class ResolveTenant
             ->where('is_active', true)
             ->first();
 
-        if (! $school) {
-            abort(404, 'School not found. Please check the URL and try again.');
+        if ($school) {
+            app()->instance('current.school', $school);
+
+            return $next($request);
         }
 
-        app()->instance('current.school', $school);
+        // Check if this is the platform's own domain (from APP_URL)
+        $platformHost = parse_url(config('app.url', ''), PHP_URL_HOST);
 
-        return $next($request);
+        if ($host === $platformHost) {
+            // Platform domain — auto-resolve if only one non-platform school exists
+            $nonPlatformSchools = School::withoutGlobalScopes()
+                ->where('is_active', true)
+                ->where('slug', '!=', 'platform')
+                ->get();
+
+            if ($nonPlatformSchools->count() === 1) {
+                app()->instance('current.school', $nonPlatformSchools->first());
+            }
+
+            // Allow through — landing page and login will work
+            return $next($request);
+        }
+
+        // Unknown domain — not platform, not a registered school
+        abort(404, 'School not found. Please check the URL and try again.');
     }
 }

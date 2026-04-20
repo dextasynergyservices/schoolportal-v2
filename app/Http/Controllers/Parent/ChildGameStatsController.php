@@ -24,7 +24,7 @@ class ChildGameStatsController extends Controller
             ->where('student_id', $child->id)
             ->where('completed', true)
             ->orderByDesc('completed_at')
-            ->get();
+            ->paginate(10);
 
         return view('parent.games.stats', compact('child', 'plays'));
     }

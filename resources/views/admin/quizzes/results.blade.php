@@ -89,6 +89,10 @@
                     </flux:table>
                 </div>
             </div>
+
+            @if ($attempts->hasPages())
+                <div class="mt-4">{{ $attempts->links() }}</div>
+            @endif
         @else
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-8 text-center">
                 <flux:icon name="chart-bar" class="mx-auto h-12 w-12 text-zinc-400" />

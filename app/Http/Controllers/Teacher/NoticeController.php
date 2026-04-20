@@ -24,7 +24,7 @@ class NoticeController extends Controller
 
         $notices = Notice::where('created_by', $teacher->id)
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(10);
 
         return view('teacher.notices.index', compact('notices'));
     }

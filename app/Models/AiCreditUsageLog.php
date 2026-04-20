@@ -19,6 +19,10 @@ class AiCreditUsageLog extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'user_id' => 'integer',
+            'level_id' => 'integer',
+            'entity_id' => 'integer',
             'created_at' => 'datetime',
         ];
     }

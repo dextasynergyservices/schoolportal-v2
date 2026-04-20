@@ -22,7 +22,7 @@ class GameController extends Controller
             ->published()
             ->forClass($classId)
             ->orderByDesc('published_at')
-            ->get();
+            ->paginate(10);
 
         return view('student.games.index', compact('games'));
     }

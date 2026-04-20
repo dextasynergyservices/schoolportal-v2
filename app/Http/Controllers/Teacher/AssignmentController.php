@@ -34,7 +34,7 @@ class AssignmentController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $assignments = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $assignments = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
 
         $classes = SchoolClass::whereIn('id', $classIds)
             ->where('is_active', true)

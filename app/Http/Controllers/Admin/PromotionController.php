@@ -35,8 +35,7 @@ class PromotionController extends Controller
             'promoter:id,name',
         ])
             ->orderByDesc('promoted_at')
-            ->take(20)
-            ->get();
+            ->paginate(10);
 
         return view('admin.promotions.index', compact('classes', 'sessions', 'recentPromotions'));
     }

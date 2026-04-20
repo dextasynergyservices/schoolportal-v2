@@ -301,6 +301,9 @@ Route::prefix('portal')->group(function () {
             Route::post('schools/{school}/deactivate', [SuperAdminSchoolController::class, 'deactivate'])->name('super-admin.schools.deactivate');
             Route::delete('schools/{school}', [SuperAdminSchoolController::class, 'destroy'])->name('super-admin.schools.destroy')->middleware('throttle:sensitive-action');
             Route::post('schools/{school}/reset-admin-password', [SuperAdminSchoolController::class, 'resetAdminPassword'])->name('super-admin.schools.reset-admin-password');
+            Route::get('schools/{school}/admins/create', [SuperAdminSchoolController::class, 'createAdmin'])->name('super-admin.schools.create-admin');
+            Route::post('schools/{school}/admins', [SuperAdminSchoolController::class, 'storeAdmin'])->name('super-admin.schools.store-admin');
+            Route::delete('schools/{school}/admins/{admin}', [SuperAdminSchoolController::class, 'destroyAdmin'])->name('super-admin.schools.destroy-admin');
 
             // AI Credits
             Route::get('credits', [SuperAdminCreditController::class, 'index'])->name('super-admin.credits.index');

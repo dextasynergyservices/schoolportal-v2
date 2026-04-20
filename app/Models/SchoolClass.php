@@ -32,6 +32,9 @@ class SchoolClass extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'level_id' => 'integer',
+            'teacher_id' => 'integer',
             'is_active' => 'boolean',
         ];
     }

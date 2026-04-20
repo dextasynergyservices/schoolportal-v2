@@ -24,12 +24,12 @@ class QuizController extends Controller
             ->published()
             ->forClass($classId)
             ->orderByDesc('published_at')
-            ->get();
+            ->paginate(10);
 
-        $available = $quizzes->filter(fn (Quiz $q) => $q->canStudentAttempt($student->id));
-        $completed = $quizzes->filter(fn (Quiz $q) => ! $q->canStudentAttempt($student->id) && $q->attemptsForStudent($student->id) > 0);
+        $available = $quizzes->getCollection()->filter(fn (Quiz $q) => $q->canStudentAttempt($student->id));
+        $completed = $quizzes->getCollection()->filter(fn (Quiz $q) => ! $q->canStudentAttempt($student->id) && $q->attemptsForStudent($student->id) > 0);
 
-        return view('student.quizzes.index', compact('available', 'completed'));
+        return view('student.quizzes.index', compact('quizzes', 'available', 'completed'));
     }
 
     public function start(Quiz $quiz): RedirectResponse|View

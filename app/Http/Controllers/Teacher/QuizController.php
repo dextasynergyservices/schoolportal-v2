@@ -33,7 +33,7 @@ class QuizController extends Controller
         $teacher = auth()->user();
         $classIds = $teacher->assignedClasses()->pluck('id');
 
-        $query = Quiz::with(['class:id,name', 'session:id,name', 'term:id,name'])
+        $query = Quiz::with(['class:id,name', 'session:id,name', 'term:id,name', 'latestTeacherAction'])
             ->where('created_by', $teacher->id);
 
         if ($request->filled('class_id')) {
@@ -44,7 +44,7 @@ class QuizController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $quizzes = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $quizzes = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
 
         $classes = SchoolClass::whereIn('id', $classIds)
             ->where('is_active', true)
@@ -69,7 +69,7 @@ class QuizController extends Controller
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
 
-        $levelId = $teacher->level_id;
+        $levelId = $teacher->level_id ? (int) $teacher->level_id : null;
         $availableCredits = $this->creditService->getAvailableCredits($school, $levelId);
 
         return view('teacher.quizzes.create', compact(
@@ -105,7 +105,7 @@ class QuizController extends Controller
             abort(403, 'You can only create quizzes for your assigned classes.');
         }
 
-        $levelId = $teacher->level_id;
+        $levelId = $teacher->level_id ? (int) $teacher->level_id : null;
         if (! $this->creditService->hasCredits($school, $levelId)) {
             return redirect()->route('teacher.quizzes.create')
                 ->with('error', __('No AI credits remaining. You can create quizzes manually or ask your admin to purchase more credits.'));
@@ -316,7 +316,7 @@ class QuizController extends Controller
             abort(403, 'You can only create quizzes for your assigned classes.');
         }
 
-        DB::transaction(function () use ($validated, $quiz) {
+        DB::transaction(function () use ($validated, $quiz, $teacher) {
             $quiz->update([
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? null,
@@ -346,6 +346,32 @@ class QuizController extends Controller
                     'sort_order' => $index,
                 ]);
             }
+
+            // Reset the existing TeacherAction back to pending
+            $action = TeacherAction::where('entity_type', 'quiz')
+                ->where('entity_id', $quiz->id)
+                ->latest()
+                ->first();
+
+            if ($action) {
+                $action->update([
+                    'status' => 'pending',
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                    'rejection_reason' => null,
+                ]);
+            } else {
+                $action = TeacherAction::create([
+                    'school_id' => $teacher->school_id,
+                    'teacher_id' => $teacher->id,
+                    'action_type' => 'create_quiz',
+                    'entity_type' => 'quiz',
+                    'entity_id' => $quiz->id,
+                    'status' => 'pending',
+                ]);
+            }
+
+            $this->notifyAdminsOfPendingSubmission($action, $teacher);
         });
 
         return redirect()->route('teacher.quizzes.index')
@@ -360,7 +386,7 @@ class QuizController extends Controller
             abort(403);
         }
 
-        $quiz->load(['questions', 'class:id,name', 'session:id,name', 'term:id,name']);
+        $quiz->load(['questions', 'class:id,name', 'session:id,name', 'term:id,name', 'latestTeacherAction']);
 
         return view('teacher.quizzes.show', compact('quiz'));
     }
@@ -375,20 +401,21 @@ class QuizController extends Controller
 
         $quiz->load(['class:id,name', 'questions']);
 
-        $attempts = $quiz->attempts()
-            ->with('student:id,name,username')
-            ->whereIn('status', ['submitted', 'timed_out'])
-            ->orderByDesc('percentage')
-            ->get();
+        $baseQuery = $quiz->attempts()->whereIn('status', ['submitted', 'timed_out']);
 
         $stats = [
-            'total_students' => $attempts->pluck('student_id')->unique()->count(),
-            'average_score' => $attempts->avg('percentage') ? round($attempts->avg('percentage'), 1) : 0,
-            'highest_score' => $attempts->max('percentage') ?? 0,
-            'lowest_score' => $attempts->min('percentage') ?? 0,
-            'passed' => $attempts->where('passed', true)->count(),
-            'failed' => $attempts->where('passed', false)->count(),
+            'total_students' => (clone $baseQuery)->distinct('student_id')->count('student_id'),
+            'average_score' => round((float) (clone $baseQuery)->avg('percentage'), 1),
+            'highest_score' => (float) ((clone $baseQuery)->max('percentage') ?? 0),
+            'lowest_score' => (float) ((clone $baseQuery)->min('percentage') ?? 0),
+            'passed' => (clone $baseQuery)->where('passed', true)->count(),
+            'failed' => (clone $baseQuery)->where('passed', false)->count(),
         ];
+
+        $attempts = $baseQuery
+            ->with('student:id,name,username')
+            ->orderByDesc('percentage')
+            ->paginate(10);
 
         return view('teacher.quizzes.results', compact('quiz', 'attempts', 'stats'));
     }

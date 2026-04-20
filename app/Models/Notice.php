@@ -31,6 +31,8 @@ class Notice extends Model
     protected function casts(): array
     {
         return [
+            'school_id' => 'integer',
+            'created_by' => 'integer',
             'target_levels' => 'array',
             'target_roles' => 'array',
             'is_published' => 'boolean',

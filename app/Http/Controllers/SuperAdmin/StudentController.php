@@ -51,7 +51,7 @@ class StudentController extends Controller
             $query->where('level_id', $request->input('level_id'));
         }
 
-        $students = $query->orderBy('name')->paginate(20)->withQueryString();
+        $students = $query->orderBy('name')->paginate(10)->withQueryString();
 
         $schools = School::tenants()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 

@@ -22,6 +22,15 @@ class AiCreditAllocation extends Model
         'allocated_by',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'school_id' => 'integer',
+            'level_id' => 'integer',
+            'allocated_by' => 'integer',
+        ];
+    }
+
     public function level(): BelongsTo
     {
         return $this->belongsTo(SchoolLevel::class, 'level_id');

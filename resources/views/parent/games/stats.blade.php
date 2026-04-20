@@ -9,10 +9,10 @@
 
         @if ($plays->isNotEmpty())
             @php
-                $totalPlays = $plays->count();
-                $avgPercentage = $plays->avg('percentage') ?? 0;
-                $bestPercentage = $plays->max('percentage') ?? 0;
-                $uniqueGames = $plays->pluck('game_id')->unique()->count();
+                $totalPlays = $plays->total();
+                $avgPercentage = $plays->getCollection()->avg('percentage') ?? 0;
+                $bestPercentage = $plays->getCollection()->max('percentage') ?? 0;
+                $uniqueGames = $plays->getCollection()->pluck('game_id')->unique()->count();
             @endphp
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
@@ -55,6 +55,10 @@
                     </div>
                 @endforeach
             </div>
+
+            @if ($plays->hasPages())
+                <div class="mt-4">{{ $plays->links() }}</div>
+            @endif
         @else
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-8 text-center">
                 <flux:icon name="puzzle-piece" class="mx-auto h-12 w-12 text-zinc-400" />

@@ -37,14 +37,12 @@ class AiCreditController extends Controller
         $purchases = AiCreditPurchase::where('school_id', $school->id)
             ->where('status', 'completed')
             ->orderByDesc('created_at')
-            ->limit(10)
-            ->get();
+            ->paginate(10, ['*'], 'purchases_page');
 
         $recentUsage = AiCreditUsageLog::where('school_id', $school->id)
             ->with(['user:id,name', 'level:id,name'])
             ->orderByDesc('created_at')
-            ->limit(20)
-            ->get();
+            ->paginate(10, ['*'], 'usage_page');
 
         return view('admin.credits.index', compact(
             'school',

@@ -36,6 +36,13 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureActions(): void
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+
+        // Custom password confirmation: Fortify::username() is 'login' (a form field,
+        // not a real column), so the default ConfirmPassword action fails with
+        // MissingAttributeException. We confirm via Hash::check directly.
+        Fortify::confirmPasswordsUsing(function (User $user, ?string $password): bool {
+            return Hash::check((string) $password, $user->password);
+        });
     }
 
     private function configureViews(): void

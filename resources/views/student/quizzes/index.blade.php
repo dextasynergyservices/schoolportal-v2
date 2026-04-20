@@ -138,5 +138,9 @@
                 <p class="mt-1 text-sm text-zinc-500">{{ __('Your teacher has not published any quizzes for your class yet.') }}</p>
             </div>
         @endif
+
+        @if ($quizzes->hasPages())
+            <div class="mt-4">{{ $quizzes->links() }}</div>
+        @endif
     </div>
 </x-layouts::app>

@@ -26,7 +26,7 @@ class SubmissionController extends Controller
             $query->where('entity_type', $request->input('type'));
         }
 
-        $submissions = $query->latest('created_at')->paginate(20)->withQueryString();
+        $submissions = $query->latest('created_at')->paginate(10)->withQueryString();
 
         // Counts per status
         $counts = [
