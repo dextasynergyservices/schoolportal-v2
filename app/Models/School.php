@@ -17,7 +17,9 @@ class School extends Model
         'name',
         'slug',
         'custom_domain',
+        'domain_verified_at',
         'logo_url',
+        'logo_public_id',
         'email',
         'phone',
         'address',
@@ -42,6 +44,7 @@ class School extends Model
             'settings' => 'array',
             'is_active' => 'boolean',
             'deactivated_at' => 'datetime',
+            'domain_verified_at' => 'datetime',
             'ai_free_credits_reset_at' => 'date',
         ];
     }

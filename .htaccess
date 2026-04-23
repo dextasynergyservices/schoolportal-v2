@@ -1,0 +1,47 @@
+# ══════════════════════════════════════════════════════
+# ROOT-LEVEL .htaccess — Deny All Direct Access
+# This file sits in the Laravel app root (above web root).
+# On Namecheap: /home/dextdqei/schoolportal/.htaccess
+# If Apache somehow serves from this directory, block everything.
+# ══════════════════════════════════════════════════════
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block ALL access to .env files
+    RewriteRule ^\.env - [F,L]
+
+    # Block ALL hidden files/directories except .well-known
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteRule (^|/)\. - [F,L]
+
+    # Block config directory
+    RewriteRule ^config(/|$) - [F,L]
+
+    # Block storage directory
+    RewriteRule ^storage(/|$) - [F,L]
+
+    # Block database directory
+    RewriteRule ^database(/|$) - [F,L]
+
+    # Block vendor directory
+    RewriteRule ^vendor(/|$) - [F,L]
+</IfModule>
+
+# Deny direct access to sensitive file types
+<FilesMatch "\.(env|log|sql|bak|yml|yaml|xml|lock|json|md|sh)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+# Specifically protect .env
+<Files ".env">
+    Order Deny,Allow
+    Deny from all
+</Files>
+
+# Protect artisan
+<Files "artisan">
+    Order Deny,Allow
+    Deny from all
+</Files>

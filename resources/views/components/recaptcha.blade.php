@@ -4,9 +4,13 @@
 
 @php
     $siteKey = config('services.recaptcha.site_key');
+    // Skip reCAPTCHA on school custom domains (client-side JS won't work there)
+    $school = app()->bound('current.school') ? app('current.school') : null;
+    $platformHost = parse_url(config('app.url'), PHP_URL_HOST);
+    $isSchoolDomain = $school && request()->getHost() !== $platformHost;
 @endphp
 
-@if ($siteKey)
+@if ($siteKey && ! $isSchoolDomain)
     <input type="hidden" name="g-recaptcha-response" id="recaptcha-token-{{ $action }}">
     <input type="hidden" name="recaptcha_action" value="{{ $action }}">
 
@@ -48,7 +52,7 @@
     <style>
         .grecaptcha-badge { visibility: hidden; }
     </style>
-    <p class="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-2">
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center mt-2">
         Protected by reCAPTCHA.
         <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" class="underline hover:text-zinc-600 dark:hover:text-zinc-300">Privacy</a>
         &middot;

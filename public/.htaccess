@@ -5,6 +5,64 @@
 
     RewriteEngine On
 
+    # ══════════════════════════════════════════════════════
+    # SECURITY: Block access to sensitive files and directories
+    # ══════════════════════════════════════════════════════
+
+    # Block .env, .git, .htaccess, composer files, etc.
+    RewriteRule ^\.env - [F,L]
+    RewriteRule ^\.git - [F,L]
+    RewriteRule ^\.editorconfig - [F,L]
+    RewriteRule ^\.phpunit - [F,L]
+    RewriteRule composer\.(json|lock)$ - [F,L]
+    RewriteRule package(-lock)?\.json$ - [F,L]
+    RewriteRule bun\.lockb$ - [F,L]
+    RewriteRule phpunit\.xml$ - [F,L]
+    RewriteRule artisan$ - [F,L]
+    RewriteRule webpack\.mix\.js$ - [F,L]
+    RewriteRule vite\.config\.(js|ts)$ - [F,L]
+    RewriteRule biome\.json$ - [F,L]
+    RewriteRule pint\.json$ - [F,L]
+    RewriteRule CLAUDE\.md$ - [F,L]
+    RewriteRule \.ya?ml$ - [F,L]
+
+    # Block access to storage, vendor, config, bootstrap, database directories
+    RewriteRule ^storage(/|$) - [F,L]
+    RewriteRule ^vendor(/|$) - [F,L]
+    RewriteRule ^config(/|$) - [F,L]
+    RewriteRule ^bootstrap(/|$) - [F,L]
+    RewriteRule ^database(/|$) - [F,L]
+    RewriteRule ^app(/|$) - [F,L]
+    RewriteRule ^resources(/|$) - [F,L]
+    RewriteRule ^routes(/|$) - [F,L]
+    RewriteRule ^tests(/|$) - [F,L]
+    RewriteRule ^node_modules(/|$) - [F,L]
+
+    # Block access to backup and SQL files
+    RewriteRule \.(sql|bak|old|orig|save|swp|swo)$ - [F,L]
+
+    # Block access to hidden files (dotfiles) except .well-known (for SSL certs)
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteRule (^|/)\. - [F,L]
+
+    # Block common exploit paths
+    RewriteRule ^(wp-admin|wp-login|wp-content|wp-includes|xmlrpc) - [F,L]
+    RewriteRule ^(administrator|admin\.php|phpmyadmin) - [F,L]
+
+    # ══════════════════════════════════════════════════════
+    # FORCE HTTPS (redirect http:// to https:// in production)
+    # Cloudflare also enforces this, but this catches direct server access
+    # ══════════════════════════════════════════════════════
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP_HOST} !^localhost$ [NC]
+    RewriteCond %{HTTP_HOST} !^127\.0\.0\.1$ [NC]
+    RewriteCond %{HTTP_HOST} !\.test$ [NC]
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # ══════════════════════════════════════════════════════
+    # STANDARD LARAVEL REWRITE RULES
+    # ══════════════════════════════════════════════════════
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -23,3 +81,57 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ══════════════════════════════════════════════════════
+# SECURITY HEADERS
+# ══════════════════════════════════════════════════════
+<IfModule mod_headers.c>
+    # Prevent MIME-type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Prevent clickjacking — allow framing only from same origin
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Enable XSS filter in browsers
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Control referrer information leakage
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Prevent content type sniffing
+    Header always set X-Permitted-Cross-Domain-Policies "none"
+
+    # Remove server version exposure
+    Header always unset X-Powered-By
+    Header always unset Server
+
+    # Strict Transport Security (HTTPS only, 1 year)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+
+    # Permissions Policy — disable unnecessary browser features
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+</IfModule>
+
+# ══════════════════════════════════════════════════════
+# BLOCK DIRECT PHP FILE ACCESS (except index.php)
+# ══════════════════════════════════════════════════════
+<FilesMatch "\.php$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+<Files "index.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+# ══════════════════════════════════════════════════════
+# DISABLE DIRECTORY LISTING & SERVER SIGNATURE
+# ══════════════════════════════════════════════════════
+Options -Indexes
+ServerSignature Off
+
+# Disable ETags (prevents inode disclosure)
+<IfModule mod_headers.c>
+    Header unset ETag
+</IfModule>
+FileETag None

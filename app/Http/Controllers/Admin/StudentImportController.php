@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Rules\SafeCsvFile;
 use App\Services\CsvImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,17 +29,22 @@ class StudentImportController extends Controller
     /**
      * Parse the uploaded CSV and show preview.
      */
-    public function preview(Request $request): View
+    public function preview(Request $request): View|RedirectResponse
     {
         $request->validate([
-            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:2048', new SafeCsvFile],
             'default_password' => ['required', 'string', 'min:6'],
         ]);
 
         $file = $request->file('csv_file');
         $school = app('current.school');
 
-        $result = $this->csvImportService->parseCsv($file->getRealPath(), $school->id);
+        try {
+            $result = $this->csvImportService->parseCsv($file->getRealPath(), $school->id);
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.students.import')
+                ->with('error', __('Failed to parse CSV file: :message', ['message' => $e->getMessage()]));
+        }
 
         // Store file temporarily for the import step
         $tempPath = $file->storeAs('imports', 'students_'.time().'.csv', 'local');
@@ -70,12 +76,39 @@ class StudentImportController extends Controller
                 ->with('error', __('Import file expired. Please upload again.'));
         }
 
-        $school = app('current.school');
-        $result = $this->csvImportService->parseCsv($fullPath, $school->id);
-        $imported = $this->csvImportService->importRows($result['rows'], $request->input('default_password'));
+        try {
+            $school = app('current.school');
+            $result = $this->csvImportService->parseCsv($fullPath, $school->id);
+            $importResult = $this->csvImportService->importRows($result['rows'], $request->input('default_password'));
+        } catch (\Throwable $e) {
+            @unlink($fullPath);
+
+            return redirect()->route('admin.students.import')
+                ->with('error', __('Import failed: :message', ['message' => $e->getMessage()]));
+        }
 
         // Clean up temp file
         @unlink($fullPath);
+
+        $imported = $importResult['imported'];
+        $skipped = $importResult['skipped'];
+
+        if ($imported === 0 && count($skipped) > 0) {
+            // Nothing imported — all skipped
+            return redirect()->route('admin.students.import')
+                ->with('error', __('No students were imported. All :count rows were skipped.', ['count' => count($skipped)]))
+                ->with('skipped_students', $skipped);
+        }
+
+        if (count($skipped) > 0) {
+            // Some imported, some skipped
+            return redirect()->route('admin.students.index')
+                ->with('success', __(':imported students imported successfully. :skipped skipped.', [
+                    'imported' => $imported,
+                    'skipped' => count($skipped),
+                ]))
+                ->with('skipped_students', $skipped);
+        }
 
         return redirect()->route('admin.students.index')
             ->with('success', __(':count students imported successfully.', ['count' => $imported]));

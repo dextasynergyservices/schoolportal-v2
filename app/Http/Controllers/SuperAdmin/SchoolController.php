@@ -10,6 +10,9 @@ use App\Http\Requests\UpdateSchoolRequest;
 use App\Models\School;
 use App\Models\User;
 use App\Notifications\WelcomeNewUser;
+use App\Services\DomainVerificationService;
+use App\Services\FileUploadService;
+use App\Services\NotificationService;
 use App\Services\SchoolSetupService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,6 +71,8 @@ class SchoolController extends Controller
             $admin->notify(new WelcomeNewUser('school_admin', $admin->username, $school->name, $data['admin_password']));
         }
 
+        app(NotificationService::class)->notifySchoolCreated($school);
+
         return redirect()
             ->route('super-admin.schools.show', $school)
             ->with('success', __('School ":name" created successfully.', ['name' => $school->name]));
@@ -121,18 +126,24 @@ class SchoolController extends Controller
             'accent_color' => $data['accent_color'] ?? ($settings['branding']['accent_color'] ?? '#10B981'),
         ]);
 
+        $newDomain = $data['custom_domain'] ?? null;
+        $domainChanged = $school->custom_domain !== $newDomain;
+
         $school->update([
             'name' => $data['name'],
-            'custom_domain' => $data['custom_domain'] ?? null,
+            'custom_domain' => $newDomain,
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'address' => $data['address'] ?? null,
             'city' => $data['city'] ?? null,
             'state' => $data['state'] ?? null,
+            // Reset verification if domain changed
+            ...($school->isDirty('custom_domain') ? ['domain_verified_at' => null] : []),
             'country' => $data['country'] ?? null,
             'website' => $data['website'] ?? null,
             'motto' => $data['motto'] ?? null,
             'settings' => $settings,
+            ...($domainChanged ? ['domain_verified_at' => null] : []),
         ]);
 
         return redirect()
@@ -278,9 +289,83 @@ class SchoolController extends Controller
             return back()->withErrors(['admin' => __('Cannot remove the last admin. A school must have at least one admin.')]);
         }
 
-        $name = $admin->name;
         $admin->delete();
 
-        return back()->with('success', __('Admin ":name" removed.', ['name' => $name]));
+        return redirect()
+            ->route('super-admin.schools.show', $school)
+            ->with('success', __('Admin removed successfully.'));
+    }
+
+    /**
+     * Verify that a school's custom domain is correctly configured.
+     */
+    public function verifyDomain(School $school, DomainVerificationService $verifier): RedirectResponse
+    {
+        if (! $school->custom_domain) {
+            return back()->with('error', __('No custom domain configured for this school.'));
+        }
+
+        $result = $verifier->verify($school);
+
+        if ($result['verified']) {
+            return back()->with('success', __('Domain verified! :domain is correctly configured and serving the portal.', ['domain' => $school->custom_domain]));
+        }
+
+        return back()->with('warning', $result['message']);
+    }
+
+    /**
+     * Upload a school logo to Cloudinary.
+     */
+    public function uploadLogo(Request $request, School $school, FileUploadService $uploader): RedirectResponse
+    {
+        $request->validate([
+            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
+        ]);
+
+        try {
+            // Delete old logo if it exists
+            if ($school->logo_public_id) {
+                $uploader->delete($school->logo_public_id);
+            }
+
+            $result = $uploader->uploadSchoolLogo($request->file('logo'), $school->id);
+
+            $school->logo_url = $result['url'];
+            $school->logo_public_id = $result['public_id'];
+            $school->save();
+
+            \Log::info('Logo uploaded successfully', [
+                'school_id' => $school->id,
+                'logo_url' => $school->logo_url,
+                'logo_public_id' => $school->logo_public_id,
+            ]);
+
+            return back()->with('success', __('School logo updated.'));
+        } catch (\Throwable $e) {
+            \Log::error('Logo upload failed', [
+                'school_id' => $school->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', __('Logo upload failed: ').$e->getMessage());
+        }
+    }
+
+    /**
+     * Remove a school's logo.
+     */
+    public function removeLogo(School $school, FileUploadService $uploader): RedirectResponse
+    {
+        if ($school->logo_public_id) {
+            $uploader->delete($school->logo_public_id);
+        }
+
+        $school->update([
+            'logo_url' => null,
+            'logo_public_id' => null,
+        ]);
+
+        return back()->with('success', __('School logo removed.'));
     }
 }

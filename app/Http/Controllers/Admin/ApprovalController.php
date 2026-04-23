@@ -12,6 +12,7 @@ use App\Models\Quiz;
 use App\Models\Result;
 use App\Models\TeacherAction;
 use App\Notifications\SubmissionReviewed;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,10 +29,49 @@ class ApprovalController extends Controller
             $query->where('status', $status);
         }
 
+        if ($request->filled('type')) {
+            $query->where('entity_type', $request->input('type'));
+        }
+
         $actions = $query->paginate(10)->withQueryString();
         $pendingCount = TeacherAction::where('status', 'pending')->count();
 
-        return view('admin.approvals.index', compact('actions', 'pendingCount', 'status'));
+        // Eager-load notice entities for inline preview modals
+        $noticeIds = $actions->getCollection()
+            ->where('entity_type', 'notice')
+            ->pluck('entity_id')
+            ->unique()
+            ->toArray();
+
+        $notices = $noticeIds
+            ? Notice::with('creator:id,name')->whereIn('id', $noticeIds)->get()->keyBy('id')
+            : collect();
+
+        // Eager-load result entities for inline preview modals
+        $resultIds = $actions->getCollection()
+            ->where('entity_type', 'result')
+            ->pluck('entity_id')
+            ->unique()
+            ->toArray();
+
+        $results = $resultIds
+            ? Result::with(['student:id,name,username', 'class:id,name', 'session:id,name', 'term:id,name'])
+                ->whereIn('id', $resultIds)->get()->keyBy('id')
+            : collect();
+
+        // Eager-load assignment entities for inline preview modals
+        $assignmentIds = $actions->getCollection()
+            ->where('entity_type', 'assignment')
+            ->pluck('entity_id')
+            ->unique()
+            ->toArray();
+
+        $assignments = $assignmentIds
+            ? Assignment::with(['class:id,name', 'session:id,name', 'term:id,name'])
+                ->whereIn('id', $assignmentIds)->get()->keyBy('id')
+            : collect();
+
+        return view('admin.approvals.index', compact('actions', 'pendingCount', 'status', 'notices', 'results', 'assignments'));
     }
 
     public function approve(TeacherAction $action): RedirectResponse
@@ -49,6 +89,34 @@ class ApprovalController extends Controller
         $teacher = $action->teacher;
         if ($teacher?->email) {
             $teacher->notify(new SubmissionReviewed($action->entity_type, 'approved'));
+        }
+
+        // DB notification to teacher
+        $notificationService = app(NotificationService::class);
+        if ($teacher) {
+            $entityTitle = $notificationService->resolveEntityTitle($action->entity_type, $action->entity_id);
+            $notificationService->notifySubmissionApproved($teacher, $action->entity_type, $entityTitle);
+        }
+
+        // If entity was auto-published on approval, notify students/parents
+        if (in_array($action->entity_type, ['quiz', 'game', 'notice'], true)) {
+            match ($action->entity_type) {
+                'quiz' => $notificationService->notifyQuizPublished(Quiz::find($action->entity_id)),
+                'game' => $notificationService->notifyGamePublished(Game::find($action->entity_id)),
+                'notice' => $notificationService->notifyNoticePublished(Notice::find($action->entity_id)),
+            };
+        }
+        if ($action->entity_type === 'result') {
+            $result = Result::find($action->entity_id);
+            if ($result) {
+                $notificationService->notifyResultUploaded($result);
+            }
+        }
+        if ($action->entity_type === 'assignment') {
+            $assignment = Assignment::find($action->entity_id);
+            if ($assignment) {
+                $notificationService->notifyAssignmentUploaded($assignment);
+            }
         }
 
         return redirect()->route('admin.approvals.index')
@@ -77,6 +145,13 @@ class ApprovalController extends Controller
             $teacher->notify(new SubmissionReviewed($action->entity_type, 'rejected', $validated['rejection_reason']));
         }
 
+        // DB notification to teacher
+        if ($teacher) {
+            $notificationService = app(NotificationService::class);
+            $entityTitle = $notificationService->resolveEntityTitle($action->entity_type, $action->entity_id);
+            $notificationService->notifySubmissionRejected($teacher, $action->entity_type, $entityTitle, $validated['rejection_reason']);
+        }
+
         return redirect()->route('admin.approvals.index')
             ->with('success', __(':type rejected.', ['type' => ucfirst($action->entity_type)]));
     }
@@ -99,7 +174,7 @@ class ApprovalController extends Controller
                 $updateData['approved_by'] = auth()->id();
                 $updateData['approved_at'] = now();
 
-                if (in_array($action->entity_type, ['quiz', 'game'], true)) {
+                if (in_array($action->entity_type, ['quiz', 'game', 'notice'], true)) {
                     $updateData['is_published'] = true;
                     $updateData['published_at'] = now();
                 }

@@ -38,6 +38,7 @@ class User extends Authenticatable
         'deactivation_reason',
         'deactivated_at',
         'must_change_password',
+        'dashboard_preferences',
         'email_verified_at',
         'last_login_at',
         'last_login_ip',
@@ -62,6 +63,7 @@ class User extends Authenticatable
             'must_change_password' => 'boolean',
             'school_id' => 'integer',
             'level_id' => 'integer',
+            'dashboard_preferences' => 'array',
         ];
     }
 
@@ -148,6 +150,14 @@ class User extends Authenticatable
         return $this->hasMany(ParentStudent::class, 'student_id');
     }
 
+    /**
+     * Achievements earned by this student.
+     */
+    public function achievements(): HasMany
+    {
+        return $this->hasMany(StudentAchievement::class, 'student_id');
+    }
+
     // ── Helpers ──
 
     public function initials(): string
@@ -157,5 +167,48 @@ class User extends Authenticatable
             ->take(2)
             ->map(fn ($word) => Str::substr($word, 0, 1))
             ->implode('');
+    }
+
+    /**
+     * Get dashboard widget preferences with defaults for any missing widgets.
+     *
+     * @return array<int, array{id: string, visible: bool}>
+     */
+    public function getDashboardWidgets(): array
+    {
+        $defaults = self::defaultDashboardWidgets();
+        $saved = $this->dashboard_preferences['widgets'] ?? null;
+
+        if (! $saved) {
+            return $defaults;
+        }
+
+        $validIds = array_column($defaults, 'id');
+        $savedIds = array_column($saved, 'id');
+
+        // Append any new widgets that weren't in saved preferences
+        foreach ($defaults as $default) {
+            if (! in_array($default['id'], $savedIds, true)) {
+                $saved[] = $default;
+            }
+        }
+
+        // Remove any widget IDs that no longer exist
+        return array_values(array_filter($saved, fn (array $w): bool => in_array($w['id'], $validIds, true)));
+    }
+
+    /**
+     * @return array<int, array{id: string, visible: bool}>
+     */
+    public static function defaultDashboardWidgets(): array
+    {
+        return [
+            ['id' => 'alerts', 'visible' => true],
+            ['id' => 'primary_stats', 'visible' => true],
+            ['id' => 'term_stats', 'visible' => true],
+            ['id' => 'quick_actions', 'visible' => true],
+            ['id' => 'approvals_activity', 'visible' => true],
+            ['id' => 'analytics_link', 'visible' => true],
+        ];
     }
 }

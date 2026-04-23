@@ -341,6 +341,81 @@ bash deploy.sh --fresh  # First-time deploy (runs seeders)
 
 > **Note:** Do not use `php artisan config:cache` on this shared hosting — it produces NULL values. The app runs without config cache.
 
+### Custom Domain Setup (Per School)
+
+Each school can have a branded subdomain (e.g., `portal.pearschool.com`) that goes directly to the login page. The platform landing page (`dexta.website`) is **never shown** on school custom domains — visitors are automatically redirected to `/portal/login`.
+
+**How it works:**
+- The `/` route checks the request's Host header against the platform domain (`APP_URL`)
+- If the domain is NOT the platform domain → redirect to `/portal/login`
+- If the domain IS the platform domain → show the DX-SchoolPortal landing page
+- The `ResolveTenant` middleware resolves the school from the `custom_domain` column in the schools table
+
+**Recommended approach:** Use `portal.pearschool.com` (not the bare domain) so the school can keep their own website at `pearschool.com`.
+
+| URL | What the user sees |
+|-----|-------------------|
+| `dexta.website` | DX-SchoolPortal landing page |
+| `portal.pearschool.com` | Redirects to `portal.pearschool.com/portal/login` |
+| `portal.pearschool.com/portal/login` | Login page (school resolved by middleware) |
+| `portal.pearschool.com/portal/admin/dashboard` | Admin dashboard (after login) |
+
+#### Scenario A: Domain on the Same Namecheap Account (Same Host)
+
+No DNS changes needed — cPanel handles it internally.
+
+```
+1. cPanel → Domains (or Subdomains)
+2. Create subdomain: portal.pearschool.com
+3. Set Document Root to: /home/dextdqei/dexta.website
+   (same folder as the platform — this is critical)
+4. Wait ~15 minutes for AutoSSL to provision HTTPS
+5. In the portal (super admin), set the school's custom_domain = 'portal.pearschool.com'
+6. Done — portal.pearschool.com goes directly to the login page
+```
+
+**If cPanel won't let you set the same document root:**
+
+```bash
+# SSH into the server
+# Remove the empty folder cPanel created and replace with a symlink
+rm -rf ~/portal.pearschool.com
+ln -s ~/dexta.website ~/portal.pearschool.com
+```
+
+#### Scenario B: Domain NOT on the Namecheap Host (External Domain)
+
+The school or their registrar must add a DNS record pointing to your server.
+
+```
+1. School adds DNS record at their registrar:
+   - A record:     portal → YOUR_SERVER_IP
+   - OR CNAME:     portal → dexta.website
+2. Wait for DNS propagation (5 min to 48 hours)
+3. In cPanel → Domains → Add domain: portal.pearschool.com
+4. Set Document Root to: /home/dextdqei/dexta.website
+   (or use symlink if cPanel doesn't allow it)
+5. Wait for AutoSSL to provision HTTPS (~15 min after DNS resolves)
+6. In the portal (super admin), set the school's custom_domain = 'portal.pearschool.com'
+7. Done — portal.pearschool.com goes directly to the login page
+```
+
+#### Quick Checklist for Onboarding a New School Domain
+
+- [ ] Subdomain created in cPanel (document root → ~/dexta.website)
+- [ ] DNS resolves correctly (`dig portal.pearschool.com` or `nslookup`)
+- [ ] AutoSSL certificate provisioned (check cPanel → SSL/TLS Status)
+- [ ] `custom_domain` set in school record via super admin panel
+- [ ] Test: `portal.pearschool.com` redirects to `/portal/login`
+- [ ] Test: Login works and resolves to the correct school
+- [ ] Test: All portal routes work (dashboard, students, etc.)
+
+#### Important Notes
+
+- After adding a new domain, run: `php artisan route:clear && php artisan view:clear && php artisan config:clear`
+- The `custom_domain` column must match **exactly** what the user types in the browser (e.g., `portal.pearschool.com`, not `https://portal.pearschool.com`)
+- Schools that don't have a custom domain simply use the platform URL: `dexta.website/portal/login`
+
 ---
 
 ## Project Structure

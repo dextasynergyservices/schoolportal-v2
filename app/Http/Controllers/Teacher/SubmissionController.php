@@ -26,14 +26,15 @@ class SubmissionController extends Controller
             $query->where('entity_type', $request->input('type'));
         }
 
-        $submissions = $query->latest('created_at')->paginate(10)->withQueryString();
+        $submissions = $query->latest('created_at')->paginate(15)->withQueryString();
 
         // Counts per status
+        $baseQuery = TeacherAction::where('teacher_id', $teacher->id);
         $counts = [
-            'all' => TeacherAction::where('teacher_id', $teacher->id)->count(),
-            'pending' => TeacherAction::where('teacher_id', $teacher->id)->where('status', 'pending')->count(),
-            'approved' => TeacherAction::where('teacher_id', $teacher->id)->where('status', 'approved')->count(),
-            'rejected' => TeacherAction::where('teacher_id', $teacher->id)->where('status', 'rejected')->count(),
+            'all' => (clone $baseQuery)->count(),
+            'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
+            'approved' => (clone $baseQuery)->where('status', 'approved')->count(),
+            'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
         ];
 
         return view('teacher.submissions.index', compact('submissions', 'counts'));

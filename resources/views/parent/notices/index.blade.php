@@ -15,16 +15,30 @@
                                 loading="lazy"
                             />
                         </div>
+                    @elseif ($notice->file_url && $notice->fileIsImage())
+                        <div class="aspect-video w-full overflow-hidden bg-zinc-100 dark:bg-zinc-700">
+                            <img
+                                src="{{ $notice->file_url }}"
+                                alt="{{ $notice->title }}"
+                                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                            />
+                        </div>
                     @endif
                     <div class="p-4">
                         <p class="font-medium text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
-                            {{ $notice->title }}
+                            <span class="flex items-center gap-1.5">
+                                {{ $notice->title }}
+                                @if ($notice->file_url && !$notice->fileIsImage())
+                                    <flux:icon.paper-clip class="w-4 h-4 text-zinc-400 shrink-0" />
+                                @endif
+                            </span>
                         </p>
                         <flux:text class="text-sm text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-3">
                             {{ Str::limit(strip_tags($notice->content), 150) }}
                         </flux:text>
                         <div class="flex items-center justify-between mt-3">
-                            <flux:text class="text-xs text-zinc-400 dark:text-zinc-500">
+                            <flux:text class="text-xs text-zinc-500 dark:text-zinc-400">
                                 {{ $notice->published_at->format('M j, Y') }}
                             </flux:text>
                             @if ($notice->expires_at)

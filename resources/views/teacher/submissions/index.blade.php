@@ -1,6 +1,6 @@
 <x-layouts::app :title="__('My Submissions')">
     <div class="space-y-6">
-        <x-admin-header :title="__('My Submissions')" :description="__('Track the approval status of your results, assignments, and notices.')" />
+        <x-admin-header :title="__('My Submissions')" :description="__('Track the approval status of all your submitted content.')" />
 
         {{-- Status tabs --}}
         <div class="flex flex-wrap gap-2">
@@ -45,6 +45,8 @@
                 <option value="result" @selected(request('type') === 'result')>{{ __('Results') }}</option>
                 <option value="assignment" @selected(request('type') === 'assignment')>{{ __('Assignments') }}</option>
                 <option value="notice" @selected(request('type') === 'notice')>{{ __('Notices') }}</option>
+                <option value="quiz" @selected(request('type') === 'quiz')>{{ __('Quizzes') }}</option>
+                <option value="game" @selected(request('type') === 'game')>{{ __('Games') }}</option>
             </flux:select>
         </div>
 
@@ -54,20 +56,31 @@
                 <flux:table.column>{{ __('Action') }}</flux:table.column>
                 <flux:table.column>{{ __('Status') }}</flux:table.column>
                 <flux:table.column class="hidden sm:table-cell">{{ __('Reviewed By') }}</flux:table.column>
-                <flux:table.column class="hidden md:table-cell">{{ __('Rejection Reason') }}</flux:table.column>
+                <flux:table.column class="hidden md:table-cell">{{ __('Reason') }}</flux:table.column>
                 <flux:table.column>{{ __('Submitted') }}</flux:table.column>
+                <flux:table.column class="text-right">{{ __('') }}</flux:table.column>
             </flux:table.columns>
             <flux:table.rows>
                 @forelse ($submissions as $submission)
                     <flux:table.row>
                         <flux:table.cell>
-                            @if ($submission->entity_type === 'result')
-                                <flux:badge color="blue" size="sm">{{ __('Result') }}</flux:badge>
-                            @elseif ($submission->entity_type === 'assignment')
-                                <flux:badge color="purple" size="sm">{{ __('Assignment') }}</flux:badge>
-                            @else
-                                <flux:badge color="cyan" size="sm">{{ __('Notice') }}</flux:badge>
-                            @endif
+                            @switch($submission->entity_type)
+                                @case('result')
+                                    <flux:badge color="blue" size="sm">{{ __('Result') }}</flux:badge>
+                                    @break
+                                @case('assignment')
+                                    <flux:badge color="purple" size="sm">{{ __('Assignment') }}</flux:badge>
+                                    @break
+                                @case('notice')
+                                    <flux:badge color="cyan" size="sm">{{ __('Notice') }}</flux:badge>
+                                    @break
+                                @case('quiz')
+                                    <flux:badge color="amber" size="sm">{{ __('Quiz') }}</flux:badge>
+                                    @break
+                                @case('game')
+                                    <flux:badge color="emerald" size="sm">{{ __('Game') }}</flux:badge>
+                                    @break
+                            @endswitch
                         </flux:table.cell>
                         <flux:table.cell class="capitalize">{{ str_replace('_', ' ', $submission->action_type) }}</flux:table.cell>
                         <flux:table.cell>
@@ -90,10 +103,27 @@
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="text-zinc-500">{{ $submission->created_at->format('M j, Y') }}</flux:table.cell>
+                        <flux:table.cell class="text-right">
+                            @php
+                                $viewRoute = match($submission->entity_type) {
+                                    'result' => route('teacher.results.index'),
+                                    'assignment' => route('teacher.assignments.index'),
+                                    'notice' => route('teacher.notices.index'),
+                                    'quiz' => route('teacher.quizzes.show', $submission->entity_id),
+                                    'game' => route('teacher.games.show', $submission->entity_id),
+                                    default => null,
+                                };
+                            @endphp
+                            @if ($viewRoute)
+                                <flux:button variant="subtle" size="xs" icon="eye" :href="$viewRoute" wire:navigate>
+                                    {{ __('View') }}
+                                </flux:button>
+                            @endif
+                        </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="6" class="text-center py-8">
+                        <flux:table.cell colspan="7" class="text-center py-8">
                             {{ __('No submissions yet.') }}
                         </flux:table.cell>
                     </flux:table.row>

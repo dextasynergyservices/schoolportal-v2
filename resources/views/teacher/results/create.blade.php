@@ -12,30 +12,15 @@
 
         <div class="max-w-2xl">
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-                <form method="POST" action="{{ route('teacher.results.store') }}" class="space-y-4">
+                <form method="POST" action="{{ route('teacher.results.store') }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
 
-                    <flux:select name="class_id" :label="__('Class')" required>
-                        <option value="">{{ __('Select class...') }}</option>
-                        @foreach ($classes as $class)
-                            <option value="{{ $class->id }}" @selected(old('class_id') == $class->id)>{{ $class->name }}</option>
-                        @endforeach
-                    </flux:select>
-                    @error('class_id')
-                        <p class="text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-
-                    <flux:select name="student_id" :label="__('Student')" required>
-                        <option value="">{{ __('Select student...') }}</option>
-                        @foreach ($students as $student)
-                            <option value="{{ $student->id }}" @selected(old('student_id') == $student->id)>
-                                {{ $student->name }} ({{ $student->username }})
-                            </option>
-                        @endforeach
-                    </flux:select>
-                    @error('student_id')
-                        <p class="text-sm text-red-600">{{ $message }}</p>
-                    @enderror
+                    {{-- Cascading Level → Class → Student selector (scoped to assigned classes) --}}
+                    @livewire('student-selector', [
+                        'restrictClassIds' => $assignedClassIds,
+                        'studentId' => old('student_id') ? (int) old('student_id') : null,
+                        'classId' => old('class_id') ? (int) old('class_id') : null,
+                    ])
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
@@ -48,11 +33,22 @@
                         </div>
                     </div>
 
-                    {{-- TODO: Replace with Cloudinary upload component --}}
-                    <flux:input name="file_url" :label="__('Result File URL')" type="url" required :value="old('file_url')" placeholder="https://res.cloudinary.com/..." />
-                    @error('file_url')
-                        <p class="text-sm text-red-600">{{ $message }}</p>
-                    @enderror
+                    <div>
+                        <label for="result_file" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Result PDF') }} <span class="text-red-500">*</span></label>
+                        <input type="file" name="result_file" id="result_file" accept=".pdf" required
+                            class="block w-full text-sm text-zinc-500 dark:text-zinc-400
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-lg file:border-0
+                                file:text-sm file:font-medium
+                                file:bg-zinc-100 file:text-zinc-700
+                                dark:file:bg-zinc-700 dark:file:text-zinc-200
+                                hover:file:bg-zinc-200 dark:hover:file:bg-zinc-600
+                                file:cursor-pointer" />
+                        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ __('PDF files only, max 10MB') }}</p>
+                        @error('result_file')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
 
                     <flux:textarea name="notes" :label="__('Notes (optional)')" rows="3" :value="old('notes')" placeholder="{{ __('Any additional notes about this result...') }}" />
 

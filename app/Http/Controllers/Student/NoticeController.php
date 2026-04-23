@@ -30,6 +30,12 @@ class NoticeController extends Controller
                     $q->orWhereJsonContains('target_levels', $profile->class->level_id);
                 }
             })
+            ->where(function ($q) use ($profile) {
+                $q->whereNull('target_classes');
+                if ($profile?->class_id) {
+                    $q->orWhereJsonContains('target_classes', $profile->class_id);
+                }
+            })
             ->with('creator:id,name')
             ->latest('published_at')
             ->paginate(10);

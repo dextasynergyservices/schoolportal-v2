@@ -39,7 +39,6 @@
                         <option value="">{{ __('Select...') }}</option>
                         <option value="male" @selected(old('gender') === 'male')>{{ __('Male') }}</option>
                         <option value="female" @selected(old('gender') === 'female')>{{ __('Female') }}</option>
-                        <option value="other" @selected(old('gender') === 'other')>{{ __('Other') }}</option>
                     </flux:select>
                 </div>
 

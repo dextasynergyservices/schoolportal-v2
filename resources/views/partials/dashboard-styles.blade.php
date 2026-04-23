@@ -35,6 +35,7 @@
     .dash-animate-delay-4 { animation-delay: 0.2s; }
     .dash-animate-delay-5 { animation-delay: 0.25s; }
     .dash-animate-delay-6 { animation-delay: 0.3s; }
+    .dash-animate-delay-7 { animation-delay: 0.35s; }
     .dash-animate-fade {
         animation: fadeIn 0.6s ease-out both;
     }
@@ -216,6 +217,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .quick-action:hover .quick-action-icon {
+        transform: scale(1.12);
     }
 
     /* ── Alert banners ── */
@@ -259,6 +264,12 @@
         position: relative;
         overflow: hidden;
     }
+    /* Role-themed welcome banners */
+    .dash-welcome-admin   { background: #312e81; }
+    .dash-welcome-teacher { background: #134e4a; }
+    .dash-welcome-student { background: #1e3a5f; }
+    .dash-welcome-parent  { background: #14532d; }
+    .dash-welcome-super   { background: #000c99; }
     .dash-welcome::before {
         content: '';
         position: absolute;
@@ -267,10 +278,15 @@
         width: 300px;
         height: 300px;
         border-radius: 50%;
-        background: rgba(0, 178, 255, 0.15);
         filter: blur(60px);
         pointer-events: none;
     }
+    /* Role-themed glow orbs */
+    .dash-welcome::before                  { background: rgba(0, 178, 255, 0.15); }
+    .dash-welcome-admin::before            { background: rgba(129, 140, 248, 0.2); }
+    .dash-welcome-teacher::before          { background: rgba(45, 212, 191, 0.2); }
+    .dash-welcome-student::before          { background: rgba(96, 165, 250, 0.2); }
+    .dash-welcome-parent::before           { background: rgba(74, 222, 128, 0.2); }
     .dash-welcome::after {
         content: '';
         position: absolute;
@@ -279,10 +295,14 @@
         width: 200px;
         height: 200px;
         border-radius: 50%;
-        background: rgba(0, 12, 153, 0.3);
         filter: blur(50px);
         pointer-events: none;
     }
+    .dash-welcome::after                   { background: rgba(0, 12, 153, 0.3); }
+    .dash-welcome-admin::after             { background: rgba(99, 102, 241, 0.2); }
+    .dash-welcome-teacher::after           { background: rgba(20, 184, 166, 0.15); }
+    .dash-welcome-student::after           { background: rgba(59, 130, 246, 0.15); }
+    .dash-welcome-parent::after            { background: rgba(34, 197, 94, 0.15); }
 
     /* ── Children cards (parent) ── */
     .child-card {
@@ -326,4 +346,96 @@
         .dash-welcome { padding: 1.25rem; }
         .dash-panel-body { padding: 1rem; }
     }
+
+    /* ── Progress bar entrance animation ── */
+    .progress-fill:not(.animated),
+    .occupancy-fill:not(.animated) {
+        width: 0% !important;
+    }
+
+    /* ── SVG ring entrance animation ── */
+    .metric-ring circle.ring-value:not(.animated) {
+        stroke-dashoffset: var(--ring-circumference, 251) !important;
+    }
+    .metric-ring circle.ring-value {
+        transition: stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
 </style>
+
+{{-- Micro-animation script: number counters + progress bar reveals --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // ── Animated number counters ──
+    // Easing: ease-out cubic
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function animateNumber(node, target, duration) {
+        var start = performance.now();
+        var hasComma = target >= 1000;
+        function step(now) {
+            var t = Math.min((now - start) / duration, 1);
+            var val = Math.round(easeOutCubic(t) * target);
+            node.textContent = hasComma ? val.toLocaleString() : val;
+            if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
+    var countObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            var el = entry.target;
+            // Find the first text node containing a digit
+            for (var i = 0; i < el.childNodes.length; i++) {
+                var n = el.childNodes[i];
+                if (n.nodeType === 3 && /\d/.test(n.textContent)) {
+                    var raw = n.textContent.trim().replace(/,/g, '');
+                    var num = parseInt(raw, 10);
+                    if (!isNaN(num) && num > 0) {
+                        n.textContent = '0';
+                        animateNumber(n, num, 900);
+                    }
+                    break;
+                }
+            }
+            countObserver.unobserve(el);
+        });
+    }, { threshold: 0.25 });
+
+    document.querySelectorAll('.stat-value').forEach(function (el) {
+        countObserver.observe(el);
+    });
+
+    // ── Progress bar & occupancy bar entrance ──
+    var barObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            // Small rAF delay so the transition triggers properly
+            requestAnimationFrame(function () {
+                entry.target.classList.add('animated');
+            });
+            barObserver.unobserve(entry.target);
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.progress-fill, .occupancy-fill').forEach(function (el) {
+        barObserver.observe(el);
+    });
+
+    // ── SVG ring entrance ──
+    document.querySelectorAll('.metric-ring circle.ring-value').forEach(function (circle) {
+        var circumference = 2 * Math.PI * (circle.getAttribute('r') || 40);
+        circle.style.setProperty('--ring-circumference', circumference);
+        var ringObserver = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                requestAnimationFrame(function () {
+                    entry.target.classList.add('animated');
+                });
+                ringObserver.unobserve(entry.target);
+            });
+        }, { threshold: 0.3 });
+        ringObserver.observe(circle);
+    });
+});
+</script>

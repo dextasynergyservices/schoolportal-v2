@@ -53,4 +53,11 @@ return [
         'threshold' => env('RECAPTCHA_THRESHOLD', 0.5),
     ],
 
+    'google_drive_backup' => [
+        'enabled' => env('GOOGLE_DRIVE_BACKUP_ENABLED', false),
+        'credentials_path' => env('GOOGLE_DRIVE_CREDENTIALS_PATH', 'google-drive-backup.json'),
+        'folder_id' => env('GOOGLE_DRIVE_BACKUP_FOLDER_ID'),
+        'retention_days' => env('GOOGLE_DRIVE_BACKUP_RETENTION_DAYS', 14),
+    ],
+
 ];

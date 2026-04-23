@@ -145,7 +145,7 @@
                             </p>
                         </div>
 
-                        <form method="POST" action="{{ route('student.quizzes.submit', $attempt) }}" id="submitForm" class="flex justify-end gap-2">
+                        <form method="POST" action="{{ route('student.quizzes.submit', $attempt) }}" id="submitForm" @submit="injectAnswers()" class="flex justify-end gap-2">
                             @csrf
                             <flux:modal.close>
                                 <flux:button type="button" variant="ghost">{{ __('Keep Reviewing') }}</flux:button>
@@ -205,9 +205,29 @@
                         this.timeRemaining--;
                         if (this.timeRemaining <= 0) {
                             clearInterval(this.timerInterval);
-                            document.getElementById('submitForm').submit();
+                            this.forceSubmit();
                         }
                     }, 1000);
+                },
+
+                injectAnswers() {
+                    const form = document.getElementById('submitForm');
+                    form.querySelectorAll('.injected-answer').forEach(el => el.remove());
+                    for (const [questionId, answer] of Object.entries(this.answeredQuestions)) {
+                        if (answer !== null && answer !== '') {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'answers[' + questionId + ']';
+                            input.value = answer;
+                            input.className = 'injected-answer';
+                            form.appendChild(input);
+                        }
+                    }
+                },
+
+                forceSubmit() {
+                    this.injectAnswers();
+                    document.getElementById('submitForm').submit();
                 },
 
                 formatTime(seconds) {

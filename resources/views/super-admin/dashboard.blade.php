@@ -1,16 +1,24 @@
 <x-layouts::app :title="__('Platform Dashboard')">
+    @php
+        $hour = (int) now()->format('G');
+        $timeGreeting = match (true) {
+            $hour >= 5 && $hour < 12  => __('Good morning'),
+            $hour >= 12 && $hour < 17 => __('Good afternoon'),
+            default                    => __('Good evening'),
+        };
+    @endphp
     @include('partials.dashboard-styles')
 
     <div class="space-y-6">
         {{-- ── Welcome Banner ─────────────────────────────────────── --}}
-        <div class="dash-welcome dash-animate" role="banner">
+        <div class="dash-welcome dash-welcome-super dash-animate" role="banner">
             <div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 class="text-xl sm:text-2xl font-bold text-white">
                         {{ __('Platform Overview') }}
                     </h1>
                     <p class="mt-1 text-sm text-white/70">
-                        {{ __('Welcome back, :name', ['name' => auth()->user()->name]) }}
+                        {{ $timeGreeting }}, {{ auth()->user()->name }}
                     </p>
                 </div>
                 <a href="{{ route('super-admin.schools.create') }}" wire:navigate class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium transition-colors backdrop-blur-sm border border-white/10">
@@ -190,11 +198,11 @@
 
         {{-- ── Health Alerts ──────────────────────────────────────── --}}
         @if ($healthAlerts->isNotEmpty())
-            <div class="dash-panel dash-animate dash-animate-delay-3" style="border-color: #fde68a;">
-                <div class="dash-panel-header" style="border-color: #fde68a; background: #fffbeb;">
+            <div class="dash-panel dash-animate dash-animate-delay-3 !border-amber-300 dark:!border-amber-700">
+                <div class="dash-panel-header !border-amber-300 dark:!border-amber-700 !bg-amber-50 dark:!bg-amber-950/40">
                     <div class="flex items-center gap-2">
-                        <flux:icon.exclamation-triangle class="w-5 h-5 text-amber-600" />
-                        <h2 class="text-sm font-semibold text-amber-800">
+                        <flux:icon.exclamation-triangle class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        <h2 class="text-sm font-semibold text-amber-800 dark:text-amber-200">
                             {{ __('School Health Alerts') }}
                         </h2>
                         <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-amber-500 rounded-full">{{ $healthAlerts->count() }}</span>
@@ -324,7 +332,7 @@
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-medium text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">{{ $school->name }}</p>
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $school->custom_domain ?? $school->email }} &bull; {{ number_format($school->student_count) }} {{ __('students') }} &bull; {{ $school->created_at->diffForHumans() }}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $school->custom_domain ?? $school->email }} &bull; {{ number_format($school->student_count) }} {{ __('students') }} &bull; {{ $school->created_at?->diffForHumans() ?? '' }}</p>
                                 </div>
                                 @if ($school->is_active)
                                     <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('Active') }}</span>
@@ -356,12 +364,16 @@
                     <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
                         @foreach ($recentPurchases as $purchase)
                             <div class="activity-item">
-                                <div class="activity-dot bg-amber-100 dark:bg-amber-900/30">
-                                    <flux:icon.banknotes class="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                                </div>
+                                @if ($purchase->purchaser?->avatar_url)
+                                    <img src="{{ $purchase->purchaser->avatar_url }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
+                                @else
+                                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                        {{ $purchase->purchaser ? strtoupper(substr($purchase->purchaser->name, 0, 1)) : '?' }}
+                                    </div>
+                                @endif
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $purchase->school?->name ?? __('Unknown School') }}</p>
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $purchase->credits }} {{ __('credits') }} &bull; {{ $purchase->purchaser?->name ?? __('Unknown') }} &bull; {{ $purchase->created_at->diffForHumans() }}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $purchase->credits }} {{ __('credits') }} &bull; {{ $purchase->purchaser?->name ?? __('Unknown') }} &bull; {{ $purchase->created_at?->diffForHumans() ?? '' }}</p>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
                                     <span class="text-sm font-bold tabular-nums text-zinc-900 dark:text-white">₦{{ number_format((float) $purchase->amount_naira) }}</span>
@@ -394,16 +406,24 @@
                     <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
                         @foreach ($recentActivity as $log)
                             <div class="activity-item">
-                                <div class="activity-dot bg-zinc-100 dark:bg-zinc-700">
-                                    <flux:icon.arrow-path class="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
-                                </div>
+                                @if ($log->user?->avatar_url)
+                                    <img src="{{ $log->user->avatar_url }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
+                                @elseif ($log->user)
+                                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-600 ring-1 ring-zinc-300 dark:ring-zinc-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                        {{ strtoupper(substr($log->user->name, 0, 1)) }}
+                                    </div>
+                                @else
+                                    <div class="activity-dot bg-zinc-100 dark:bg-zinc-700">
+                                        <flux:icon.cog-6-tooth class="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                                    </div>
+                                @endif
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm text-zinc-700 dark:text-zinc-300">
                                         <span class="font-semibold text-zinc-900 dark:text-white">{{ $log->user?->name ?? __('System') }}</span>
                                         {{ str_replace('.', ' ', $log->action) }}
                                     </p>
                                     <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                                        {{ $log->school?->name ?? '' }}{{ $log->school ? ' · ' : '' }}{{ $log->created_at->diffForHumans() }}
+                                        {{ $log->school?->name ?? '' }}{{ $log->school ? ' · ' : '' }}{{ $log->created_at?->diffForHumans() ?? '' }}
                                     </p>
                                 </div>
                             </div>

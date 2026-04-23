@@ -53,7 +53,7 @@
                                 @endif
                                 &middot; {{ $quiz->passing_score }}% {{ __('to pass') }}
                             </p>
-                            <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                            <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                                 {{ $quiz->session?->name }} / {{ $quiz->term?->name }}
                                 &middot; {{ $quiz->created_at->format('M j, Y') }}
                             </p>

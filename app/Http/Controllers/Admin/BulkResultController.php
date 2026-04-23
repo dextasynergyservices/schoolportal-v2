@@ -9,6 +9,7 @@ use App\Models\Result;
 use App\Models\SchoolClass;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -113,8 +114,10 @@ class BulkResultController extends Controller
         ]);
 
         $imported = 0;
+        $school = app('current.school');
+        $uploadService = app(FileUploadService::class);
 
-        DB::transaction(function () use ($request, &$imported) {
+        DB::transaction(function () use ($request, &$imported, $school, $uploadService) {
             foreach ($request->input('imports') as $item) {
                 $fullPath = storage_path('app/private/'.$item['temp_path']);
 
@@ -122,9 +125,18 @@ class BulkResultController extends Controller
                     continue;
                 }
 
-                // TODO: Upload to Cloudinary and get URL
-                // For now, use a placeholder URL
-                $fileUrl = 'pending://cloudinary/'.$item['temp_path'];
+                // Upload to Cloudinary
+                $upload = $uploadService->uploadResultFromPath($fullPath, $school->id);
+
+                // Delete old Cloudinary file if replacing an existing result
+                $existing = Result::where('student_id', $item['student_id'])
+                    ->where('session_id', $request->input('session_id'))
+                    ->where('term_id', $request->input('term_id'))
+                    ->first();
+
+                if ($existing?->file_public_id) {
+                    $uploadService->delete($existing->file_public_id);
+                }
 
                 Result::updateOrCreate(
                     [
@@ -134,7 +146,8 @@ class BulkResultController extends Controller
                     ],
                     [
                         'class_id' => $request->input('class_id'),
-                        'file_url' => $fileUrl,
+                        'file_url' => $upload['url'],
+                        'file_public_id' => $upload['public_id'],
                         'uploaded_by' => auth()->id(),
                         'approved_by' => auth()->id(),
                         'approved_at' => now(),

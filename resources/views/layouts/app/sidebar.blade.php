@@ -9,10 +9,15 @@
             {{ __('Skip to main content') }}
         </a>
 
-        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
+        <flux:sidebar sticky collapsible class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
                 <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
-                <flux:sidebar.collapse class="lg:hidden" />
+
+                <div class="in-data-flux-sidebar-collapsed-desktop:hidden">
+                    <livewire:notification-bell />
+                </div>
+
+                <flux:sidebar.collapse />
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
@@ -29,6 +34,8 @@
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
 
             <flux:spacer />
+
+            <livewire:notification-bell />
 
             <flux:dropdown position="top" align="end">
                 <flux:profile

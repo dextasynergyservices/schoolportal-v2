@@ -11,6 +11,10 @@
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif
 
+        @if (session('error'))
+            <flux:callout variant="danger" icon="exclamation-circle">{{ session('error') }}</flux:callout>
+        @endif
+
         <form method="GET" action="{{ route('teacher.results.index') }}" class="flex flex-wrap items-end gap-3">
             <div class="flex-1 max-w-sm">
                 <flux:input name="search" :value="request('search')" placeholder="{{ __('Search student name...') }}" icon="magnifying-glass" />
@@ -44,6 +48,7 @@
                 <flux:table.column class="hidden md:table-cell">{{ __('Session / Term') }}</flux:table.column>
                 <flux:table.column>{{ __('Status') }}</flux:table.column>
                 <flux:table.column class="hidden sm:table-cell">{{ __('Uploaded') }}</flux:table.column>
+                <flux:table.column class="w-20" />
             </flux:table.columns>
             <flux:table.rows>
                 @forelse ($results as $result)
@@ -63,11 +68,17 @@
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="hidden sm:table-cell text-zinc-500">{{ $result->created_at->format('M j, Y') }}</flux:table.cell>
+                        <flux:table.cell>
+                            @if ($result->status !== 'approved')
+                                <flux:button variant="subtle" size="xs" icon="pencil" href="{{ route('teacher.results.edit', $result) }}" wire:navigate />
+                            @endif
+                        </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="5" class="text-center py-8">
-                            {{ __('No results uploaded yet.') }}
+                        <flux:table.cell colspan="6" class="text-center py-8">
+                            <flux:icon.document-text class="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-600" />
+                            <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{{ __('No results uploaded yet. Upload your first student result to get started.') }}</p>
                         </flux:table.cell>
                     </flux:table.row>
                 @endforelse

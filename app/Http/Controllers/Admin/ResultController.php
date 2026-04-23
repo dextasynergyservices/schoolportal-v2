@@ -8,7 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Result;
 use App\Models\SchoolClass;
 use App\Models\Term;
-use App\Models\User;
+use App\Services\FileUploadService;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -48,12 +49,10 @@ class ResultController extends Controller
     public function create(): View
     {
         $school = app('current.school');
-        $classes = SchoolClass::where('is_active', true)->orderBy('name')->get();
-        $students = User::where('role', 'student')->where('is_active', true)->orderBy('name')->get();
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
 
-        return view('admin.results.create', compact('classes', 'students', 'currentSession', 'currentTerm'));
+        return view('admin.results.create', compact('currentSession', 'currentTerm'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -63,18 +62,28 @@ class ResultController extends Controller
             'class_id' => ['required', 'exists:classes,id'],
             'session_id' => ['required', 'exists:academic_sessions,id'],
             'term_id' => ['required', 'exists:terms,id'],
-            'file_url' => ['required', 'url'],
-            'file_public_id' => ['nullable', 'string'],
+            'result_file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        Result::create([
-            ...$validated,
+        $school = app('current.school');
+        $upload = app(FileUploadService::class)->uploadResult($request->file('result_file'), $school->id);
+
+        $result = Result::create([
+            'student_id' => $validated['student_id'],
+            'class_id' => $validated['class_id'],
+            'session_id' => $validated['session_id'],
+            'term_id' => $validated['term_id'],
+            'notes' => $validated['notes'] ?? null,
+            'file_url' => $upload['url'],
+            'file_public_id' => $upload['public_id'],
             'uploaded_by' => auth()->id(),
             'approved_by' => auth()->id(),
             'approved_at' => now(),
             'status' => 'approved',
         ]);
+
+        app(NotificationService::class)->notifyResultUploaded($result);
 
         return redirect()->route('admin.results.index')
             ->with('success', __('Result uploaded.'));
@@ -89,7 +98,9 @@ class ResultController extends Controller
 
     public function destroy(Result $result): RedirectResponse
     {
-        // TODO: Delete from Cloudinary using file_public_id
+        if ($result->file_public_id) {
+            app(FileUploadService::class)->delete($result->file_public_id);
+        }
 
         $result->delete();
 

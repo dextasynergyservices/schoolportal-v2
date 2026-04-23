@@ -49,7 +49,6 @@
                     <flux:select name="gender" :label="__('Gender')" required>
                         <option value="male" @selected(old('gender', $student->gender) === 'male')>{{ __('Male') }}</option>
                         <option value="female" @selected(old('gender', $student->gender) === 'female')>{{ __('Female') }}</option>
-                        <option value="other" @selected(old('gender', $student->gender) === 'other')>{{ __('Other') }}</option>
                     </flux:select>
                 </div>
 

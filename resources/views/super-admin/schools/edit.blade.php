@@ -66,10 +66,10 @@
                         <flux:input
                             name="custom_domain"
                             :value="old('custom_domain', $school->custom_domain)"
-                            placeholder="pearschool.com"
+                            placeholder="portal.pearschool.com"
                         />
                         <flux:description>
-                            {{ __('The school accesses the portal on this domain. DNS setup instructions are on the school details page.') }}
+                            {{ __('Enter the exact domain or subdomain the school will use (e.g. portal.pearschool.com). For schools with their own website, use a subdomain so the main site stays untouched. Changing this will reset domain verification.') }}
                         </flux:description>
                     </flux:field>
 
@@ -198,6 +198,77 @@
                 </flux:button>
             </div>
         </form>
+
+        {{-- School Logo (standalone forms — must be outside the main update form) --}}
+        <section class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900 sm:p-6">
+            <flux:heading size="lg">{{ __('School Logo') }}</flux:heading>
+            <flux:text class="mt-1 text-zinc-500">
+                {{ __('Upload a logo that appears in the sidebar, login page, and other branding areas.') }}
+            </flux:text>
+
+            <div class="mt-4 flex items-start gap-4" x-data="{ preview: null }">
+                <div class="shrink-0">
+                    {{-- Client-side preview (shown when file selected) --}}
+                    <img
+                        x-show="preview"
+                        x-cloak
+                        :src="preview"
+                        alt="{{ __('Logo preview') }}"
+                        class="size-20 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    {{-- Server-rendered logo or placeholder --}}
+                    <div x-show="!preview">
+                        @if ($school->logo_url)
+                            <img
+                                src="{{ $school->logo_url }}"
+                                alt="{{ $school->name }} logo"
+                                class="size-20 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+                            />
+                        @else
+                            <div class="flex size-20 items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800">
+                                <flux:icon.photo class="size-8 text-zinc-400" />
+                            </div>
+                        @endif
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <form method="POST" action="{{ route('super-admin.schools.upload-logo', $school) }}" enctype="multipart/form-data" class="space-y-2">
+                        @csrf
+                        <input
+                            type="file"
+                            name="logo"
+                            accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                            class="block w-full text-sm text-zinc-500 file:mr-2 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-300"
+                            required
+                            @change="
+                                const file = $event.target.files[0];
+                                if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (e) => { preview = e.target.result; };
+                                    reader.readAsDataURL(file);
+                                } else {
+                                    preview = null;
+                                }
+                            "
+                        />
+                        @error('logo') <flux:error>{{ $message }}</flux:error> @enderror
+                        <flux:text size="xs" class="text-zinc-500">{{ __('JPG, PNG, WebP or SVG. Max 2 MB.') }}</flux:text>
+                        <flux:button type="submit" variant="primary" size="sm" icon="arrow-up-tray">
+                            {{ $school->logo_url ? __('Replace Logo') : __('Upload Logo') }}
+                        </flux:button>
+                    </form>
+                    @if ($school->logo_url)
+                        <form method="POST" action="{{ route('super-admin.schools.remove-logo', $school) }}">
+                            @csrf
+                            @method('DELETE')
+                            <flux:button type="submit" variant="danger" size="sm" icon="trash">
+                                {{ __('Remove Logo') }}
+                            </flux:button>
+                        </form>
+                    @endif
+                </div>
+            </div>
+        </section>
 
         {{-- Reset School Admin Password --}}
         @if ($primaryAdmin)

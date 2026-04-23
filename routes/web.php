@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AiCreditController;
+use App\Http\Controllers\Admin\AnalyticsController as AdminAnalyticsController;
+use App\Http\Controllers\Admin\AnnouncementController as AdminAnnouncementController;
 use App\Http\Controllers\Admin\ApprovalController;
 use App\Http\Controllers\Admin\AssignmentController;
 use App\Http\Controllers\Admin\AuditLogController;
@@ -11,6 +13,7 @@ use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Admin\HelpController;
+use App\Http\Controllers\Admin\InsightsController as AdminInsightsController;
 use App\Http\Controllers\Admin\LevelController;
 use App\Http\Controllers\Admin\NoticeController;
 use App\Http\Controllers\Admin\ParentController;
@@ -22,7 +25,9 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\StudentImportController;
 use App\Http\Controllers\Admin\TeacherController;
+use App\Http\Controllers\AnnouncementReadController;
 use App\Http\Controllers\Auth\ChangePasswordController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Parent\ChildAssignmentController;
 use App\Http\Controllers\Parent\ChildController;
 use App\Http\Controllers\Parent\ChildGameStatsController;
@@ -30,15 +35,19 @@ use App\Http\Controllers\Parent\ChildQuizResultController;
 use App\Http\Controllers\Parent\ChildResultController;
 use App\Http\Controllers\Parent\DashboardController as ParentDashboardController;
 use App\Http\Controllers\Parent\NoticeController as ParentNoticeController;
+use App\Http\Controllers\Parent\OverviewController as ParentOverviewController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\Student\AssignmentController as StudentAssignmentController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\GameController as StudentGameController;
 use App\Http\Controllers\Student\NoticeController as StudentNoticeController;
+use App\Http\Controllers\Student\ProfileController as StudentProfileController;
 use App\Http\Controllers\Student\QuizController as StudentQuizController;
 use App\Http\Controllers\Student\ResultController as StudentResultController;
+use App\Http\Controllers\SuperAdmin\AnnouncementController as SuperAdminAnnouncementController;
 use App\Http\Controllers\SuperAdmin\CreditController as SuperAdminCreditController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
+use App\Http\Controllers\SuperAdmin\EmailController as SuperAdminEmailController;
 use App\Http\Controllers\SuperAdmin\ParentController as SuperAdminParentController;
 use App\Http\Controllers\SuperAdmin\SchoolController as SuperAdminSchoolController;
 use App\Http\Controllers\SuperAdmin\StudentController as SuperAdminStudentController;
@@ -46,6 +55,7 @@ use App\Http\Controllers\SuperAdmin\TeacherController as SuperAdminTeacherContro
 use App\Http\Controllers\Teacher\AssignmentController as TeacherAssignmentController;
 use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardController;
 use App\Http\Controllers\Teacher\GameController as TeacherGameController;
+use App\Http\Controllers\Teacher\InsightsController as TeacherInsightsController;
 use App\Http\Controllers\Teacher\NoticeController as TeacherNoticeController;
 use App\Http\Controllers\Teacher\QuizController as TeacherQuizController;
 use App\Http\Controllers\Teacher\ResultController as TeacherResultController;
@@ -53,7 +63,17 @@ use App\Http\Controllers\Teacher\StudentController as TeacherStudentController;
 use App\Http\Controllers\Teacher\SubmissionController as TeacherSubmissionController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'landing')->name('home');
+Route::get('/', function () {
+    // If this is a school's custom domain, redirect to login
+    $host = request()->getHost();
+    $platformHost = parse_url(config('app.url', ''), PHP_URL_HOST);
+
+    if ($host !== $platformHost && $host !== 'localhost' && $host !== '127.0.0.1' && ! str_ends_with($host, '.test')) {
+        return redirect('/portal/login');
+    }
+
+    return view('landing');
+})->name('home');
 
 // Paystack webhook (no auth, no CSRF — verified by HMAC signature)
 Route::post('webhooks/paystack', PaystackWebhookController::class)->name('webhooks.paystack');
@@ -83,9 +103,23 @@ Route::prefix('portal')->group(function () {
             };
         })->name('dashboard');
 
+        // ── Notifications (all roles) ──
+        Route::prefix('notifications')->group(function () {
+            Route::get('/', [NotificationController::class, 'index'])->name('notifications.index');
+            Route::post('mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+            Route::delete('clear-all', [NotificationController::class, 'destroyAll'])->name('notifications.clear-all');
+            Route::post('{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+            Route::delete('{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+        });
+
+        // Dismiss school announcement (all roles)
+        Route::post('announcement/{announcement}/dismiss', [AnnouncementReadController::class, 'dismissSchool'])->name('announcement.dismiss');
+
         // ── School Admin Routes ──
         Route::prefix('admin')->middleware('role:school_admin')->group(function () {
             Route::get('dashboard', AdminDashboardController::class)->name('admin.dashboard');
+            Route::get('analytics', AdminAnalyticsController::class)->name('admin.analytics');
+            Route::get('insights', AdminInsightsController::class)->name('admin.insights');
 
             // Students
             Route::resource('students', StudentController::class)->names('admin.students');
@@ -132,6 +166,8 @@ Route::prefix('portal')->group(function () {
 
             // Notices
             Route::resource('notices', NoticeController::class)->names('admin.notices')->except('show');
+            Route::post('notices/{notice}/unpublish', [NoticeController::class, 'unpublish'])->name('admin.notices.unpublish');
+            Route::post('notices/{notice}/publish', [NoticeController::class, 'publish'])->name('admin.notices.publish');
 
             // Approvals
             Route::get('approvals', [ApprovalController::class, 'index'])->name('admin.approvals.index');
@@ -174,10 +210,25 @@ Route::prefix('portal')->group(function () {
             Route::get('settings', [SettingsController::class, 'index'])->name('admin.settings.index');
             Route::put('settings', [SettingsController::class, 'update'])->name('admin.settings.update');
             Route::put('settings/branding', [SettingsController::class, 'updateBranding'])->name('admin.settings.branding');
+            Route::post('settings/upload-logo', [SettingsController::class, 'uploadLogo'])->name('admin.settings.upload-logo');
+            Route::delete('settings/remove-logo', [SettingsController::class, 'removeLogo'])->name('admin.settings.remove-logo');
             Route::put('settings/portal', [SettingsController::class, 'updatePortal'])->name('admin.settings.portal');
 
             // Help Guide
             Route::get('help', HelpController::class)->name('admin.help');
+
+            // Announcements
+            Route::get('announcements', [AdminAnnouncementController::class, 'index'])->name('admin.announcements.index');
+            Route::get('announcements/create', [AdminAnnouncementController::class, 'create'])->name('admin.announcements.create');
+            Route::post('announcements', [AdminAnnouncementController::class, 'store'])->name('admin.announcements.store');
+            Route::get('announcements/{announcement}/edit', [AdminAnnouncementController::class, 'edit'])->name('admin.announcements.edit');
+            Route::put('announcements/{announcement}', [AdminAnnouncementController::class, 'update'])->name('admin.announcements.update');
+            Route::post('announcements/{announcement}/deactivate', [AdminAnnouncementController::class, 'deactivate'])->name('admin.announcements.deactivate');
+            Route::post('announcements/{announcement}/activate', [AdminAnnouncementController::class, 'activate'])->name('admin.announcements.activate');
+            Route::delete('announcements/{announcement}', [AdminAnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
+
+            // Mark platform announcement as read
+            Route::post('platform-announcement/{announcement}/read', [AnnouncementReadController::class, 'markPlatformRead'])->name('admin.platform-announcement.read');
         });
 
         // ── Teacher Routes ──
@@ -191,6 +242,8 @@ Route::prefix('portal')->group(function () {
             Route::get('results', [TeacherResultController::class, 'index'])->name('teacher.results.index');
             Route::get('results/create', [TeacherResultController::class, 'create'])->name('teacher.results.create');
             Route::post('results', [TeacherResultController::class, 'store'])->name('teacher.results.store');
+            Route::get('results/{result}/edit', [TeacherResultController::class, 'edit'])->name('teacher.results.edit');
+            Route::put('results/{result}', [TeacherResultController::class, 'update'])->name('teacher.results.update');
 
             // Assignments
             Route::get('assignments', [TeacherAssignmentController::class, 'index'])->name('teacher.assignments.index');
@@ -203,6 +256,11 @@ Route::prefix('portal')->group(function () {
             Route::get('notices', [TeacherNoticeController::class, 'index'])->name('teacher.notices.index');
             Route::get('notices/create', [TeacherNoticeController::class, 'create'])->name('teacher.notices.create');
             Route::post('notices', [TeacherNoticeController::class, 'store'])->name('teacher.notices.store');
+            Route::get('notices/{notice}/edit', [TeacherNoticeController::class, 'edit'])->name('teacher.notices.edit');
+            Route::put('notices/{notice}', [TeacherNoticeController::class, 'update'])->name('teacher.notices.update');
+            Route::post('notices/{notice}/unpublish', [TeacherNoticeController::class, 'unpublish'])->name('teacher.notices.unpublish');
+            Route::post('notices/{notice}/publish', [TeacherNoticeController::class, 'publish'])->name('teacher.notices.publish');
+            Route::delete('notices/{notice}', [TeacherNoticeController::class, 'destroy'])->name('teacher.notices.destroy');
 
             // Quizzes
             Route::get('quizzes', [TeacherQuizController::class, 'index'])->name('teacher.quizzes.index');
@@ -229,11 +287,15 @@ Route::prefix('portal')->group(function () {
 
             // Submissions (approval tracking)
             Route::get('submissions', [TeacherSubmissionController::class, 'index'])->name('teacher.submissions.index');
+
+            // Insights
+            Route::get('insights', TeacherInsightsController::class)->name('teacher.insights');
         });
 
         // ── Student Routes ──
         Route::prefix('student')->middleware('role:student')->group(function () {
             Route::get('dashboard', StudentDashboardController::class)->name('student.dashboard');
+            Route::get('profile', StudentProfileController::class)->name('student.profile');
 
             // Results
             Route::get('results', [StudentResultController::class, 'index'])->name('student.results.index');
@@ -264,6 +326,12 @@ Route::prefix('portal')->group(function () {
         // ── Parent Routes ──
         Route::prefix('parent')->middleware('role:parent')->group(function () {
             Route::get('dashboard', ParentDashboardController::class)->name('parent.dashboard');
+
+            // Overview pages (all children)
+            Route::get('results', [ParentOverviewController::class, 'results'])->name('parent.results.index');
+            Route::get('assignments', [ParentOverviewController::class, 'assignments'])->name('parent.assignments.index');
+            Route::get('quizzes', [ParentOverviewController::class, 'quizzes'])->name('parent.quizzes.index');
+            Route::get('games', [ParentOverviewController::class, 'games'])->name('parent.games.index');
 
             // Children
             Route::get('children/{child}', [ChildController::class, 'show'])->name('parent.children.show');
@@ -304,6 +372,9 @@ Route::prefix('portal')->group(function () {
             Route::get('schools/{school}/admins/create', [SuperAdminSchoolController::class, 'createAdmin'])->name('super-admin.schools.create-admin');
             Route::post('schools/{school}/admins', [SuperAdminSchoolController::class, 'storeAdmin'])->name('super-admin.schools.store-admin');
             Route::delete('schools/{school}/admins/{admin}', [SuperAdminSchoolController::class, 'destroyAdmin'])->name('super-admin.schools.destroy-admin');
+            Route::post('schools/{school}/verify-domain', [SuperAdminSchoolController::class, 'verifyDomain'])->name('super-admin.schools.verify-domain');
+            Route::post('schools/{school}/upload-logo', [SuperAdminSchoolController::class, 'uploadLogo'])->name('super-admin.schools.upload-logo');
+            Route::delete('schools/{school}/remove-logo', [SuperAdminSchoolController::class, 'removeLogo'])->name('super-admin.schools.remove-logo');
 
             // AI Credits
             Route::get('credits', [SuperAdminCreditController::class, 'index'])->name('super-admin.credits.index');
@@ -326,6 +397,23 @@ Route::prefix('portal')->group(function () {
             Route::get('parents/create', [SuperAdminParentController::class, 'create'])->name('super-admin.parents.create');
             Route::post('parents', [SuperAdminParentController::class, 'store'])->name('super-admin.parents.store');
             Route::delete('parents/{parent}', [SuperAdminParentController::class, 'destroy'])->name('super-admin.parents.destroy');
+
+            // Announcements
+            Route::get('announcements', [SuperAdminAnnouncementController::class, 'index'])->name('super-admin.announcements.index');
+            Route::get('announcements/create', [SuperAdminAnnouncementController::class, 'create'])->name('super-admin.announcements.create');
+            Route::post('announcements', [SuperAdminAnnouncementController::class, 'store'])->name('super-admin.announcements.store');
+            Route::get('announcements/{announcement}', [SuperAdminAnnouncementController::class, 'show'])->name('super-admin.announcements.show');
+            Route::get('announcements/{announcement}/edit', [SuperAdminAnnouncementController::class, 'edit'])->name('super-admin.announcements.edit');
+            Route::put('announcements/{announcement}', [SuperAdminAnnouncementController::class, 'update'])->name('super-admin.announcements.update');
+            Route::post('announcements/{announcement}/deactivate', [SuperAdminAnnouncementController::class, 'deactivate'])->name('super-admin.announcements.deactivate');
+            Route::post('announcements/{announcement}/activate', [SuperAdminAnnouncementController::class, 'activate'])->name('super-admin.announcements.activate');
+            Route::delete('announcements/{announcement}', [SuperAdminAnnouncementController::class, 'destroy'])->name('super-admin.announcements.destroy');
+
+            // Emails
+            Route::get('emails', [SuperAdminEmailController::class, 'index'])->name('super-admin.emails.index');
+            Route::get('emails/create', [SuperAdminEmailController::class, 'create'])->name('super-admin.emails.create');
+            Route::post('emails', [SuperAdminEmailController::class, 'store'])->name('super-admin.emails.store');
+            Route::get('emails/{email}', [SuperAdminEmailController::class, 'show'])->name('super-admin.emails.show');
         });
     });
 

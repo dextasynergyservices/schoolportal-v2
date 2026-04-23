@@ -81,6 +81,9 @@ class ResolveTenant
         }
 
         // Production: resolve school from custom domain
+        // Strip www. prefix — schools register bare domains (e.g., portal.double6.store)
+        $host = preg_replace('/^www\./', '', $host);
+
         $school = School::withoutGlobalScopes()
             ->where('custom_domain', $host)
             ->where('is_active', true)

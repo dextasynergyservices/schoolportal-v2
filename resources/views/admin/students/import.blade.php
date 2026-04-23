@@ -10,6 +10,19 @@
             <flux:callout variant="danger" icon="exclamation-triangle">{{ session('error') }}</flux:callout>
         @endif
 
+        @if (session('skipped_students'))
+            <flux:callout variant="warning" icon="exclamation-triangle">
+                <div>
+                    <p class="font-medium mb-2">{{ __('The following students were skipped:') }}</p>
+                    <ul class="list-disc list-inside text-sm space-y-1">
+                        @foreach (session('skipped_students') as $skipped)
+                            <li>{{ __('Row :line — :name (@:username): :reason', ['line' => $skipped['line'], 'name' => $skipped['name'], 'username' => $skipped['username'], 'reason' => $skipped['reason']]) }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </flux:callout>
+        @endif
+
         <div class="max-w-2xl space-y-6">
             {{-- Instructions --}}
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
@@ -18,7 +31,7 @@
                     <li>{{ __('Download the CSV template and fill in student data.') }}</li>
                     <li>{{ __('Required columns: name, username, gender, class') }}</li>
                     <li>{{ __('Optional columns: admission_number, date_of_birth, address, blood_group') }}</li>
-                    <li>{{ __('Gender must be: male, female, or other') }}</li>
+                    <li>{{ __('Gender must be: male or female') }}</li>
                     <li>{{ __('Class name must match exactly (e.g. "Primary 1", "Nursery 2")') }}</li>
                     <li>{{ __('All imported students will use the default password you set below.') }}</li>
                 </ul>
