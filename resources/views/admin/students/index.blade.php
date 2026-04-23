@@ -14,6 +14,19 @@
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif
 
+        @if (session('skipped_students'))
+            <flux:callout variant="warning" icon="exclamation-triangle">
+                <div>
+                    <p class="font-medium mb-2">{{ __('The following students were skipped during import:') }}</p>
+                    <ul class="list-disc list-inside text-sm space-y-1">
+                        @foreach (session('skipped_students') as $skipped)
+                            <li>{{ __('Row :line — :name (@:username): :reason', ['line' => $skipped['line'], 'name' => $skipped['name'], 'username' => $skipped['username'], 'reason' => $skipped['reason']]) }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </flux:callout>
+        @endif
+
         {{-- Filters --}}
         <form method="GET" action="{{ route('admin.students.index') }}" class="flex flex-wrap items-end gap-3">
             <div class="flex-1 min-w-48">

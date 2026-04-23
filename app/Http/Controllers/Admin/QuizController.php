@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Quiz;
 use App\Models\SchoolClass;
 use App\Models\TeacherAction;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -57,6 +58,8 @@ class QuizController extends Controller
             'is_published' => true,
             'published_at' => now(),
         ]);
+
+        app(NotificationService::class)->notifyQuizPublished($quiz);
 
         return redirect()->route('admin.quizzes.index')
             ->with('success', __('Quiz published and visible to students.'));

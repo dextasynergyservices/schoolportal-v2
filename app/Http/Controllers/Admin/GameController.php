@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\SchoolClass;
 use App\Models\TeacherAction;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -58,6 +59,8 @@ class GameController extends Controller
             'is_published' => true,
             'published_at' => now(),
         ]);
+
+        app(NotificationService::class)->notifyGamePublished($game);
 
         return redirect()->route('admin.games.index')
             ->with('success', __('Game published and visible to students.'));

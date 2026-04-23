@@ -9,6 +9,7 @@ use App\Models\AiCreditPurchase;
 use App\Models\AiCreditUsageLog;
 use App\Models\School;
 use App\Models\User;
+use App\Notifications\CreditPurchaseConfirmation;
 
 class AiCreditService
 {
@@ -97,6 +98,27 @@ class AiCreditService
         $school = School::find($purchase->school_id);
         $school->increment('ai_purchased_credits', $purchase->credits);
         $school->increment('ai_credits_total_purchased', $purchase->credits);
+
+        $formattedAmount = '₦'.number_format((float) $purchase->amount_naira, 0);
+
+        // Notify super admins of the purchase (database + email)
+        app(NotificationService::class)->notifyCreditPurchased(
+            $school,
+            $purchase->credits,
+            $formattedAmount,
+        );
+
+        // Send confirmation email to the purchaser (school admin)
+        $purchaser = User::withoutGlobalScopes()->find($purchase->purchased_by);
+        if ($purchaser?->email) {
+            $newBalance = $school->ai_free_credits + $school->ai_purchased_credits;
+            $purchaser->notify(new CreditPurchaseConfirmation(
+                schoolName: $school->name,
+                credits: $purchase->credits,
+                amount: $formattedAmount,
+                newBalance: $newBalance,
+            ));
+        }
     }
 
     /**

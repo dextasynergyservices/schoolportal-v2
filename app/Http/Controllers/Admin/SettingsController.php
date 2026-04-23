@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -78,5 +79,60 @@ class SettingsController extends Controller
 
         return redirect()->route('admin.settings.index')
             ->with('success', __('Portal settings updated.'));
+    }
+
+    public function uploadLogo(Request $request, FileUploadService $uploader): RedirectResponse
+    {
+        $request->validate([
+            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
+        ]);
+
+        $school = app('current.school');
+
+        try {
+            if ($school->logo_public_id) {
+                $uploader->delete($school->logo_public_id);
+            }
+
+            $result = $uploader->uploadSchoolLogo($request->file('logo'), $school->id);
+
+            $school->logo_url = $result['url'];
+            $school->logo_public_id = $result['public_id'];
+            $school->save();
+
+            \Log::info('Logo uploaded successfully', [
+                'school_id' => $school->id,
+                'logo_url' => $school->logo_url,
+                'logo_public_id' => $school->logo_public_id,
+            ]);
+
+            return redirect()->route('admin.settings.index')
+                ->with('success', __('School logo updated.'));
+        } catch (\Throwable $e) {
+            \Log::error('Logo upload failed', [
+                'school_id' => $school->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.settings.index')
+                ->with('error', __('Logo upload failed: ').$e->getMessage());
+        }
+    }
+
+    public function removeLogo(FileUploadService $uploader): RedirectResponse
+    {
+        $school = app('current.school');
+
+        if ($school->logo_public_id) {
+            $uploader->delete($school->logo_public_id);
+        }
+
+        $school->update([
+            'logo_url' => null,
+            'logo_public_id' => null,
+        ]);
+
+        return redirect()->route('admin.settings.index')
+            ->with('success', __('School logo removed.'));
     }
 }

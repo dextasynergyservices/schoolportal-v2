@@ -1,12 +1,22 @@
 <x-layouts::app :title="__('Teacher Dashboard')">
+    @php
+        $hour = (int) now()->format('G');
+        $timeGreeting = match (true) {
+            $hour >= 5 && $hour < 12  => __('Good morning'),
+            $hour >= 12 && $hour < 17 => __('Good afternoon'),
+            default                    => __('Good evening'),
+        };
+    @endphp
     @include('partials.dashboard-styles')
+
+    @include('partials.announcement-banners')
 
     <div class="space-y-6">
         {{-- ── Welcome Banner ─────────────────────────────────────── --}}
-        <div class="dash-welcome dash-animate" role="banner">
+        <div class="dash-welcome dash-welcome-teacher dash-animate" role="banner">
             <div class="relative z-10">
                 <h1 class="text-xl sm:text-2xl font-bold text-white">
-                    {{ __('Welcome back, :name', ['name' => $teacher->name]) }} 👋
+                    {{ $timeGreeting }}, {{ $teacher->name }} 👋
                 </h1>
                 @if ($currentSession && $currentTerm)
                     <p class="mt-1 text-sm text-white/70">
@@ -19,6 +29,15 @@
                 @endif
             </div>
         </div>
+
+        {{-- ── Session/Term Filter ─────────────────────────────────── --}}
+        @include('partials.session-term-filter', [
+            'route' => 'teacher.dashboard',
+            'allSessions' => $allSessions,
+            'sessionTerms' => $sessionTerms,
+            'currentSession' => $currentSession,
+            'currentTerm' => $currentTerm,
+        ])
 
         {{-- ── Rejected Submissions Alert ─────────────────────────── --}}
         @if ($rejectedSubmissions->isNotEmpty())
@@ -215,6 +234,15 @@
             </div>
         @endif
 
+        {{-- ── Student Performance Insights (lazy-loaded) ─────────── --}}
+        <div class="dash-animate dash-animate-delay-4">
+            <livewire:teacher.student-insights
+                :session-id="$currentSession?->id"
+                :term-id="$currentTerm?->id"
+                :compact="true"
+                lazy />
+        </div>
+
         {{-- ── Upcoming Deadlines + My Classes ────────────────────── --}}
         <div class="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <div class="dash-panel dash-animate dash-animate-delay-4">
@@ -254,7 +282,7 @@
                             <div class="w-12 h-12 mx-auto rounded-full bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center mb-3">
                                 <flux:icon.calendar class="w-6 h-6 text-zinc-400" />
                             </div>
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('No upcoming deadlines') }}</p>
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('All clear — no upcoming assignment deadlines for your classes.') }}</p>
                         </div>
                     @endforelse
                 </div>

@@ -25,6 +25,16 @@ class ValidateRecaptcha
             return $next($request);
         }
 
+        // Skip reCAPTCHA on school custom domains.
+        // Google reCAPTCHA client-side JS requires each domain to be registered in the
+        // admin console, which doesn't scale for multi-tenant with dynamic custom domains.
+        // School logins are still protected by rate limiting (5 attempts/min per IP).
+        $school = app()->bound('current.school') ? app('current.school') : null;
+        $platformHost = parse_url(config('app.url'), PHP_URL_HOST);
+        if ($school && $request->getHost() !== $platformHost) {
+            return $next($request);
+        }
+
         // Skip for routes that don't need reCAPTCHA (already behind auth)
         if ($request->routeIs('password.confirm.store', 'password.confirmation')) {
             return $next($request);

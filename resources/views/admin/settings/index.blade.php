@@ -5,6 +5,9 @@
         @if (session('success'))
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif
+        @if (session('error'))
+            <flux:callout variant="danger" icon="exclamation-triangle">{{ session('error') }}</flux:callout>
+        @endif
 
         <div class="max-w-2xl space-y-8">
             {{-- School Information --}}
@@ -39,23 +42,136 @@
 
             {{-- Branding --}}
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-                <flux:heading size="sm" class="mb-4">{{ __('Branding Colors') }}</flux:heading>
-                <form method="POST" action="{{ route('admin.settings.branding') }}" class="space-y-4">
+                <flux:heading size="sm" class="mb-2">{{ __('Branding') }}</flux:heading>
+                <flux:text size="sm" class="mb-4 text-zinc-500">{{ __('Logo and colors that appear throughout your school portal.') }}</flux:text>
+
+                {{-- Logo upload --}}
+                <div class="mb-6 pb-6 border-b border-zinc-200 dark:border-zinc-700"
+                     x-data="{ preview: null }"
+                >
+                    <flux:text size="sm" class="font-semibold mb-3">{{ __('School Logo') }}</flux:text>
+                    <div class="flex items-start gap-4">
+                        <div class="shrink-0">
+                            {{-- Client-side preview (shown when file selected) --}}
+                            <img
+                                x-show="preview"
+                                x-cloak
+                                :src="preview"
+                                alt="{{ __('Logo preview') }}"
+                                class="size-20 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900"
+                            />
+                            {{-- Server-rendered logo or placeholder --}}
+                            <div x-show="!preview">
+                                @if ($school->logo_url)
+                                    <img
+                                        src="{{ $school->logo_url }}"
+                                        alt="{{ $school->name }} logo"
+                                        class="size-20 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900"
+                                    />
+                                @else
+                                    <div class="flex size-20 items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900">
+                                        <flux:icon.photo class="size-8 text-zinc-400" />
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <form method="POST" action="{{ route('admin.settings.upload-logo') }}" enctype="multipart/form-data" class="space-y-2">
+                                @csrf
+                                <input
+                                    type="file"
+                                    name="logo"
+                                    accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                                    class="block w-full text-sm text-zinc-500 file:mr-2 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-300"
+                                    required
+                                    @change="
+                                        const file = $event.target.files[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (e) => { preview = e.target.result; };
+                                            reader.readAsDataURL(file);
+                                        } else {
+                                            preview = null;
+                                        }
+                                    "
+                                />
+                                @error('logo') <flux:error>{{ $message }}</flux:error> @enderror
+                                <flux:text size="xs" class="text-zinc-500">{{ __('JPG, PNG, WebP or SVG. Max 2 MB.') }}</flux:text>
+                                <flux:button type="submit" variant="primary" size="sm" icon="arrow-up-tray">
+                                    {{ $school->logo_url ? __('Replace Logo') : __('Upload Logo') }}
+                                </flux:button>
+                            </form>
+                            @if ($school->logo_url)
+                                <form method="POST" action="{{ route('admin.settings.remove-logo') }}">
+                                    @csrf
+                                    @method('DELETE')
+                                    <flux:button type="submit" variant="danger" size="sm" icon="trash">
+                                        {{ __('Remove Logo') }}
+                                    </flux:button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Colors --}}
+                @php
+                    $brandPrimary = $school->settings['branding']['primary_color'] ?? '#4F46E5';
+                    $brandSecondary = $school->settings['branding']['secondary_color'] ?? '#F59E0B';
+                    $brandAccent = $school->settings['branding']['accent_color'] ?? '#10B981';
+                @endphp
+
+                <form
+                    method="POST"
+                    action="{{ route('admin.settings.branding') }}"
+                    class="space-y-4"
+                    x-data="{
+                        primary: '{{ old('primary_color', $brandPrimary) }}',
+                        secondary: '{{ old('secondary_color', $brandSecondary) }}',
+                        accent: '{{ old('accent_color', $brandAccent) }}',
+                    }"
+                >
                     @csrf
                     @method('PUT')
 
+                    <flux:text size="sm" class="font-semibold">{{ __('Brand Colors') }}</flux:text>
+
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Primary Color') }}</label>
-                            <input type="color" name="primary_color" value="{{ old('primary_color', $school->settings['branding']['primary_color'] ?? '#4F46E5') }}" class="h-10 w-full rounded border border-zinc-300 cursor-pointer" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Secondary Color') }}</label>
-                            <input type="color" name="secondary_color" value="{{ old('secondary_color', $school->settings['branding']['secondary_color'] ?? '#F59E0B') }}" class="h-10 w-full rounded border border-zinc-300 cursor-pointer" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Accent Color') }}</label>
-                            <input type="color" name="accent_color" value="{{ old('accent_color', $school->settings['branding']['accent_color'] ?? '#10B981') }}" class="h-10 w-full rounded border border-zinc-300 cursor-pointer" />
+                        @foreach ([
+                            ['label' => __('Primary'), 'name' => 'primary_color', 'model' => 'primary'],
+                            ['label' => __('Secondary'), 'name' => 'secondary_color', 'model' => 'secondary'],
+                            ['label' => __('Accent'), 'name' => 'accent_color', 'model' => 'accent'],
+                        ] as $color)
+                            <div class="space-y-2">
+                                <label for="{{ $color['name'] }}" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                    {{ $color['label'] }}
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        id="{{ $color['name'] }}"
+                                        name="{{ $color['name'] }}"
+                                        x-model="{{ $color['model'] }}"
+                                        class="h-10 w-12 shrink-0 cursor-pointer rounded border border-zinc-300 bg-transparent p-1 dark:border-zinc-600"
+                                    />
+                                    <input
+                                        type="text"
+                                        x-model="{{ $color['model'] }}"
+                                        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+                                        pattern="^#[0-9A-Fa-f]{6}$"
+                                    />
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    {{-- Live preview --}}
+                    <div class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                        <flux:text size="xs" class="mb-2 uppercase tracking-wide text-zinc-500">{{ __('Preview') }}</flux:text>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-white" :style="`background-color: ${primary}`">{{ __('Primary') }}</span>
+                            <span class="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-white" :style="`background-color: ${secondary}`">{{ __('Secondary') }}</span>
+                            <span class="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-white" :style="`background-color: ${accent}`">{{ __('Accent') }}</span>
                         </div>
                     </div>
 

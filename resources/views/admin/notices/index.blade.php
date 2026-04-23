@@ -10,38 +10,148 @@
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif
 
+        @if (session('error'))
+            <flux:callout variant="danger" icon="exclamation-triangle">{{ session('error') }}</flux:callout>
+        @endif
+
         <flux:table>
             <flux:table.columns>
                 <flux:table.column>{{ __('Title') }}</flux:table.column>
-                <flux:table.column>{{ __('Created By') }}</flux:table.column>
-                <flux:table.column>{{ __('Published') }}</flux:table.column>
-                <flux:table.column>{{ __('Expires') }}</flux:table.column>
-                <flux:table.column>{{ __('Date') }}</flux:table.column>
-                <flux:table.column class="w-32" />
+                <flux:table.column class="hidden sm:table-cell">{{ __('Created By') }}</flux:table.column>
+                <flux:table.column>{{ __('Status') }}</flux:table.column>
+                <flux:table.column class="hidden md:table-cell">{{ __('Expires') }}</flux:table.column>
+                <flux:table.column class="hidden sm:table-cell">{{ __('Date') }}</flux:table.column>
+                <flux:table.column class="w-40" />
             </flux:table.columns>
             <flux:table.rows>
                 @forelse ($notices as $notice)
                     <flux:table.row>
-                        <flux:table.cell class="font-medium">{{ Str::limit($notice->title, 50) }}</flux:table.cell>
-                        <flux:table.cell class="text-zinc-500">{{ $notice->creator?->name ?? '—' }}</flux:table.cell>
+                        <flux:table.cell class="font-medium">
+                            <span class="flex items-center gap-1.5">
+                                {{ Str::limit($notice->title, 50) }}
+                                @if ($notice->file_url)
+                                    <flux:icon.paper-clip class="w-4 h-4 text-zinc-400" />
+                                @endif
+                            </span>
+                        </flux:table.cell>
+                        <flux:table.cell class="hidden sm:table-cell text-zinc-500">{{ $notice->creator?->name ?? '—' }}</flux:table.cell>
                         <flux:table.cell>
                             @if ($notice->is_published)
-                                <flux:badge color="green" size="sm">{{ __('Yes') }}</flux:badge>
+                                <flux:badge color="green" size="sm">{{ __('Published') }}</flux:badge>
+                            @elseif ($notice->status === 'approved')
+                                <flux:badge color="sky" size="sm">{{ __('Unpublished') }}</flux:badge>
+                            @elseif ($notice->status === 'pending')
+                                <flux:badge color="yellow" size="sm">{{ __('Pending') }}</flux:badge>
+                            @elseif ($notice->status === 'rejected')
+                                <flux:badge color="red" size="sm">{{ __('Rejected') }}</flux:badge>
                             @else
-                                <flux:badge color="zinc" size="sm">{{ __('No') }}</flux:badge>
+                                <flux:badge color="zinc" size="sm">{{ __('Draft') }}</flux:badge>
                             @endif
                         </flux:table.cell>
-                        <flux:table.cell>{{ $notice->expires_at?->format('M j, Y') ?? '—' }}</flux:table.cell>
-                        <flux:table.cell class="text-zinc-500">{{ $notice->created_at->format('M j, Y') }}</flux:table.cell>
+                        <flux:table.cell class="hidden md:table-cell text-zinc-500">{{ $notice->expires_at?->format('M j, Y') ?? '—' }}</flux:table.cell>
+                        <flux:table.cell class="hidden sm:table-cell text-zinc-500">{{ $notice->created_at->format('M j, Y') }}</flux:table.cell>
                         <flux:table.cell>
                             <div class="flex items-center gap-1">
-                                <flux:button variant="subtle" size="xs" icon="pencil-square" href="{{ route('admin.notices.edit', $notice) }}" wire:navigate />
-                                <x-confirm-delete
-                                    :action="route('admin.notices.destroy', $notice)"
-                                    :title="__('Delete Notice')"
-                                    :message="__('Are you sure you want to delete this notice? This action cannot be undone.')"
-                                    :ariaLabel="__('Delete notice')"
-                                />
+                                {{-- Preview modal --}}
+                                <div x-data="{ showPreview: false }">
+                                    <flux:button variant="subtle" size="xs" icon="eye" @click="showPreview = true" :aria-label="__('Preview notice')" />
+
+                                    <div x-show="showPreview" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="showPreview = false" @keydown.escape.window="showPreview = false">
+                                        <div class="bg-white dark:bg-zinc-800 rounded-xl shadow-xl max-w-2xl w-full mx-auto max-h-[85vh] flex flex-col" @click.stop>
+                                            <div class="flex items-start justify-between gap-4 p-5 border-b border-zinc-200 dark:border-zinc-700">
+                                                <div>
+                                                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-white">{{ $notice->title }}</h3>
+                                                    <p class="text-xs text-zinc-500 mt-1">
+                                                        {{ __('By') }} {{ $notice->creator?->name ?? __('Unknown') }} &middot; {{ $notice->created_at->format('M j, Y g:i A') }}
+                                                    </p>
+                                                </div>
+                                                <button @click="showPreview = false" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1">
+                                                    <flux:icon name="x-mark" class="size-5" />
+                                                </button>
+                                            </div>
+                                            <div class="p-5 overflow-y-auto flex-1 space-y-4">
+                                                <div class="prose prose-sm dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300">
+                                                    {!! nl2br(e($notice->content)) !!}
+                                                </div>
+                                                @if ($notice->file_url)
+                                                    <div class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+                                                        @if ($notice->fileIsImage())
+                                                            <img src="{{ $notice->file_url }}" alt="{{ $notice->file_name ?? __('Notice attachment') }}" class="w-full max-h-80 object-contain bg-zinc-50 dark:bg-zinc-900" />
+                                                        @else
+                                                            <div class="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-700/50">
+                                                                <flux:icon.paper-clip class="size-5 text-zinc-500 shrink-0" />
+                                                                <span class="text-sm text-zinc-700 dark:text-zinc-300 truncate flex-1">{{ $notice->file_name ?? __('Attached file') }}</span>
+                                                                <a href="{{ $notice->file_url }}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap">{{ __('Open file') }}</a>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                                                    <div>
+                                                        <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">{{ __('Levels') }}</span>
+                                                        <p class="mt-0.5 text-zinc-700 dark:text-zinc-300">
+                                                            @if (!empty($notice->target_levels))
+                                                                {{ \App\Models\SchoolLevel::whereIn('id', $notice->target_levels)->pluck('name')->join(', ') }}
+                                                            @else
+                                                                {{ __('All levels') }}
+                                                            @endif
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">{{ __('Classes') }}</span>
+                                                        <p class="mt-0.5 text-zinc-700 dark:text-zinc-300">
+                                                            @if (!empty($notice->target_classes))
+                                                                {{ \App\Models\SchoolClass::whereIn('id', $notice->target_classes)->pluck('name')->join(', ') }}
+                                                            @else
+                                                                {{ __('All classes') }}
+                                                            @endif
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">{{ __('Audience') }}</span>
+                                                        <p class="mt-0.5 text-zinc-700 dark:text-zinc-300">
+                                                            @if (!empty($notice->target_roles))
+                                                                {{ collect($notice->target_roles)->map(fn ($r) => ucfirst($r) . 's')->join(', ') }}
+                                                            @else
+                                                                {{ __('Everyone') }}
+                                                            @endif
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                @if ($notice->expires_at)
+                                                    <p class="text-xs text-zinc-500">{{ __('Expires:') }} {{ $notice->expires_at->format('M j, Y') }}</p>
+                                                @endif
+                                            </div>
+                                            <div class="flex justify-end gap-2 p-5 border-t border-zinc-200 dark:border-zinc-700">
+                                                <flux:button variant="subtle" size="sm" @click="showPreview = false">{{ __('Close') }}</flux:button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Edit & actions only for notices the admin created --}}
+                                @if ($notice->created_by === auth()->id())
+                                    <flux:button variant="subtle" size="xs" icon="pencil-square" href="{{ route('admin.notices.edit', $notice) }}" wire:navigate />
+
+                                    @if ($notice->is_published)
+                                        <form method="POST" action="{{ route('admin.notices.unpublish', $notice) }}">
+                                            @csrf
+                                            <flux:button type="submit" variant="subtle" size="xs" icon="eye-slash" :aria-label="__('Unpublish notice')" />
+                                        </form>
+                                    @elseif ($notice->status === 'approved')
+                                        <form method="POST" action="{{ route('admin.notices.publish', $notice) }}">
+                                            @csrf
+                                            <flux:button type="submit" variant="subtle" size="xs" icon="eye" :aria-label="__('Publish notice')" />
+                                        </form>
+                                    @endif
+
+                                    <x-confirm-delete
+                                        :action="route('admin.notices.destroy', $notice)"
+                                        :title="__('Delete Notice')"
+                                        :message="__('Are you sure you want to delete this notice? This action cannot be undone.')"
+                                        :ariaLabel="__('Delete notice')"
+                                    />
+                                @endif
                             </div>
                         </flux:table.cell>
                     </flux:table.row>

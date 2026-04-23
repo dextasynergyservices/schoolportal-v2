@@ -21,6 +21,9 @@
         @if (session('success'))
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif
+        @if (session('error'))
+            <flux:callout variant="danger" icon="exclamation-triangle">{{ session('error') }}</flux:callout>
+        @endif
 
         {{-- Status + quick actions --}}
         <div class="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
@@ -227,29 +230,106 @@
                 @endif
             </div>
 
-            {{-- Branding preview --}}
-            <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            {{-- Branding --}}
+            <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900 lg:col-span-2">
                 <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
                     <flux:heading size="lg">{{ __('Branding') }}</flux:heading>
                 </div>
-                <div class="space-y-3 p-4">
-                    @foreach ([
-                        __('Primary') => $primaryColor,
-                        __('Secondary') => $secondaryColor,
-                        __('Accent') => $accentColor,
-                    ] as $label => $hex)
-                        <div class="flex items-center gap-3">
-                            <span
-                                class="inline-block size-10 rounded-lg border border-zinc-200 dark:border-zinc-700"
-                                style="background-color: {{ $hex }}"
-                                aria-hidden="true"
-                            ></span>
-                            <div>
-                                <div class="text-sm font-medium">{{ $label }}</div>
-                                <div class="font-mono text-xs text-zinc-500">{{ $hex }}</div>
+                <div class="grid grid-cols-1 gap-6 p-4 sm:grid-cols-2">
+                    {{-- Logo --}}
+                    <div class="space-y-4">
+                        <flux:text size="sm" class="font-semibold">{{ __('School Logo') }}</flux:text>
+                        <div class="flex items-start gap-4" x-data="{ preview: null }">
+                            <div class="shrink-0">
+                                {{-- Client-side preview (shown when file selected) --}}
+                                <img
+                                    x-show="preview"
+                                    x-cloak
+                                    :src="preview"
+                                    alt="{{ __('Logo preview') }}"
+                                    class="size-24 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+                                />
+                                {{-- Server-rendered logo or placeholder --}}
+                                <div x-show="!preview">
+                                    @if ($school->logo_url)
+                                        <img
+                                            src="{{ $school->logo_url }}"
+                                            alt="{{ $school->name }} logo"
+                                            class="size-24 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
+                                        />
+                                    @else
+                                        <div class="flex size-24 items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800">
+                                            <flux:icon.photo class="size-8 text-zinc-400" />
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <form method="POST" action="{{ route('super-admin.schools.upload-logo', $school) }}" enctype="multipart/form-data" class="space-y-2">
+                                    @csrf
+                                    <input
+                                        type="file"
+                                        name="logo"
+                                        id="logo-upload-{{ $school->id }}"
+                                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                                        class="block w-full text-sm text-zinc-500 file:mr-2 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-300"
+                                        required
+                                        @change="
+                                            const file = $event.target.files[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onload = (e) => { preview = e.target.result; };
+                                                reader.readAsDataURL(file);
+                                            } else {
+                                                preview = null;
+                                            }
+                                        "
+                                    />
+                                    @error('logo') <flux:error>{{ $message }}</flux:error> @enderror
+                                    <flux:text size="xs" class="text-zinc-500">{{ __('JPG, PNG, WebP or SVG. Max 2 MB.') }}</flux:text>
+                                    <flux:button type="submit" variant="primary" size="xs" icon="arrow-up-tray">
+                                        {{ $school->logo_url ? __('Replace Logo') : __('Upload Logo') }}
+                                    </flux:button>
+                                </form>
+                                @if ($school->logo_url)
+                                    <form method="POST" action="{{ route('super-admin.schools.remove-logo', $school) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <flux:button type="submit" variant="danger" size="xs" icon="trash">
+                                            {{ __('Remove Logo') }}
+                                        </flux:button>
+                                    </form>
+                                @endif
                             </div>
                         </div>
-                    @endforeach
+                    </div>
+
+                    {{-- Colors --}}
+                    <div class="space-y-4">
+                        <flux:text size="sm" class="font-semibold">{{ __('Brand Colors') }}</flux:text>
+                        <div class="space-y-3">
+                            @foreach ([
+                                __('Primary') => $primaryColor,
+                                __('Secondary') => $secondaryColor,
+                                __('Accent') => $accentColor,
+                            ] as $label => $hex)
+                                <div class="flex items-center gap-3">
+                                    <span
+                                        class="inline-block size-10 rounded-lg border border-zinc-200 dark:border-zinc-700"
+                                        style="background-color: {{ $hex }}"
+                                        aria-hidden="true"
+                                    ></span>
+                                    <div>
+                                        <div class="text-sm font-medium">{{ $label }}</div>
+                                        <div class="font-mono text-xs text-zinc-500">{{ $hex }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                            <flux:button variant="subtle" size="xs" icon="pencil-square" href="{{ route('super-admin.schools.edit', $school) }}" wire:navigate>
+                                {{ __('Edit Colors') }}
+                            </flux:button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -291,59 +371,62 @@
             </div>
             <div class="space-y-4 p-4">
                 @if ($school->custom_domain)
-                    <div class="flex items-center gap-2">
-                        <flux:icon.globe-alt class="size-5 text-zinc-500" />
-                        <span class="font-mono text-sm font-medium">{{ $school->custom_domain }}</span>
-                        <a href="https://{{ $school->custom_domain }}" target="_blank" rel="noopener noreferrer" class="ml-1 text-xs text-zinc-500 hover:underline">
-                            {{ __('Open ↗') }}
-                        </a>
-                    </div>
-
-                    <flux:callout variant="secondary" icon="information-circle">
-                        <flux:heading size="sm">{{ __('DNS setup required') }}</flux:heading>
-                        <flux:text size="sm" class="mt-1">
-                            {{ __('Have the school add ONE of the following options at their domain registrar so the portal resolves on their domain.') }}
-                        </flux:text>
-                    </flux:callout>
-
-                    {{-- Option A: CNAME records (recommended) --}}
-                    <div class="space-y-2">
-                        <flux:text size="sm" class="font-semibold">{{ __('Option A — CNAME Records (Recommended)') }}</flux:text>
-                        <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                            <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
-                                <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
-                                    <tr>
-                                        <th scope="col" class="px-3 py-2">{{ __('Type') }}</th>
-                                        <th scope="col" class="px-3 py-2">{{ __('Name') }}</th>
-                                        <th scope="col" class="px-3 py-2">{{ __('Value') }}</th>
-                                        <th scope="col" class="px-3 py-2">{{ __('TTL') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-zinc-100 font-mono dark:divide-zinc-800">
-                                    <tr>
-                                        <td class="px-3 py-2">CNAME</td>
-                                        <td class="px-3 py-2">@</td>
-                                        <td class="px-3 py-2">{{ $platformDomain }}</td>
-                                        <td class="px-3 py-2">3600</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-3 py-2">CNAME</td>
-                                        <td class="px-3 py-2">www</td>
-                                        <td class="px-3 py-2">{{ $platformDomain }}</td>
-                                        <td class="px-3 py-2">3600</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    {{-- Domain + verification status --}}
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2">
+                            <flux:icon.globe-alt class="size-5 text-zinc-500" />
+                            <span class="font-mono text-sm font-medium">{{ $school->custom_domain }}</span>
+                            <a href="https://{{ $school->custom_domain }}" target="_blank" rel="noopener noreferrer" class="ml-1 text-xs text-zinc-500 hover:underline">
+                                {{ __('Open ↗') }}
+                            </a>
                         </div>
-                        <flux:text size="xs" class="text-zinc-500">
-                            {{ __('Note: Some registrars do not support CNAME on the root (@). In that case, use a CNAME for www only and redirect @ to www, or use Option B.') }}
-                        </flux:text>
+
+                        @if ($school->domain_verified_at)
+                            <span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                <flux:icon.check-circle class="size-3.5" />
+                                {{ __('Verified') }}
+                            </span>
+                            <span class="text-xs text-zinc-500">{{ $school->domain_verified_at->diffForHumans() }}</span>
+                        @else
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                <flux:icon.clock class="size-3.5" />
+                                {{ __('Unverified') }}
+                            </span>
+                        @endif
                     </div>
 
-                    {{-- Option B: A records --}}
-                    <div class="space-y-2">
-                        <flux:text size="sm" class="font-semibold">{{ __('Option B — A Records (if CNAME on root is not supported)') }}</flux:text>
-                        @if ($serverIp)
+                    {{-- Verify button --}}
+                    <form method="POST" action="{{ route('super-admin.schools.verify-domain', $school) }}">
+                        @csrf
+                        <flux:button type="submit" variant="primary" size="sm" icon="arrow-path">
+                            {{ $school->domain_verified_at ? __('Re-check Domain') : __('Verify Domain') }}
+                        </flux:button>
+                    </form>
+
+                    {{-- Flash messages for verification results --}}
+                    @if (session('warning'))
+                        <flux:callout variant="warning" icon="exclamation-triangle">
+                            <flux:text size="sm">{{ session('warning') }}</flux:text>
+                        </flux:callout>
+                    @endif
+
+                    @unless ($school->domain_verified_at)
+                        {{-- DNS instructions (shown only when not verified) --}}
+                        <flux:callout variant="secondary" icon="information-circle">
+                            <flux:heading size="sm">{{ __('DNS setup required') }}</flux:heading>
+                            <flux:text size="sm" class="mt-1">
+                                {{ __('Have the school add ONE of the following DNS record options at their domain registrar. For subdomains like portal.pearschool.com, the school adds records for "portal" (not "@").') }}
+                            </flux:text>
+                        </flux:callout>
+
+                        @php
+                            $isSubdomain = substr_count($school->custom_domain, '.') > 1;
+                            $dnsName = $isSubdomain ? explode('.', $school->custom_domain, 2)[0] : '@';
+                        @endphp
+
+                        {{-- Option A: CNAME record (recommended) --}}
+                        <div class="space-y-2">
+                            <flux:text size="sm" class="font-semibold">{{ __('Option A — CNAME Record (Recommended)') }}</flux:text>
                             <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
                                 <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
                                     <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
@@ -356,31 +439,65 @@
                                     </thead>
                                     <tbody class="divide-y divide-zinc-100 font-mono dark:divide-zinc-800">
                                         <tr>
-                                            <td class="px-3 py-2">A</td>
-                                            <td class="px-3 py-2">@</td>
-                                            <td class="px-3 py-2">{{ $serverIp }}</td>
-                                            <td class="px-3 py-2">3600</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-3 py-2">A</td>
-                                            <td class="px-3 py-2">www</td>
-                                            <td class="px-3 py-2">{{ $serverIp }}</td>
+                                            <td class="px-3 py-2">CNAME</td>
+                                            <td class="px-3 py-2">{{ $dnsName }}</td>
+                                            <td class="px-3 py-2">{{ $platformDomain }}</td>
                                             <td class="px-3 py-2">3600</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
-                        @else
-                            <flux:callout variant="warning" icon="exclamation-triangle">
-                                <flux:text size="sm">{{ __('Server IP not configured. Add SERVER_IP to your .env file to display A record instructions.') }}</flux:text>
-                            </flux:callout>
-                        @endif
-                    </div>
+                            @unless ($isSubdomain)
+                                <flux:text size="xs" class="text-zinc-500">
+                                    {{ __('Note: Some registrars do not support CNAME on the root (@). In that case, use Option B, or consider using a subdomain like portal.pearschool.com.') }}
+                                </flux:text>
+                            @endunless
+                        </div>
 
-                    <flux:text size="sm" class="text-zinc-500">
-                        {{ __('After DNS propagates (up to 24 hours), SSL is auto-provisioned and the portal becomes reachable at') }}
-                        <span class="font-mono">https://{{ $school->custom_domain }}/portal</span>.
-                    </flux:text>
+                        {{-- Option B: A record --}}
+                        <div class="space-y-2">
+                            <flux:text size="sm" class="font-semibold">{{ __('Option B — A Record (if CNAME is not supported)') }}</flux:text>
+                            @if ($serverIp)
+                                <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
+                                        <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
+                                            <tr>
+                                                <th scope="col" class="px-3 py-2">{{ __('Type') }}</th>
+                                                <th scope="col" class="px-3 py-2">{{ __('Name') }}</th>
+                                                <th scope="col" class="px-3 py-2">{{ __('Value') }}</th>
+                                                <th scope="col" class="px-3 py-2">{{ __('TTL') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-zinc-100 font-mono dark:divide-zinc-800">
+                                            <tr>
+                                                <td class="px-3 py-2">A</td>
+                                                <td class="px-3 py-2">{{ $dnsName }}</td>
+                                                <td class="px-3 py-2">{{ $serverIp }}</td>
+                                                <td class="px-3 py-2">3600</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <flux:callout variant="warning" icon="exclamation-triangle">
+                                    <flux:text size="sm">{{ __('Server IP not configured. Add SERVER_IP to your .env file to display A record instructions.') }}</flux:text>
+                                </flux:callout>
+                            @endif
+                        </div>
+
+                        <flux:text size="sm" class="text-zinc-500">
+                            {{ __('After DNS propagates (5 minutes to 48 hours), SSL is auto-provisioned via cPanel AutoSSL. Then click "Verify Domain" above to confirm everything is working.') }}
+                        </flux:text>
+                    @endunless
+
+                    @if ($school->domain_verified_at)
+                        <flux:callout variant="success" icon="check-circle">
+                            <flux:text size="sm">
+                                {{ __('This domain is verified and serving the portal at') }}
+                                <a href="https://{{ $school->custom_domain }}/portal/login" target="_blank" class="font-mono underline">https://{{ $school->custom_domain }}/portal/login</a>.
+                            </flux:text>
+                        </flux:callout>
+                    @endif
                 @else
                     <flux:text class="text-zinc-500">
                         {{ __('No custom domain set. Add one in') }}

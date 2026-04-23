@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ParentProfile;
 use App\Models\ParentStudent;
+use App\Models\SchoolClass;
+use App\Models\SchoolLevel;
 use App\Models\User;
 use App\Notifications\PasswordResetByAdmin;
 use App\Notifications\WelcomeNewUser;
@@ -39,13 +41,30 @@ class ParentController extends Controller
 
     public function create(): View
     {
+        $levels = SchoolLevel::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get(['id', 'name']);
+
+        $classes = SchoolClass::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'level_id']);
+
         $students = User::where('role', 'student')
             ->where('is_active', true)
-            ->with('studentProfile.class:id,name')
+            ->with('studentProfile:id,user_id,class_id,admission_number')
             ->orderBy('name')
-            ->get();
+            ->get(['id', 'name', 'username']);
 
-        return view('admin.parents.create', compact('students'));
+        // Build structured data for Alpine.js cascading selection
+        $studentData = $students->map(fn (User $s) => [
+            'id' => $s->id,
+            'name' => $s->name,
+            'username' => $s->username,
+            'admission_number' => $s->studentProfile?->admission_number,
+            'class_id' => $s->studentProfile?->class_id,
+        ]);
+
+        return view('admin.parents.create', compact('levels', 'classes', 'studentData'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -55,7 +74,7 @@ class ParentController extends Controller
             'username' => ['required', 'string', 'max:100', 'unique:users,username'],
             'password' => ['required', 'string', Password::defaults()],
             'phone' => ['nullable', 'string', 'max:20'],
-            'gender' => ['nullable', 'in:male,female,other'],
+            'gender' => ['nullable', 'in:male,female'],
             'occupation' => ['nullable', 'string', 'max:255'],
             'relationship' => ['nullable', 'in:father,mother,guardian,other'],
             'address' => ['nullable', 'string'],
@@ -63,7 +82,7 @@ class ParentController extends Controller
             'student_ids.*' => ['exists:users,id'],
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $parent = DB::transaction(function () use ($validated) {
             $parent = User::create([
                 'name' => $validated['name'],
                 'username' => $validated['username'],
@@ -111,15 +130,31 @@ class ParentController extends Controller
 
         $parent->load('parentProfile');
 
+        $levels = SchoolLevel::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get(['id', 'name']);
+
+        $classes = SchoolClass::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'level_id']);
+
         $students = User::where('role', 'student')
             ->where('is_active', true)
-            ->with('studentProfile.class:id,name')
+            ->with('studentProfile:id,user_id,class_id,admission_number')
             ->orderBy('name')
-            ->get();
+            ->get(['id', 'name', 'username']);
+
+        $studentData = $students->map(fn (User $s) => [
+            'id' => $s->id,
+            'name' => $s->name,
+            'username' => $s->username,
+            'admission_number' => $s->studentProfile?->admission_number,
+            'class_id' => $s->studentProfile?->class_id,
+        ]);
 
         $linkedStudentIds = ParentStudent::where('parent_id', $parent->id)->pluck('student_id')->toArray();
 
-        return view('admin.parents.edit', compact('parent', 'students', 'linkedStudentIds'));
+        return view('admin.parents.edit', compact('parent', 'levels', 'classes', 'studentData', 'linkedStudentIds'));
     }
 
     public function update(Request $request, User $parent): RedirectResponse
@@ -131,7 +166,7 @@ class ParentController extends Controller
             'username' => ['required', 'string', 'max:100', "unique:users,username,{$parent->id}"],
             'password' => ['nullable', 'string', Password::defaults()],
             'phone' => ['nullable', 'string', 'max:20'],
-            'gender' => ['nullable', 'in:male,female,other'],
+            'gender' => ['nullable', 'in:male,female'],
             'is_active' => ['boolean'],
             'occupation' => ['nullable', 'string', 'max:255'],
             'relationship' => ['nullable', 'in:father,mother,guardian,other'],
@@ -151,7 +186,6 @@ class ParentController extends Controller
 
             if (! empty($validated['password'])) {
                 $userData['password'] = Hash::make($validated['password']);
-                $userData['must_change_password'] = true;
                 $userData['must_change_password'] = true;
             }
 

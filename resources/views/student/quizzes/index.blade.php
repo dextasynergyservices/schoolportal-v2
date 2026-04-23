@@ -24,7 +24,7 @@
                                     &middot; {{ __('Due:') }} {{ $quiz->expires_at->format('M j') }}
                                 @endif
                             </p>
-                            <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                                 {{ __('Attempts:') }} {{ $attemptsDone }}/{{ $quiz->max_attempts }}
                                 @if ($bestAttempt)
                                     &middot; {{ __('Best:') }} {{ number_format($bestAttempt->percentage, 0) }}%

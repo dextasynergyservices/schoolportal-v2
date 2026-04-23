@@ -73,8 +73,8 @@
 
                     <flux:field>
                         <flux:label>{{ __('Custom Domain') }}</flux:label>
-                        <flux:input name="custom_domain" :value="old('custom_domain')" placeholder="pearschool.com" />
-                        <flux:description>{{ __("The school's own domain. DNS setup is shown after creation.") }}</flux:description>
+                        <flux:input name="custom_domain" :value="old('custom_domain')" placeholder="portal.pearschool.com" />
+                        <flux:description>{{ __('Enter the exact domain or subdomain the school will use to access the portal (e.g. portal.pearschool.com). For schools with their own website, use a subdomain like portal.pearschool.com so the main site stays untouched. DNS setup instructions are shown after creation.') }}</flux:description>
                     </flux:field>
 
                     <flux:field>

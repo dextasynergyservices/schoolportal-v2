@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Quiz;
 use App\Models\QuizAnswer;
 use App\Models\QuizAttempt;
+use App\Services\AchievementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -134,12 +135,38 @@ class QuizController extends Controller
         return redirect()->back();
     }
 
-    public function submit(QuizAttempt $attempt): RedirectResponse
+    public function submit(Request $request, QuizAttempt $attempt): RedirectResponse
     {
         $student = auth()->user();
 
         if ($attempt->student_id !== $student->id || $attempt->status !== 'in_progress') {
             abort(403);
+        }
+
+        // Save any answers bundled with the submit to prevent race conditions
+        // (background fetch saves may not have completed before form submission)
+        $answers = $request->input('answers', []);
+        if (is_array($answers) && ! empty($answers)) {
+            $validQuestionIds = $attempt->quiz->questions()->pluck('id')->all();
+            foreach ($answers as $questionId => $answer) {
+                if (! is_numeric($questionId) || ! in_array((int) $questionId, $validQuestionIds, true)) {
+                    continue;
+                }
+                if ($answer === null || $answer === '') {
+                    continue;
+                }
+                QuizAnswer::updateOrCreate(
+                    [
+                        'attempt_id' => $attempt->id,
+                        'question_id' => (int) $questionId,
+                    ],
+                    [
+                        'school_id' => $student->school_id,
+                        'selected_answer' => (string) $answer,
+                        'answered_at' => now(),
+                    ]
+                );
+            }
         }
 
         $this->submitAttempt($attempt, 'submitted');
@@ -220,5 +247,17 @@ class QuizController extends Controller
                 'status' => $status,
             ]);
         });
+
+        // Check achievements after scoring
+        try {
+            $student = auth()->user();
+            $attempt->refresh();
+            $newAchievements = app(AchievementService::class)->processQuizCompletion($student, $attempt);
+            if (! empty($newAchievements)) {
+                session()->flash('new_achievements', $newAchievements);
+            }
+        } catch (\Throwable) {
+            // Don't break quiz flow if achievement check fails
+        }
     }
 }

@@ -2,6 +2,11 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
     <head>
         @include('partials.head')
+        @php
+            $school = app()->bound('current.school') ? app('current.school') : null;
+            $schoolBranding = $school?->settings['branding'] ?? [];
+            $brandColor = $schoolBranding['primary_color'] ?? '#000c99';
+        @endphp
         <style>
             /* ── Login page animations ── */
             @keyframes fadeInUp {
@@ -32,7 +37,7 @@
             .animate-delay-400 { animation-delay: 0.4s; }
 
             .login-brand-panel {
-                background: #000c99;
+                background: {{ $school ? ($schoolBranding['primary_color'] ?? '#000c99') : '#000c99' }};
                 position: relative;
                 overflow: hidden;
             }
@@ -87,25 +92,53 @@
 
                 {{-- Top: Logo --}}
                 <div class="relative z-10 animate-fade-in">
-                    <a href="{{ route('home') }}" class="inline-flex items-center gap-3 text-white no-underline group">
-                        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm transition-transform group-hover:scale-105">
-                            <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                            </svg>
-                        </div>
-                        <span class="text-lg font-bold tracking-tight">DX-SchoolPortal</span>
-                    </a>
+                    @if ($school?->logo_url)
+                        <a href="{{ route('home') }}" class="inline-flex items-center gap-3 text-white no-underline group">
+                            <img src="{{ $school->logo_url }}" alt="{{ $school->name }}" class="h-10 w-10 rounded-xl object-contain bg-white/10 backdrop-blur-sm p-1 transition-transform group-hover:scale-105" />
+                            <span class="text-lg font-bold tracking-tight">{{ $school->name }}</span>
+                        </a>
+                    @elseif ($school)
+                        <a href="{{ route('home') }}" class="inline-flex items-center gap-3 text-white no-underline group">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm transition-transform group-hover:scale-105">
+                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+                                </svg>
+                            </div>
+                            <span class="text-lg font-bold tracking-tight">{{ $school->name }}</span>
+                        </a>
+                    @else
+                        <a href="{{ route('home') }}" class="inline-flex items-center gap-3 text-white no-underline group">
+                            <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm transition-transform group-hover:scale-105">
+                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+                                </svg>
+                            </div>
+                            <span class="text-lg font-bold tracking-tight">DX-SchoolPortal</span>
+                        </a>
+                    @endif
                 </div>
 
                 {{-- Center: Tagline + floating cards --}}
                 <div class="relative z-10 flex-1 flex flex-col justify-center max-w-lg">
-                    <h1 class="text-3xl xl:text-4xl font-extrabold text-white leading-tight mb-4 animate-fade-in-up">
-                        Shaping the future of education,
-                        <span class="text-[#00b2ff]">together.</span>
-                    </h1>
-                    <p class="text-white/60 text-base leading-relaxed mb-8 animate-fade-in-up animate-delay-100">
-                        Manage students, deliver results, create AI-powered quizzes, and connect with parents — all from one platform.
-                    </p>
+                    @if ($school)
+                        <h1 class="text-3xl xl:text-4xl font-extrabold text-white leading-tight mb-4 animate-fade-in-up">
+                            {{ __('Welcome to') }}
+                            <span style="color: {{ $schoolBranding['secondary_color'] ?? '#00b2ff' }}">{{ $school->name }}</span>
+                        </h1>
+                        @if ($school->motto)
+                            <p class="text-white/60 text-base leading-relaxed mb-8 animate-fade-in-up animate-delay-100">
+                                {{ $school->motto }}
+                            </p>
+                        @endif
+                    @else
+                        <h1 class="text-3xl xl:text-4xl font-extrabold text-white leading-tight mb-4 animate-fade-in-up">
+                            Shaping the future of education,
+                            <span class="text-[#00b2ff]">together.</span>
+                        </h1>
+                        <p class="text-white/60 text-base leading-relaxed mb-8 animate-fade-in-up animate-delay-100">
+                            Manage students, deliver results, create AI-powered quizzes, and connect with parents — all from one platform.
+                        </p>
+                    @endif
 
                     {{-- Floating preview cards --}}
                     <div class="space-y-3 animate-fade-in-up animate-delay-200">
@@ -141,7 +174,7 @@
 
                 {{-- Bottom: Copyright --}}
                 <div class="relative z-10 animate-fade-in animate-delay-400">
-                    <p class="text-white/30 text-xs">&copy; {{ date('Y') }} DX-SchoolPortal. All rights reserved.</p>
+                    <p class="text-white/30 text-xs">&copy; {{ date('Y') }} {{ $school?->name ?? 'DX-SchoolPortal' }}. {{ __('All rights reserved.') }}</p>
                 </div>
             </div>
 

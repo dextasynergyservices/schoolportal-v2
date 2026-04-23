@@ -127,8 +127,8 @@ class CsvImportService
             $errors[] = ['line' => $lineNumber, 'message' => "Duplicate username \"{$row['username']}\" in CSV."];
         }
 
-        if (empty($row['gender']) || ! in_array(strtolower($row['gender']), ['male', 'female', 'other'])) {
-            $errors[] = ['line' => $lineNumber, 'message' => 'Gender must be male, female, or other.'];
+        if (empty($row['gender']) || ! in_array(strtolower($row['gender']), ['male', 'female'])) {
+            $errors[] = ['line' => $lineNumber, 'message' => 'Gender must be male or female.'];
         }
 
         if (empty($row['class'])) {
@@ -141,48 +141,83 @@ class CsvImportService
     }
 
     /**
-     * Import validated rows into the database.
+     * Import validated rows into the database, one at a time.
      *
-     * @return int Number of students imported
+     * Each student is imported individually so that a failure on one row
+     * does not prevent the rest from being imported.
+     *
+     * @return array{imported: int, skipped: array<int, array{line: int, name: string, username: string, reason: string}>}
      */
-    public function importRows(array $rows, string $defaultPassword): int
+    public function importRows(array $rows, string $defaultPassword): array
     {
         $imported = 0;
-        $sessionId = app()->bound('current.school') && $school = app('current.school')
-            ? $school->currentSession()?->id
-            : null;
+        $skipped = [];
+        $school = app()->bound('current.school') ? app('current.school') : null;
+        $sessionId = $school?->currentSession()?->id;
 
-        DB::transaction(function () use ($rows, $defaultPassword, $sessionId, &$imported) {
-            foreach ($rows as $row) {
-                if (! ($row['_valid'] ?? false)) {
-                    continue;
-                }
+        // Get current school_id for the duplicate check
+        $schoolId = $school?->id;
 
-                $user = User::create([
+        foreach ($rows as $row) {
+            if (! ($row['_valid'] ?? false)) {
+                continue;
+            }
+
+            // Final duplicate check right before insert (handles race conditions)
+            $usernameExists = User::withoutGlobalScopes()
+                ->where('school_id', $schoolId)
+                ->where('username', $row['username'])
+                ->exists();
+
+            if ($usernameExists) {
+                $skipped[] = [
+                    'line' => $row['_line'],
                     'name' => $row['name'],
                     'username' => $row['username'],
-                    'password' => Hash::make($defaultPassword),
-                    'role' => 'student',
-                    'gender' => strtolower($row['gender']),
-                    'level_id' => $row['_level_id'],
-                    'must_change_password' => true,
-                ]);
+                    'reason' => __('Username ":username" already exists.', ['username' => $row['username']]),
+                ];
 
-                StudentProfile::create([
-                    'user_id' => $user->id,
-                    'school_id' => $user->school_id,
-                    'class_id' => $row['_class_id'],
-                    'admission_number' => $row['admission_number'] ?? null,
-                    'date_of_birth' => ! empty($row['date_of_birth']) ? $row['date_of_birth'] : null,
-                    'address' => $row['address'] ?? null,
-                    'blood_group' => $row['blood_group'] ?? null,
-                    'enrolled_session_id' => $sessionId,
-                ]);
+                continue;
+            }
+
+            try {
+                DB::transaction(function () use ($row, $defaultPassword, $sessionId) {
+                    $user = User::create([
+                        'name' => $row['name'],
+                        'username' => $row['username'],
+                        'password' => Hash::make($defaultPassword),
+                        'role' => 'student',
+                        'gender' => strtolower($row['gender']),
+                        'level_id' => $row['_level_id'],
+                        'must_change_password' => true,
+                    ]);
+
+                    StudentProfile::create([
+                        'user_id' => $user->id,
+                        'school_id' => $user->school_id,
+                        'class_id' => $row['_class_id'],
+                        'admission_number' => $row['admission_number'] ?? null,
+                        'date_of_birth' => ! empty($row['date_of_birth']) ? $row['date_of_birth'] : null,
+                        'address' => $row['address'] ?? null,
+                        'blood_group' => $row['blood_group'] ?? null,
+                        'enrolled_session_id' => $sessionId,
+                    ]);
+                });
 
                 $imported++;
+            } catch (\Throwable $e) {
+                $skipped[] = [
+                    'line' => $row['_line'],
+                    'name' => $row['name'],
+                    'username' => $row['username'],
+                    'reason' => __('Failed to import: :message', ['message' => $e->getMessage()]),
+                ];
             }
-        });
+        }
 
-        return $imported;
+        return [
+            'imported' => $imported,
+            'skipped' => $skipped,
+        ];
     }
 }

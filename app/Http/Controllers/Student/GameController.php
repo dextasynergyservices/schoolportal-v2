@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\GamePlay;
+use App\Services\AchievementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -74,10 +75,19 @@ class GameController extends Controller
             'completed_at' => now(),
         ]);
 
+        // Check achievements after game completion
+        $newAchievements = [];
+        try {
+            $newAchievements = app(AchievementService::class)->processGameCompletion($student);
+        } catch (\Throwable) {
+            // Don't break game flow if achievement check fails
+        }
+
         return response()->json([
             'success' => true,
             'play_id' => $play->id,
             'percentage' => $percentage,
+            'new_achievements' => $newAchievements,
         ]);
     }
 

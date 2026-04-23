@@ -76,7 +76,8 @@
                 @empty
                     <flux:table.row>
                         <flux:table.cell colspan="6" class="text-center py-8">
-                            {{ __('No assignments uploaded yet.') }}
+                            <flux:icon.clipboard-document-list class="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-600" />
+                            <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{{ __('No assignments uploaded yet. Create your first assignment for your class.') }}</p>
                         </flux:table.cell>
                     </flux:table.row>
                 @endforelse

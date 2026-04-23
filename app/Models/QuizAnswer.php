@@ -21,6 +21,7 @@ class QuizAnswer extends Model
         'selected_answer',
         'is_correct',
         'points_earned',
+        'answered_at',
     ];
 
     protected function casts(): array

@@ -5,7 +5,7 @@
 
 {{-- Super Admin Navigation --}}
 @if ($user->isSuperAdmin())
-    <flux:sidebar.group expandable :heading="__('Platform')" icon="globe-alt" :expanded="request()->routeIs('super-admin.dashboard', 'super-admin.schools.*', 'super-admin.credits.*')" class="grid">
+    <flux:sidebar.group expandable :heading="__('Platform')" icon="globe-alt" :expanded="request()->routeIs('super-admin.dashboard', 'super-admin.schools.*', 'super-admin.credits.*', 'super-admin.announcements.*', 'super-admin.emails.*')" class="grid">
         <flux:sidebar.item icon="home" :href="route('super-admin.dashboard')" :current="request()->routeIs('super-admin.dashboard')" wire:navigate>
             {{ __('Dashboard') }}
         </flux:sidebar.item>
@@ -14,6 +14,12 @@
         </flux:sidebar.item>
         <flux:sidebar.item icon="sparkles" :href="route('super-admin.credits.index')" :current="request()->routeIs('super-admin.credits.*')" wire:navigate>
             {{ __('AI Credits') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="megaphone" :href="route('super-admin.announcements.index')" :current="request()->routeIs('super-admin.announcements.*')" wire:navigate>
+            {{ __('Announcements') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="envelope" :href="route('super-admin.emails.index')" :current="request()->routeIs('super-admin.emails.*')" wire:navigate>
+            {{ __('Email Schools') }}
         </flux:sidebar.item>
     </flux:sidebar.group>
 
@@ -32,9 +38,15 @@
 
 {{-- School Admin Navigation --}}
 @if ($user->isSchoolAdmin())
-    <flux:sidebar.group expandable :heading="__('Administration')" icon="building-office" class="grid">
+    <flux:sidebar.group expandable :heading="__('Administration')" icon="building-office" :expanded="request()->routeIs('admin.dashboard', 'admin.analytics', 'admin.insights')" class="grid">
         <flux:sidebar.item icon="home" :href="route('admin.dashboard')" :current="request()->routeIs('admin.dashboard')" wire:navigate>
             {{ __('Dashboard') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="chart-bar-square" :href="route('admin.analytics')" :current="request()->routeIs('admin.analytics')" wire:navigate>
+            {{ __('Analytics') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="magnifying-glass" :href="route('admin.insights')" :current="request()->routeIs('admin.insights')" wire:navigate>
+            {{ __('Student Insights') }}
         </flux:sidebar.item>
     </flux:sidebar.group>
 
@@ -71,14 +83,21 @@
         </flux:sidebar.item>
     </flux:sidebar.group>
 
-    <flux:sidebar.group expandable :heading="__('Communication')" icon="megaphone" :expanded="request()->routeIs('admin.notices.*')" class="grid">
+    <flux:sidebar.group expandable :heading="__('Communication')" icon="megaphone" :expanded="request()->routeIs('admin.notices.*', 'admin.announcements.*')" class="grid">
         <flux:sidebar.item icon="megaphone" :href="route('admin.notices.index')" :current="request()->routeIs('admin.notices.*')" wire:navigate>
             {{ __('Notices') }}
         </flux:sidebar.item>
+        <flux:sidebar.item icon="signal" :href="route('admin.announcements.index')" :current="request()->routeIs('admin.announcements.*')" wire:navigate>
+            {{ __('Announcements') }}
+        </flux:sidebar.item>
     </flux:sidebar.group>
 
+    @php
+        $pendingApprovalCount = \App\Models\TeacherAction::where('status', 'pending')->count();
+    @endphp
+
     <flux:sidebar.group expandable :heading="__('Management')" icon="cog-6-tooth" :expanded="request()->routeIs('admin.approvals.*', 'admin.promotions.*', 'admin.levels.*', 'admin.audit-logs.*', 'admin.credits.*', 'admin.settings.*')" class="grid">
-        <flux:sidebar.item icon="check-badge" :href="route('admin.approvals.index')" :current="request()->routeIs('admin.approvals.*')" wire:navigate>
+        <flux:sidebar.item icon="check-badge" :href="route('admin.approvals.index')" :current="request()->routeIs('admin.approvals.*')" :badge="$pendingApprovalCount > 0 ? $pendingApprovalCount : null" badge:color="red" wire:navigate>
             {{ __('Approvals') }}
         </flux:sidebar.item>
         <flux:sidebar.item icon="arrow-up-on-square-stack" :href="route('admin.promotions.index')" :current="request()->routeIs('admin.promotions.*')" wire:navigate>
@@ -131,7 +150,10 @@
         </flux:sidebar.item>
     </flux:sidebar.group>
 
-    <flux:sidebar.group expandable :heading="__('Tracking')" icon="clock" :expanded="request()->routeIs('teacher.submissions.*')" class="grid">
+    <flux:sidebar.group expandable :heading="__('Tracking')" icon="clock" :expanded="request()->routeIs('teacher.submissions.*', 'teacher.insights')" class="grid">
+        <flux:sidebar.item icon="magnifying-glass" :href="route('teacher.insights')" :current="request()->routeIs('teacher.insights')" wire:navigate>
+            {{ __('Student Insights') }}
+        </flux:sidebar.item>
         <flux:sidebar.item icon="clock" :href="route('teacher.submissions.index')" :current="request()->routeIs('teacher.submissions.*')" wire:navigate>
             {{ __('My Submissions') }}
         </flux:sidebar.item>
@@ -143,6 +165,9 @@
     <flux:sidebar.group expandable :heading="__('My Portal')" icon="academic-cap" class="grid">
         <flux:sidebar.item icon="home" :href="route('student.dashboard')" :current="request()->routeIs('student.dashboard')" wire:navigate>
             {{ __('Dashboard') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="user-circle" :href="route('student.profile')" :current="request()->routeIs('student.profile')" wire:navigate>
+            {{ __('My Profile') }}
         </flux:sidebar.item>
     </flux:sidebar.group>
 
@@ -176,17 +201,17 @@
         </flux:sidebar.item>
     </flux:sidebar.group>
 
-    <flux:sidebar.group expandable :heading="__('Academics')" icon="book-open" :expanded="request()->routeIs('parent.children.results*', 'parent.children.assignments*', 'parent.children.quizzes*', 'parent.children.games*')" class="grid">
-        <flux:sidebar.item icon="document-text" :href="route('parent.dashboard')" :current="request()->routeIs('parent.children.results*')" wire:navigate>
+    <flux:sidebar.group expandable :heading="__('Academics')" icon="book-open" :expanded="request()->routeIs('parent.results*', 'parent.assignments*', 'parent.quizzes*', 'parent.games*', 'parent.children.results*', 'parent.children.assignments*', 'parent.children.quizzes*', 'parent.children.games*')" class="grid">
+        <flux:sidebar.item icon="document-text" :href="route('parent.results.index')" :current="request()->routeIs('parent.results*', 'parent.children.results*')" wire:navigate>
             {{ __('Results') }}
         </flux:sidebar.item>
-        <flux:sidebar.item icon="clipboard-document-list" :href="route('parent.dashboard')" :current="request()->routeIs('parent.children.assignments*')" wire:navigate>
+        <flux:sidebar.item icon="clipboard-document-list" :href="route('parent.assignments.index')" :current="request()->routeIs('parent.assignments*', 'parent.children.assignments*')" wire:navigate>
             {{ __('Assignments') }}
         </flux:sidebar.item>
-        <flux:sidebar.item icon="question-mark-circle" :href="route('parent.dashboard')" :current="request()->routeIs('parent.children.quizzes*')" wire:navigate>
+        <flux:sidebar.item icon="question-mark-circle" :href="route('parent.quizzes.index')" :current="request()->routeIs('parent.quizzes*', 'parent.children.quizzes*')" wire:navigate>
             {{ __('Quizzes') }}
         </flux:sidebar.item>
-        <flux:sidebar.item icon="puzzle-piece" :href="route('parent.dashboard')" :current="request()->routeIs('parent.children.games*')" wire:navigate>
+        <flux:sidebar.item icon="puzzle-piece" :href="route('parent.games.index')" :current="request()->routeIs('parent.games*', 'parent.children.games*')" wire:navigate>
             {{ __('Games') }}
         </flux:sidebar.item>
     </flux:sidebar.group>

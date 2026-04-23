@@ -30,6 +30,7 @@ class AiCreditPurchase extends Model
             'school_id' => 'integer',
             'purchased_by' => 'integer',
             'amount_naira' => 'decimal:2',
+            'created_at' => 'datetime',
         ];
     }
 

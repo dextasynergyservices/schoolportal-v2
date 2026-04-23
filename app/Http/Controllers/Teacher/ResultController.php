@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Result;
 use App\Models\SchoolClass;
 use App\Models\TeacherAction;
-use App\Models\User;
+use App\Services\FileUploadService;
 use App\Traits\NotifiesAdminsOnSubmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,23 +58,12 @@ class ResultController extends Controller
     {
         $teacher = auth()->user();
         $school = app('current.school');
-        $classIds = $teacher->assignedClasses()->pluck('id');
-
-        $classes = SchoolClass::whereIn('id', $classIds)
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
-        $students = User::where('role', 'student')
-            ->where('is_active', true)
-            ->whereHas('studentProfile', fn ($q) => $q->whereIn('class_id', $classIds))
-            ->orderBy('name')
-            ->get();
+        $assignedClassIds = $teacher->assignedClasses()->pluck('id')->toArray();
 
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
 
-        return view('teacher.results.create', compact('classes', 'students', 'currentSession', 'currentTerm'));
+        return view('teacher.results.create', compact('assignedClassIds', 'currentSession', 'currentTerm'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -87,8 +76,7 @@ class ResultController extends Controller
             'class_id' => ['required', 'exists:classes,id'],
             'session_id' => ['required', 'exists:academic_sessions,id'],
             'term_id' => ['required', 'exists:terms,id'],
-            'file_url' => ['required', 'url'],
-            'file_public_id' => ['nullable', 'string'],
+            'result_file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -97,9 +85,18 @@ class ResultController extends Controller
             abort(403, 'You can only upload results for your assigned classes.');
         }
 
-        DB::transaction(function () use ($validated, $teacher) {
+        $school = app('current.school');
+        $upload = app(FileUploadService::class)->uploadResult($request->file('result_file'), $school->id);
+
+        DB::transaction(function () use ($validated, $teacher, $upload) {
             $result = Result::create([
-                ...$validated,
+                'student_id' => $validated['student_id'],
+                'class_id' => $validated['class_id'],
+                'session_id' => $validated['session_id'],
+                'term_id' => $validated['term_id'],
+                'notes' => $validated['notes'] ?? null,
+                'file_url' => $upload['url'],
+                'file_public_id' => $upload['public_id'],
                 'uploaded_by' => $teacher->id,
                 'status' => 'pending',
             ]);
@@ -118,5 +115,96 @@ class ResultController extends Controller
 
         return redirect()->route('teacher.results.index')
             ->with('success', __('Result uploaded and submitted for approval.'));
+    }
+
+    public function edit(Result $result): View
+    {
+        $teacher = auth()->user();
+
+        abort_unless($result->uploaded_by === $teacher->id, 403);
+
+        if ($result->status === 'approved') {
+            return redirect()->route('teacher.results.index')
+                ->with('error', __('Approved results cannot be edited.'));
+        }
+
+        $school = app('current.school');
+        $assignedClassIds = $teacher->assignedClasses()->pluck('id')->toArray();
+        $currentSession = $school->currentSession();
+        $currentTerm = $school->currentTerm();
+
+        $rejectionReason = TeacherAction::where('entity_type', 'result')
+            ->where('entity_id', $result->id)
+            ->where('status', 'rejected')
+            ->latest('reviewed_at')
+            ->value('rejection_reason');
+
+        return view('teacher.results.edit', compact('result', 'assignedClassIds', 'currentSession', 'currentTerm', 'rejectionReason'));
+    }
+
+    public function update(Request $request, Result $result): RedirectResponse
+    {
+        $teacher = auth()->user();
+
+        abort_unless($result->uploaded_by === $teacher->id, 403);
+
+        if ($result->status === 'approved') {
+            return redirect()->route('teacher.results.index')
+                ->with('error', __('Approved results cannot be edited.'));
+        }
+
+        $classIds = $teacher->assignedClasses()->pluck('id')->toArray();
+
+        $validated = $request->validate([
+            'student_id' => ['required', 'exists:users,id'],
+            'class_id' => ['required', 'exists:classes,id'],
+            'result_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        if (! in_array((int) $validated['class_id'], $classIds, true)) {
+            abort(403, 'You can only upload results for your assigned classes.');
+        }
+
+        $data = [
+            'student_id' => $validated['student_id'],
+            'class_id' => $validated['class_id'],
+            'notes' => $validated['notes'] ?? null,
+        ];
+
+        if ($request->hasFile('result_file')) {
+            if ($result->file_public_id) {
+                app(FileUploadService::class)->delete($result->file_public_id);
+            }
+            $school = app('current.school');
+            $upload = app(FileUploadService::class)->uploadResult($request->file('result_file'), $school->id);
+            $data['file_url'] = $upload['url'];
+            $data['file_public_id'] = $upload['public_id'];
+        }
+
+        DB::transaction(function () use ($data, $result, $teacher) {
+            $data['status'] = 'pending';
+            $result->update($data);
+
+            // Reset the existing TeacherAction to pending and re-notify admins
+            $action = TeacherAction::where('entity_type', 'result')
+                ->where('entity_id', $result->id)
+                ->where('teacher_id', $teacher->id)
+                ->first();
+
+            if ($action) {
+                $action->update([
+                    'status' => 'pending',
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                    'rejection_reason' => null,
+                ]);
+
+                $this->notifyAdminsOfPendingSubmission($action, $teacher);
+            }
+        });
+
+        return redirect()->route('teacher.results.index')
+            ->with('success', __('Result updated and resubmitted for approval.'));
     }
 }

@@ -52,6 +52,12 @@ class Recaptcha implements ValidationRule
             $data = $response->json();
 
             if (! ($data['success'] ?? false)) {
+                Log::error('reCAPTCHA verification failed', [
+                    'error_codes' => $data['error-codes'] ?? [],
+                    'hostname' => $data['hostname'] ?? null,
+                    'request_host' => request()->getHost(),
+                    'response_data' => $data,
+                ]);
                 $fail(__('reCAPTCHA verification failed. Please try again.'));
 
                 return;

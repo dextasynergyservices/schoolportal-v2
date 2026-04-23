@@ -84,7 +84,7 @@
                                         {{ Str::limit($assignment->description, 100) }}
                                     </flux:text>
                                 @endif
-                                <flux:text class="text-xs text-zinc-400 dark:text-zinc-500 mt-1 sm:hidden">
+                                <flux:text class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 sm:hidden">
                                     {{ __('Week :week', ['week' => $assignment->week_number]) }}
                                     @if ($assignment->due_date)
                                         &mdash; {{ __('Due :date', ['date' => $assignment->due_date->format('M j')]) }}
@@ -123,7 +123,7 @@
                         <flux:table.cell colspan="4" class="text-center py-8">
                             <flux:icon.clipboard-document-list class="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-600" />
                             <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                                {{ __('No assignments found for the selected filters.') }}
+                                {{ __('No assignments found for the selected filters. Try a different session or term, or check back later.') }}
                             </flux:text>
                         </flux:table.cell>
                     </flux:table.row>

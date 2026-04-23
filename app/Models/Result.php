@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\FileUploadService;
 use App\Traits\Auditable;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -71,5 +72,21 @@ class Result extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Auto-sign raw Cloudinary URLs so they don't return HTTP 401.
+     */
+    public function getFileUrlAttribute(?string $value): ?string
+    {
+        if (! $value || ! $this->file_public_id) {
+            return $value;
+        }
+
+        try {
+            return FileUploadService::signedRawUrl($this->file_public_id);
+        } catch (\Throwable) {
+            return $value;
+        }
     }
 }

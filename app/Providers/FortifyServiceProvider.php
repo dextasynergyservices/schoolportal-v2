@@ -8,6 +8,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\LoginResponse;
 use App\Models\School;
 use App\Models\User;
+use App\Services\AchievementService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -68,7 +69,7 @@ class FortifyServiceProvider extends ServiceProvider
             // Resolve the current school
             $school = app()->bound('current.school') ? app('current.school') : null;
 
-            // In local dev without a resolved school, try to find from the request
+            // If no school resolved yet, try from form input or session
             if (! $school) {
                 $schoolId = $request->input('school_id') ?? $request->session()->get('school_id');
 
@@ -77,9 +78,34 @@ class FortifyServiceProvider extends ServiceProvider
                 }
             }
 
+            // If still no school, check if this is a super_admin trying to log in on the platform domain
             if (! $school) {
+                $isEmail = filter_var($login, FILTER_VALIDATE_EMAIL);
+
+                $superAdmin = User::withoutGlobalScopes()
+                    ->where('role', 'super_admin')
+                    ->when($isEmail, fn ($q) => $q->where('email', $login))
+                    ->when(! $isEmail, fn ($q) => $q->where('username', $login))
+                    ->first();
+
+                if ($superAdmin && Hash::check($password, $superAdmin->password)) {
+                    if (! $superAdmin->is_active) {
+                        throw ValidationException::withMessages([
+                            'login' => ['Your account has been deactivated. Please contact the platform administrator.'],
+                        ]);
+                    }
+
+                    $superAdmin->update([
+                        'last_login_at' => now(),
+                        'last_login_ip' => $request->ip(),
+                    ]);
+
+                    return $superAdmin;
+                }
+
+                // Not a super_admin — need a school
                 throw ValidationException::withMessages([
-                    'login' => ['Unable to determine your school. Please check the URL.'],
+                    'login' => ['Unable to determine your school. Please select your school or access via your school\'s portal URL.'],
                 ]);
             }
 
@@ -152,6 +178,18 @@ class FortifyServiceProvider extends ServiceProvider
                 'last_login_at' => now(),
                 'last_login_ip' => $request->ip(),
             ]);
+
+            // Track login streak for students
+            if ($user->isStudent()) {
+                try {
+                    $newAchievements = app(AchievementService::class)->processLoginStreak($user);
+                    if (! empty($newAchievements)) {
+                        $request->session()->flash('new_achievements', $newAchievements);
+                    }
+                } catch (\Throwable) {
+                    // Don't block login if achievement tracking fails
+                }
+            }
 
             return $user;
         });

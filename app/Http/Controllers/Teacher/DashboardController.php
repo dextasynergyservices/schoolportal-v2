@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicSession;
 use App\Models\AiCreditAllocation;
 use App\Models\Assignment;
 use App\Models\Game;
@@ -13,18 +14,37 @@ use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\Result;
 use App\Models\TeacherAction;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(Request $request): View
     {
         $teacher = auth()->user();
         $school = app('current.school');
         $classIds = $teacher->assignedClasses()->pluck('id');
 
-        $currentSession = $school->currentSession();
-        $currentTerm = $school->currentTerm();
+        // ── Session/Term filtering (default to current) ──────────────
+        $allSessions = AcademicSession::orderByDesc('start_date')->get(['id', 'name', 'is_current']);
+
+        if ($request->filled('session_id')) {
+            $currentSession = AcademicSession::find((int) $request->input('session_id'));
+        } else {
+            $currentSession = $school->currentSession();
+        }
+
+        if ($currentSession && $request->filled('term_id')) {
+            $currentTerm = $currentSession->terms()->find((int) $request->input('term_id'));
+        } elseif ($currentSession) {
+            $currentTerm = $request->filled('session_id')
+                ? $currentSession->terms()->first()
+                : $school->currentTerm();
+        } else {
+            $currentTerm = null;
+        }
+
+        $sessionTerms = $currentSession?->terms()->orderBy('term_number')->get(['id', 'name', 'term_number', 'is_current']) ?? collect();
 
         // ── Assigned classes with student counts ─────────────────────
         $assignedClasses = $teacher->assignedClasses()
@@ -144,6 +164,7 @@ class DashboardController extends Controller
 
         return view('teacher.dashboard', compact(
             'teacher', 'currentSession', 'currentTerm',
+            'allSessions', 'sessionTerms',
             'assignedClasses', 'totalStudents',
             'totalResults', 'totalAssignments', 'totalNotices', 'pendingCount',
             'rejectedSubmissions', 'recentSubmissions',

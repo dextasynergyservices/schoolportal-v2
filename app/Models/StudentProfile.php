@@ -25,6 +25,11 @@ class StudentProfile extends Model
         'blood_group',
         'medical_notes',
         'enrolled_session_id',
+        'login_streak',
+        'best_login_streak',
+        'last_streak_date',
+        'quiz_pass_streak',
+        'best_quiz_pass_streak',
     ];
 
     protected function casts(): array
@@ -35,6 +40,11 @@ class StudentProfile extends Model
             'class_id' => 'integer',
             'enrolled_session_id' => 'integer',
             'date_of_birth' => 'date',
+            'login_streak' => 'integer',
+            'best_login_streak' => 'integer',
+            'last_streak_date' => 'date',
+            'quiz_pass_streak' => 'integer',
+            'best_quiz_pass_streak' => 'integer',
         ];
     }
 

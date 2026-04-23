@@ -1,12 +1,22 @@
 <x-layouts::app :title="__('Parent Dashboard')">
+    @php
+        $hour = (int) now()->format('G');
+        $timeGreeting = match (true) {
+            $hour >= 5 && $hour < 12  => __('Good morning'),
+            $hour >= 12 && $hour < 17 => __('Good afternoon'),
+            default                    => __('Good evening'),
+        };
+    @endphp
     @include('partials.dashboard-styles')
+
+    @include('partials.announcement-banners')
 
     <div class="space-y-6">
         {{-- ── Welcome Banner ─────────────────────────────────────── --}}
-        <div class="dash-welcome dash-animate" role="banner">
+        <div class="dash-welcome dash-welcome-parent dash-animate" role="banner">
             <div class="relative z-10">
                 <h1 class="text-xl sm:text-2xl font-bold text-white">
-                    {{ __('Welcome, :name', ['name' => $parent->name]) }} 👋
+                    {{ $timeGreeting }}, {{ $parent->name }} 👋
                 </h1>
                 @if ($currentSession && $currentTerm)
                     <p class="mt-1 text-sm text-white/70">
@@ -84,61 +94,73 @@
         @endif
 
         {{-- ── Children Section ───────────────────────────────────── --}}
-        <section aria-label="{{ __('Your children') }}">
-            <h2 class="text-sm font-semibold text-zinc-900 dark:text-white mb-3 dash-animate dash-animate-delay-3">{{ __('Your Children') }}</h2>
-
+        <section aria-label="{{ __('Your children') }}" x-data="{ sel: 0 }">
             @if ($children->isNotEmpty())
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    @foreach ($children as $child)
-                        @php
-                            $profile = $child->studentProfile;
-                            $class = $profile?->class;
-                            $stats = $childrenStats[$child->id] ?? [];
-                        @endphp
-                        <div class="child-card dash-animate dash-animate-delay-{{ min($loop->iteration + 2, 6) }}">
-                            {{-- Child Header --}}
-                            <div class="p-4 border-b border-zinc-100 dark:border-zinc-700/50">
-                                <div class="flex items-center gap-3">
-                                    <flux:avatar size="lg" :src="$child->avatar_url" :name="$child->name" :initials="$child->initials()" />
-                                    <div class="min-w-0 flex-1">
-                                        <p class="font-bold text-zinc-900 dark:text-white truncate">{{ $child->name }}</p>
-                                        <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                                            {{ $class?->name ?? __('No class assigned') }}
+                {{-- Child Selector Tabs (multiple children) --}}
+                @if ($children->count() > 1)
+                    <div class="dash-panel dash-animate dash-animate-delay-3" style="padding: 0;">
+                        <div class="flex items-center gap-1 p-1.5 overflow-x-auto" style="scrollbar-width: none;">
+                            @foreach ($children as $child)
+                                <button
+                                    @click="sel = {{ $loop->index }}"
+                                    :class="sel === {{ $loop->index }}
+                                        ? 'bg-[#000c99] text-white shadow-sm'
+                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700/50'"
+                                    class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                                >
+                                    <flux:avatar size="sm" :src="$child->avatar_url" :name="$child->name" :initials="$child->initials()" />
+                                    <div class="text-left">
+                                        <p class="text-sm font-semibold leading-tight">{{ $child->name }}</p>
+                                        <p class="text-[11px] leading-tight" :class="sel === {{ $loop->index }} ? 'text-white/70' : 'opacity-50'">
+                                            {{ $child->studentProfile?->class?->name ?? __('No class') }}
                                         </p>
-                                        @if ($class?->level)
-                                            <p class="text-xs text-zinc-400 dark:text-zinc-500">{{ $class->level->name }}</p>
-                                        @endif
                                     </div>
-                                </div>
-                            </div>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
-                            {{-- Per-Child Quick Stats --}}
-                            <div class="grid grid-cols-4 divide-x divide-zinc-100 dark:divide-zinc-700/50 border-b border-zinc-100 dark:border-zinc-700/50">
-                                <div class="p-3 text-center">
-                                    <p class="text-lg font-bold text-zinc-900 dark:text-white">{{ $stats['results_count'] ?? 0 }}</p>
-                                    <p class="text-[10px] uppercase tracking-wider font-medium text-zinc-500 dark:text-zinc-400">{{ __('Results') }}</p>
-                                </div>
-                                <div class="p-3 text-center">
-                                    <p class="text-lg font-bold text-zinc-900 dark:text-white">{{ $stats['quizzes_taken'] ?? 0 }}</p>
-                                    <p class="text-[10px] uppercase tracking-wider font-medium text-zinc-500 dark:text-zinc-400">{{ __('Quizzes') }}</p>
-                                </div>
-                                <div class="p-3 text-center">
-                                    <p class="text-lg font-bold text-zinc-900 dark:text-white">{{ $stats['games_played'] ?? 0 }}</p>
-                                    <p class="text-[10px] uppercase tracking-wider font-medium text-zinc-500 dark:text-zinc-400">{{ __('Games') }}</p>
-                                </div>
-                                <div class="p-3 text-center">
-                                    @php $childAvg = $stats['quiz_avg'] ?? null; @endphp
-                                    <p class="text-lg font-bold {{ $childAvg !== null && $childAvg >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($childAvg !== null && $childAvg >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-white') }}">
-                                        {{ $childAvg !== null ? number_format((float) $childAvg, 0) . '%' : '—' }}
+                {{-- Per-Child Full View --}}
+                @foreach ($children as $child)
+                    @php
+                        $profile = $child->studentProfile;
+                        $class = $profile?->class;
+                        $stats = $childrenStats[$child->id] ?? [];
+                        $childAvg = $stats['quiz_avg'] ?? null;
+                    @endphp
+
+                    <div x-show="sel === {{ $loop->index }}" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-4 mt-4">
+                        {{-- Profile Header --}}
+                        <div class="dash-panel dash-animate dash-animate-delay-3">
+                            <div class="flex items-center gap-4">
+                                <flux:avatar size="xl" :src="$child->avatar_url" :name="$child->name" :initials="$child->initials()" />
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-lg font-bold text-zinc-900 dark:text-white truncate">{{ $child->name }}</h3>
+                                    <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                                        {{ $class?->name ?? __('No class assigned') }}
+                                        @if ($class?->level)
+                                            <span class="text-zinc-300 dark:text-zinc-600 mx-1">&middot;</span>
+                                            {{ $class->level->name }}
+                                        @endif
                                     </p>
-                                    <p class="text-[10px] uppercase tracking-wider font-medium text-zinc-500 dark:text-zinc-400">{{ __('Avg') }}</p>
+                                    @if ($class?->teacher)
+                                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                            {{ __('Class Teacher: :name', ['name' => $class->teacher->name]) }}
+                                        </p>
+                                    @endif
                                 </div>
+                                <a href="{{ route('parent.children.show', $child) }}" wire:navigate
+                                   class="hidden sm:flex items-center gap-1.5 shrink-0 text-xs font-medium text-[#000c99] dark:text-blue-400 hover:underline">
+                                    <flux:icon.user class="w-3.5 h-3.5" />
+                                    {{ __('Full Profile') }}
+                                </a>
                             </div>
 
-                            {{-- Latest Result --}}
                             @if (!empty($stats['latest_result']))
-                                <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-700/50">
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                <div class="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-700/50">
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                        <flux:icon.document-check class="w-3.5 h-3.5 text-emerald-500" />
                                         {{ __('Latest result:') }}
                                         <span class="font-semibold text-zinc-700 dark:text-zinc-300">
                                             {{ $stats['latest_result']->session?->name }} &mdash; {{ $stats['latest_result']->term?->name }}
@@ -146,52 +168,107 @@
                                     </p>
                                 </div>
                             @endif
+                        </div>
 
-                            {{-- Class Teacher --}}
-                            @if ($class?->teacher)
-                                <div class="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-700/50">
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                                        {{ __('Class Teacher: :name', ['name' => $class->teacher->name]) }}
-                                    </p>
+                        {{-- Child Stats --}}
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="stat-card stat-card-emerald">
+                                <div class="flex items-center gap-3">
+                                    <div class="stat-icon bg-emerald-500/15">
+                                        <flux:icon.document-text class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Results') }}</p>
+                                        <p class="stat-value text-zinc-900 dark:text-white">{{ $stats['results_count'] ?? 0 }}</p>
+                                    </div>
                                 </div>
-                            @endif
-
-                            {{-- Quick Actions --}}
-                            <div class="p-3 grid grid-cols-2 gap-1.5">
-                                <a href="{{ route('parent.children.results', $child) }}" wire:navigate class="quick-action !p-2 !gap-1.5">
-                                    <div class="quick-action-icon !w-7 !h-7 bg-emerald-100 dark:bg-emerald-900/30">
-                                        <flux:icon.document-text class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div class="stat-card stat-card-amber">
+                                <div class="flex items-center gap-3">
+                                    <div class="stat-icon bg-amber-500/15">
+                                        <flux:icon.academic-cap class="w-5 h-5 text-amber-600 dark:text-amber-400" />
                                     </div>
-                                    <span class="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('Results') }}</span>
-                                </a>
-                                <a href="{{ route('parent.children.assignments', $child) }}" wire:navigate class="quick-action !p-2 !gap-1.5">
-                                    <div class="quick-action-icon !w-7 !h-7 bg-purple-100 dark:bg-purple-900/30">
-                                        <flux:icon.clipboard-document-list class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Quizzes') }}</p>
+                                        <p class="stat-value text-zinc-900 dark:text-white">{{ $stats['quizzes_taken'] ?? 0 }}</p>
                                     </div>
-                                    <span class="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('Assignments') }}</span>
-                                </a>
-                                <a href="{{ route('parent.children.quizzes', $child) }}" wire:navigate class="quick-action !p-2 !gap-1.5">
-                                    <div class="quick-action-icon !w-7 !h-7 bg-amber-100 dark:bg-amber-900/30">
-                                        <flux:icon.academic-cap class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                            </div>
+                            <div class="stat-card stat-card-pink">
+                                <div class="flex items-center gap-3">
+                                    <div class="stat-icon bg-pink-500/15">
+                                        <flux:icon.puzzle-piece class="w-5 h-5 text-pink-600 dark:text-pink-400" />
                                     </div>
-                                    <span class="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('Quizzes') }}</span>
-                                </a>
-                                <a href="{{ route('parent.children.games', $child) }}" wire:navigate class="quick-action !p-2 !gap-1.5">
-                                    <div class="quick-action-icon !w-7 !h-7 bg-pink-100 dark:bg-pink-900/30">
-                                        <flux:icon.puzzle-piece class="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Games') }}</p>
+                                        <p class="stat-value text-zinc-900 dark:text-white">{{ $stats['games_played'] ?? 0 }}</p>
                                     </div>
-                                    <span class="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('Games') }}</span>
-                                </a>
-                                <a href="{{ route('parent.children.show', $child) }}" wire:navigate class="quick-action !p-2 !gap-1.5 col-span-2">
-                                    <div class="quick-action-icon !w-7 !h-7 bg-blue-100 dark:bg-blue-900/30">
-                                        <flux:icon.user class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                            </div>
+                            <div class="stat-card stat-card-purple">
+                                <div class="flex items-center gap-3">
+                                    <div class="stat-icon bg-purple-500/15">
+                                        <flux:icon.chart-bar class="w-5 h-5 text-purple-600 dark:text-purple-400" />
                                     </div>
-                                    <span class="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">{{ __('View Profile') }}</span>
-                                </a>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Avg Score') }}</p>
+                                        <p class="stat-value {{ $childAvg !== null && $childAvg >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($childAvg !== null && $childAvg >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-white') }}">
+                                            {{ $childAvg !== null ? number_format((float) $childAvg, 0) . '%' : '—' }}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    @endforeach
-                </div>
+
+                        {{-- Navigation Tiles --}}
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <a href="{{ route('parent.children.results', $child) }}" wire:navigate
+                               class="dash-panel group flex flex-col items-center gap-2.5 py-5 hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800/50 transition-all cursor-pointer" style="margin-bottom: 0;">
+                                <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 group-hover:scale-110 transition-transform">
+                                    <flux:icon.document-text class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{{ __('Results') }}</span>
+                                <span class="text-[10px] text-zinc-500 dark:text-zinc-400">{{ ($stats['results_count'] ?? 0) . ' ' . __('available') }}</span>
+                            </a>
+                            <a href="{{ route('parent.children.assignments', $child) }}" wire:navigate
+                               class="dash-panel group flex flex-col items-center gap-2.5 py-5 hover:shadow-md hover:border-purple-200 dark:hover:border-purple-800/50 transition-all cursor-pointer" style="margin-bottom: 0;">
+                                <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-purple-100 dark:bg-purple-900/30 group-hover:scale-110 transition-transform">
+                                    <flux:icon.clipboard-document-list class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{{ __('Assignments') }}</span>
+                                <span class="text-[10px] text-zinc-500 dark:text-zinc-400">{{ __('View all') }}</span>
+                            </a>
+                            <a href="{{ route('parent.children.quizzes', $child) }}" wire:navigate
+                               class="dash-panel group flex flex-col items-center gap-2.5 py-5 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-800/50 transition-all cursor-pointer" style="margin-bottom: 0;">
+                                <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-900/30 group-hover:scale-110 transition-transform">
+                                    <flux:icon.academic-cap class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{{ __('Quizzes') }}</span>
+                                <span class="text-[10px] text-zinc-500 dark:text-zinc-400">{{ ($stats['quizzes_taken'] ?? 0) . ' ' . __('completed') }}</span>
+                            </a>
+                            <a href="{{ route('parent.children.games', $child) }}" wire:navigate
+                               class="dash-panel group flex flex-col items-center gap-2.5 py-5 hover:shadow-md hover:border-pink-200 dark:hover:border-pink-800/50 transition-all cursor-pointer" style="margin-bottom: 0;">
+                                <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-pink-100 dark:bg-pink-900/30 group-hover:scale-110 transition-transform">
+                                    <flux:icon.puzzle-piece class="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                                </div>
+                                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{{ __('Games') }}</span>
+                                <span class="text-[10px] text-zinc-500 dark:text-zinc-400">{{ ($stats['games_played'] ?? 0) . ' ' . __('played') }}</span>
+                            </a>
+                        </div>
+
+                        {{-- Profile link (mobile only — desktop has it in the header) --}}
+                        <a href="{{ route('parent.children.show', $child) }}" wire:navigate
+                           class="sm:hidden dash-panel flex items-center justify-between" style="margin-bottom: 0; padding-top: 0.75rem; padding-bottom: 0.75rem;">
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                                    <flux:icon.user class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ __('View Full Profile') }}</span>
+                            </div>
+                            <flux:icon.chevron-right class="w-4 h-4 text-zinc-400" />
+                        </a>
+                    </div>
+                @endforeach
             @else
                 <div class="dash-panel p-8 text-center dash-animate dash-animate-delay-3">
                     <div class="w-16 h-16 mx-auto rounded-full bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center mb-4">
@@ -224,7 +301,7 @@
                             @endif
                             <div class="min-w-0 flex-1">
                                 <p class="font-medium text-sm text-zinc-900 dark:text-white">{{ $notice->title }}</p>
-                                <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{{ $notice->published_at->format('M j, Y') }}</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{{ $notice->published_at->format('M j, Y') }}</p>
                             </div>
                             <flux:icon.chevron-right class="w-4 h-4 text-zinc-400 mt-1 shrink-0" />
                         </a>
