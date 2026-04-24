@@ -3,7 +3,22 @@
         <x-admin-header :title="__('Add Teacher')" />
 
         <div class="max-w-2xl rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-            <form method="POST" action="{{ route('admin.teachers.store') }}" class="space-y-6">
+            <form method="POST" action="{{ route('admin.teachers.store') }}" class="space-y-6"
+                  x-data="{
+                      levelId: '{{ old('level_id', '') }}',
+                      allClasses: {{ Js::from($classes->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'level_id' => $c->level_id, 'level_name' => $c->level?->name])) }},
+                      selectedClassIds: {{ Js::from(old('class_ids', [])) }},
+                      get filteredClasses() {
+                          if (!this.levelId) return this.allClasses;
+                          return this.allClasses.filter(c => c.level_id == this.levelId);
+                      },
+                      toggleClass(id) {
+                          const idx = this.selectedClassIds.indexOf(id);
+                          if (idx > -1) { this.selectedClassIds.splice(idx, 1); }
+                          else { this.selectedClassIds.push(id); }
+                      },
+                      isSelected(id) { return this.selectedClassIds.includes(id); }
+                  }">
                 @csrf
 
                 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -25,23 +40,30 @@
                     </flux:select>
                 </div>
 
-                <flux:select name="level_id" :label="__('School Level (optional)')">
+                <flux:select name="level_id" :label="__('School Level (optional)')" x-model="levelId">
                     <option value="">{{ __('All levels') }}</option>
                     @foreach ($levels as $level)
-                        <option value="{{ $level->id }}" @selected(old('level_id') == $level->id)>{{ $level->name }}</option>
+                        <option value="{{ $level->id }}">{{ $level->name }}</option>
                     @endforeach
                 </flux:select>
 
-                @if ($classes->count())
-                    <fieldset>
-                        <legend class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{{ __('Assign to Classes (optional)') }}</legend>
-                        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            @foreach ($classes as $class)
-                                <flux:checkbox name="class_ids[]" :value="$class->id" :label="$class->name" :checked="in_array($class->id, old('class_ids', []))" />
-                            @endforeach
-                        </div>
-                    </fieldset>
-                @endif
+                <fieldset x-show="filteredClasses.length > 0">
+                    <legend class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{{ __('Assign to Classes (optional)') }}</legend>
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <template x-for="cls in filteredClasses" :key="cls.id">
+                            <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                <input type="checkbox" name="class_ids[]" :value="cls.id"
+                                       :checked="isSelected(cls.id)" @change="toggleClass(cls.id)"
+                                       class="rounded border-zinc-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)] dark:border-zinc-600 dark:bg-zinc-700" />
+                                <span x-text="cls.name" class="text-zinc-700 dark:text-zinc-300"></span>
+                                <span x-show="!levelId" x-text="'(' + (cls.level_name || '') + ')'" class="text-xs text-zinc-400"></span>
+                            </label>
+                        </template>
+                    </div>
+                    <p x-show="filteredClasses.length === 0 && levelId" class="text-sm text-zinc-500 mt-2">
+                        {{ __('No unassigned classes in this level.') }}
+                    </p>
+                </fieldset>
 
                 <div class="flex gap-3">
                     <flux:button variant="primary" type="submit">{{ __('Add Teacher') }}</flux:button>

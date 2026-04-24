@@ -39,9 +39,10 @@ class TeacherController extends Controller
     public function create(): View
     {
         $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
-        $classes = SchoolClass::where('is_active', true)
-            ->whereNull('teacher_id')
-            ->orderBy('name')
+        $classes = SchoolClass::with('level:id,name')
+            ->where('is_active', true)
+            ->orderBy('level_id')
+            ->orderBy('sort_order')
             ->get();
 
         return view('admin.teachers.create', compact('levels', 'classes'));
@@ -91,11 +92,10 @@ class TeacherController extends Controller
         abort_unless($teacher->role === 'teacher', 404);
 
         $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
-        $classes = SchoolClass::where('is_active', true)
-            ->where(function ($q) use ($teacher) {
-                $q->whereNull('teacher_id')->orWhere('teacher_id', $teacher->id);
-            })
-            ->orderBy('name')
+        $classes = SchoolClass::with('level:id,name')
+            ->where('is_active', true)
+            ->orderBy('level_id')
+            ->orderBy('sort_order')
             ->get();
 
         $assignedClassIds = $teacher->assignedClasses()->pluck('id')->toArray();
