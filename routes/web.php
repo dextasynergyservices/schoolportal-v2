@@ -60,6 +60,7 @@ use App\Http\Controllers\Teacher\NoticeController as TeacherNoticeController;
 use App\Http\Controllers\Teacher\QuizController as TeacherQuizController;
 use App\Http\Controllers\Teacher\ResultController as TeacherResultController;
 use App\Http\Controllers\Teacher\StudentController as TeacherStudentController;
+use App\Http\Controllers\Teacher\StudentImportController as TeacherStudentImportController;
 use App\Http\Controllers\Teacher\SubmissionController as TeacherSubmissionController;
 use Illuminate\Support\Facades\Route;
 
@@ -237,6 +238,11 @@ Route::prefix('portal')->group(function () {
 
             // Students (read-only)
             Route::get('students', [TeacherStudentController::class, 'index'])->name('teacher.students.index');
+            // CSV import disabled — teachers should not add students
+            // Route::get('students/import', [TeacherStudentImportController::class, 'create'])->name('teacher.students.import');
+            // Route::post('students/import/preview', [TeacherStudentImportController::class, 'preview'])->name('teacher.students.import.preview');
+            // Route::post('students/import', [TeacherStudentImportController::class, 'store'])->name('teacher.students.import.store');
+            // Route::get('students/import/template', [TeacherStudentImportController::class, 'template'])->name('teacher.students.import.template');
 
             // Results
             Route::get('results', [TeacherResultController::class, 'index'])->name('teacher.results.index');

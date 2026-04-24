@@ -16,7 +16,7 @@
         <div class="dash-welcome dash-welcome-parent dash-animate" role="banner">
             <div class="relative z-10">
                 <h1 class="text-xl sm:text-2xl font-bold text-white">
-                    {{ $timeGreeting }}, {{ $parent->name }} 👋
+                    {{ $timeGreeting }}, {{ $parent->name }}
                 </h1>
                 @if ($currentSession && $currentTerm)
                     <p class="mt-1 text-sm text-white/70">

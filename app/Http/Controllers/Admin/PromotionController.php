@@ -37,7 +37,25 @@ class PromotionController extends Controller
             ->orderByDesc('promoted_at')
             ->paginate(10);
 
-        return view('admin.promotions.index', compact('classes', 'sessions', 'recentPromotions'));
+        // All active students for single-student promotion search
+        $allStudents = User::where('role', 'student')
+            ->where('is_active', true)
+            ->with('studentProfile:user_id,class_id')
+            ->get()
+            ->map(function ($s) use ($classes) {
+                $classId = $s->studentProfile?->class_id;
+                $class = $classes->firstWhere('id', $classId);
+
+                return [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'username' => $s->username,
+                    'class_id' => $classId,
+                    'class_name' => $class?->name ?? '—',
+                ];
+            });
+
+        return view('admin.promotions.index', compact('classes', 'sessions', 'recentPromotions', 'allStudents'));
     }
 
     public function preview(Request $request): View

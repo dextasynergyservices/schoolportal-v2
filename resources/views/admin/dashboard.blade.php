@@ -17,7 +17,7 @@
             <div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 class="text-xl sm:text-2xl font-bold text-white">
-                        {{ $timeGreeting }}, {{ auth()->user()->name }} 👋
+                        {{ $timeGreeting }}, {{ auth()->user()->name }}
                     </h1>
                     @if ($currentSession && $currentTerm)
                         <p class="mt-1 text-sm text-white/70">

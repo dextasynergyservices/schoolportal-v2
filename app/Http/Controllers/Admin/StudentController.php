@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ParentProfile;
+use App\Models\ParentStudent;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\StudentProfile;
@@ -62,8 +64,12 @@ class StudentController extends Controller
 
         $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
         $currentSession = app('current.school')->currentSession();
+        $parents = User::where('role', 'parent')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'username', 'phone']);
 
-        return view('admin.students.create', compact('classes', 'levels', 'currentSession'));
+        return view('admin.students.create', compact('classes', 'levels', 'currentSession', 'parents'));
     }
 
     public function store(Request $request, FileUploadService $uploadService): RedirectResponse
@@ -81,6 +87,13 @@ class StudentController extends Controller
             'address' => ['nullable', 'string'],
             'blood_group' => ['nullable', 'string', 'max:5'],
             'medical_notes' => ['nullable', 'string'],
+            'parent_ids' => ['nullable', 'array'],
+            'parent_ids.*' => ['exists:users,id'],
+            'new_parent_name' => ['nullable', 'string', 'max:255'],
+            'new_parent_username' => ['nullable', 'string', 'max:100', 'unique:users,username'],
+            'new_parent_password' => ['nullable', 'string', 'min:6'],
+            'new_parent_phone' => ['nullable', 'string', 'max:20'],
+            'new_parent_relationship' => ['nullable', 'in:father,mother,guardian,other'],
         ]);
 
         // Upload avatar to Cloudinary if provided
@@ -115,6 +128,42 @@ class StudentController extends Controller
                 'enrolled_session_id' => app('current.school')->currentSession()?->id,
             ]);
 
+            // Link existing parents
+            if (! empty($validated['parent_ids'])) {
+                foreach ($validated['parent_ids'] as $parentId) {
+                    ParentStudent::firstOrCreate([
+                        'parent_id' => $parentId,
+                        'student_id' => $user->id,
+                    ], [
+                        'school_id' => $user->school_id,
+                    ]);
+                }
+            }
+
+            // Create new parent inline if provided
+            if (! empty($validated['new_parent_name']) && ! empty($validated['new_parent_username']) && ! empty($validated['new_parent_password'])) {
+                $newParent = User::create([
+                    'name' => $validated['new_parent_name'],
+                    'username' => $validated['new_parent_username'],
+                    'password' => Hash::make($validated['new_parent_password']),
+                    'role' => 'parent',
+                    'phone' => $validated['new_parent_phone'] ?? null,
+                    'must_change_password' => true,
+                ]);
+
+                ParentProfile::create([
+                    'user_id' => $newParent->id,
+                    'school_id' => $newParent->school_id,
+                    'relationship' => $validated['new_parent_relationship'] ?? null,
+                ]);
+
+                ParentStudent::create([
+                    'parent_id' => $newParent->id,
+                    'student_id' => $user->id,
+                    'school_id' => $user->school_id,
+                ]);
+            }
+
             return $user;
         });
 
@@ -145,8 +194,13 @@ class StudentController extends Controller
             ->orderBy('name')
             ->get();
         $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
+        $parents = User::where('role', 'parent')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'username', 'phone']);
+        $linkedParentIds = ParentStudent::where('student_id', $student->id)->pluck('parent_id')->toArray();
 
-        return view('admin.students.edit', compact('student', 'classes', 'levels'));
+        return view('admin.students.edit', compact('student', 'classes', 'levels', 'parents', 'linkedParentIds'));
     }
 
     public function update(Request $request, User $student, FileUploadService $uploadService): RedirectResponse
@@ -168,6 +222,13 @@ class StudentController extends Controller
             'address' => ['nullable', 'string'],
             'blood_group' => ['nullable', 'string', 'max:5'],
             'medical_notes' => ['nullable', 'string'],
+            'parent_ids' => ['nullable', 'array'],
+            'parent_ids.*' => ['exists:users,id'],
+            'new_parent_name' => ['nullable', 'string', 'max:255'],
+            'new_parent_username' => ['nullable', 'string', 'max:100', 'unique:users,username'],
+            'new_parent_password' => ['nullable', 'string', 'min:6'],
+            'new_parent_phone' => ['nullable', 'string', 'max:20'],
+            'new_parent_relationship' => ['nullable', 'in:father,mother,guardian,other'],
         ]);
 
         // Handle avatar upload/removal
@@ -209,6 +270,42 @@ class StudentController extends Controller
                     'medical_notes' => $validated['medical_notes'] ?? null,
                 ],
             );
+
+            // Sync parent links
+            ParentStudent::where('student_id', $student->id)->delete();
+            if (! empty($validated['parent_ids'])) {
+                foreach ($validated['parent_ids'] as $parentId) {
+                    ParentStudent::create([
+                        'parent_id' => $parentId,
+                        'student_id' => $student->id,
+                        'school_id' => $student->school_id,
+                    ]);
+                }
+            }
+
+            // Create new parent inline if provided
+            if (! empty($validated['new_parent_name']) && ! empty($validated['new_parent_username']) && ! empty($validated['new_parent_password'])) {
+                $newParent = User::create([
+                    'name' => $validated['new_parent_name'],
+                    'username' => $validated['new_parent_username'],
+                    'password' => Hash::make($validated['new_parent_password']),
+                    'role' => 'parent',
+                    'phone' => $validated['new_parent_phone'] ?? null,
+                    'must_change_password' => true,
+                ]);
+
+                ParentProfile::create([
+                    'user_id' => $newParent->id,
+                    'school_id' => $newParent->school_id,
+                    'relationship' => $validated['new_parent_relationship'] ?? null,
+                ]);
+
+                ParentStudent::create([
+                    'parent_id' => $newParent->id,
+                    'student_id' => $student->id,
+                    'school_id' => $student->school_id,
+                ]);
+            }
         });
 
         return redirect()->route('admin.students.index')

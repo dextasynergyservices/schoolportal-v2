@@ -74,6 +74,85 @@
                 <flux:textarea name="address" :label="__('Address')" :value="old('address')" rows="2" />
                 <flux:textarea name="medical_notes" :label="__('Medical Notes')" :value="old('medical_notes')" rows="2" />
 
+                <flux:separator />
+
+                {{-- Parent Linking Section --}}
+                <flux:heading size="sm">{{ __('Link Parent / Guardian') }}</flux:heading>
+
+                <div x-data="{
+                    parents: {{ Js::from($parents) }},
+                    selectedIds: {{ Js::from(old('parent_ids', [])) }},
+                    search: '',
+                    showNewParent: false,
+                    get filtered() {
+                        if (!this.search) return [];
+                        const q = this.search.toLowerCase();
+                        return this.parents.filter(p =>
+                            !this.selectedIds.includes(p.id) &&
+                            (p.name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q))
+                        ).slice(0, 8);
+                    },
+                    addParent(p) { this.selectedIds.push(p.id); this.search = ''; },
+                    removeParent(id) { this.selectedIds = this.selectedIds.filter(i => i !== id); },
+                    getParent(id) { return this.parents.find(p => p.id === id); }
+                }" class="space-y-4">
+
+                    {{-- Search existing parents --}}
+                    <div class="relative">
+                        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Search Existing Parents') }}</label>
+                        <input type="text" x-model="search" placeholder="{{ __('Type parent name or username...') }}"
+                               class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]" />
+                        <div x-show="filtered.length > 0" x-cloak class="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg max-h-48 overflow-y-auto">
+                            <template x-for="p in filtered" :key="p.id">
+                                <button type="button" @click="addParent(p)" class="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 text-sm">
+                                    <flux:icon.user class="w-4 h-4 text-zinc-400 shrink-0" />
+                                    <span x-text="p.name" class="font-medium"></span>
+                                    <span x-text="'@' + p.username" class="text-zinc-400 text-xs"></span>
+                                    <span x-show="p.phone" x-text="p.phone" class="text-zinc-400 text-xs ml-auto"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    {{-- Selected parents --}}
+                    <div x-show="selectedIds.length > 0" class="flex flex-wrap gap-2">
+                        <template x-for="id in selectedIds" :key="id">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-3 py-1 text-sm font-medium">
+                                <input type="hidden" name="parent_ids[]" :value="id" />
+                                <span x-text="getParent(id)?.name"></span>
+                                <button type="button" @click="removeParent(id)" class="hover:text-red-500">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+
+                    {{-- Create new parent inline --}}
+                    <div>
+                        <button type="button" @click="showNewParent = !showNewParent" class="text-sm text-[var(--color-primary)] hover:underline flex items-center gap-1">
+                            <flux:icon.plus class="w-4 h-4" />
+                            <span x-text="showNewParent ? '{{ __('Hide new parent form') }}' : '{{ __('Create new parent') }}'"></span>
+                        </button>
+                    </div>
+
+                    <div x-show="showNewParent" x-cloak class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4 space-y-4">
+                        <p class="text-xs text-zinc-500">{{ __('Fill in to create and link a new parent account.') }}</p>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <flux:input name="new_parent_name" :label="__('Parent Name')" :value="old('new_parent_name')" />
+                            <flux:input name="new_parent_username" :label="__('Parent Username')" :value="old('new_parent_username')" />
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <x-password-input name="new_parent_password" :label="__('Parent Password')" />
+                            <flux:input name="new_parent_phone" :label="__('Phone (optional)')" :value="old('new_parent_phone')" />
+                        </div>
+                        <flux:select name="new_parent_relationship" :label="__('Relationship')">
+                            <option value="">{{ __('Select...') }}</option>
+                            <option value="father" @selected(old('new_parent_relationship') === 'father')>{{ __('Father') }}</option>
+                            <option value="mother" @selected(old('new_parent_relationship') === 'mother')>{{ __('Mother') }}</option>
+                            <option value="guardian" @selected(old('new_parent_relationship') === 'guardian')>{{ __('Guardian') }}</option>
+                            <option value="other" @selected(old('new_parent_relationship') === 'other')>{{ __('Other') }}</option>
+                        </flux:select>
+                    </div>
+                </div>
+
                 <div class="flex gap-3">
                     <flux:button variant="primary" type="submit">{{ __('Add Student') }}</flux:button>
                     <flux:button variant="ghost" href="{{ route('admin.students.index') }}" wire:navigate>{{ __('Cancel') }}</flux:button>
