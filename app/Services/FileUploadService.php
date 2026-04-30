@@ -73,11 +73,21 @@ class FileUploadService
     }
 
     /**
-     * Delete a file from Cloudinary by its public ID.
+     * Delete an image from Cloudinary by its public ID.
      */
     public function delete(string $publicId): void
     {
         $this->uploader->destroy($publicId);
+    }
+
+    /**
+     * Delete a raw file (PDF, DOCX, etc.) from Cloudinary by its public ID.
+     * Raw files require resource_type=raw — the default destroy() uses 'image'
+     * which would silently return "not found" for raw resources.
+     */
+    public function deleteRaw(string $publicId): void
+    {
+        $this->uploader->destroy($publicId, ['resource_type' => 'raw']);
     }
 
     /**
@@ -173,6 +183,52 @@ class FileUploadService
     public function uploadAssignment(UploadedFile $file, int $schoolId): array
     {
         return $this->uploadRawFile($file, $schoolId, 'assignments');
+    }
+
+    /**
+     * Upload a raw document (PDF, DOCX) for AI exam/quiz generation.
+     *
+     * @return array{url: string, public_id: string}
+     */
+    public function uploadRawDocument(UploadedFile $file, int $schoolId): array
+    {
+        return $this->uploadRawFile($file, $schoolId, 'exam-sources');
+    }
+
+    /**
+     * Upload a platform email attachment to Cloudinary.
+     * Stored in a shared platform folder (not school-scoped).
+     * Should be deleted after all recipient emails have been sent.
+     *
+     * @return array{url: string, public_id: string, name: string, mime: string, size: int}
+     */
+    public function uploadEmailAttachment(UploadedFile $file): array
+    {
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $extension = $file->getClientOriginalExtension();
+        $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $originalName);
+        $uniqueName = $safeName.'_'.uniqid();
+
+        $tempFile = sys_get_temp_dir().DIRECTORY_SEPARATOR.$uniqueName.'.'.$extension;
+        copy($file->getRealPath(), $tempFile);
+
+        try {
+            $result = $this->uploader->upload($tempFile, [
+                'folder' => 'schoolportal/platform/email-attachments',
+                'resource_type' => 'raw',
+                'public_id' => $uniqueName.'.'.$extension,
+            ]);
+        } finally {
+            @unlink($tempFile);
+        }
+
+        return [
+            'url' => $result['secure_url'],
+            'public_id' => $result['public_id'],
+            'name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType() ?? 'application/octet-stream',
+            'size' => $file->getSize(),
+        ];
     }
 
     /**

@@ -10,9 +10,12 @@ Artisan::command('inspire', function () {
 
 // ── Scheduled Tasks ──
 
-// Process queued jobs every minute (emails, notifications)
+// Process queued jobs every 5 minutes (emails, notifications)
 // Required for shared hosting where persistent queue workers can't run
-Schedule::command('queue:work --stop-when-empty --max-time=55')->everyMinute()->withoutOverlapping();
+Schedule::command('queue:work --stop-when-empty --max-time=240')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
 
 // Daily database backup at 2:00 AM
 Schedule::command('db:backup')->dailyAt('02:00')->onOneServer();
@@ -23,8 +26,5 @@ Schedule::command('credits:reset-free')->monthlyOn(1, '00:00')->onOneServer();
 // Send weekly digest emails to parents every Monday at 7:00 AM
 Schedule::command('digest:parents-weekly')->weeklyOn(1, '07:00')->onOneServer();
 
-// Process queued jobs
-Schedule::command('queue:work --stop-when-empty --max-time=300')
-    ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->onOneServer();
+// Send 24-hour deadline reminders for quizzes and exams every day at 8:00 AM
+Schedule::command('reminders:send-deadlines')->dailyAt('08:00')->onOneServer();

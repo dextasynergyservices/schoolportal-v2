@@ -57,22 +57,22 @@
                             <div class="flex-1 space-y-2">
                                 <template x-if="gameType === 'memory_match'">
                                     <div class="grid grid-cols-2 gap-2">
-                                        <input type="text" x-model="item.term" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Term') }}" required>
-                                        <input type="text" x-model="item.definition" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Definition') }}" required>
+                                        <input type="text" x-model="item.term" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Term') }}" required>
+                                        <input type="text" x-model="item.definition" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Definition') }}" required>
                                     </div>
                                 </template>
                                 <template x-if="gameType === 'word_scramble'">
                                     <div class="grid grid-cols-2 gap-2">
-                                        <input type="text" x-model="item.word" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Word') }}" required>
-                                        <input type="text" x-model="item.hint" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Hint') }}" required>
+                                        <input type="text" x-model="item.word" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Word') }}" required>
+                                        <input type="text" x-model="item.hint" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Hint') }}" required>
                                     </div>
                                 </template>
                                 <template x-if="gameType === 'quiz_race'">
                                     <div>
-                                        <input type="text" x-model="item.question" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm mb-2" placeholder="{{ __('Question') }}" required>
+                                        <input type="text" x-model="item.question" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500 mb-2" placeholder="{{ __('Question') }}" required>
                                         <div class="grid grid-cols-2 gap-2">
                                             <template x-for="(opt, oi) in item.options" :key="oi">
-                                                <input type="text" x-model="item.options[oi]" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                <input type="text" x-model="item.options[oi]" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                     :placeholder="oi === 0 ? '{{ __("Correct") }}' : '{{ __("Option") }} ' + (oi + 1)" required>
                                             </template>
                                         </div>
@@ -80,8 +80,8 @@
                                 </template>
                                 <template x-if="gameType === 'flashcard'">
                                     <div class="grid grid-cols-2 gap-2">
-                                        <input type="text" x-model="item.front" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Front') }}" required>
-                                        <input type="text" x-model="item.back" class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Back') }}" required>
+                                        <input type="text" x-model="item.front" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Front') }}" required>
+                                        <input type="text" x-model="item.back" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Back') }}" required>
                                     </div>
                                 </template>
                             </div>

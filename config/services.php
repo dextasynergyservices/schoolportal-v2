@@ -60,4 +60,9 @@ return [
         'retention_days' => env('GOOGLE_DRIVE_BACKUP_RETENTION_DAYS', 14),
     ],
 
+    'backup' => [
+        'alert_email' => env('BACKUP_ALERT_EMAIL'),
+        'keep_local' => env('BACKUP_KEEP_LOCAL', 7),
+    ],
+
 ];

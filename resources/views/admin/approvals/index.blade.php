@@ -1,22 +1,22 @@
 <x-layouts::app :title="__('Approvals')">
-    <div class="space-y-6">
+    <div class="space-y-6" x-data="{ selected: [], showBulkReject: false, bulkReason: '' }">
         <x-admin-header :title="__('Teacher Approvals')" :description="__(':count pending', ['count' => $pendingCount])" />
 
         @if (session('success'))
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif
 
-        <div class="flex gap-2">
-            <flux:button variant="{{ $status === 'pending' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'pending']) }}" wire:navigate>
+        <div class="flex flex-wrap gap-2" role="tablist" aria-label="{{ __('Status filter') }}">
+            <flux:button variant="{{ $status === 'pending' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'pending']) }}" wire:navigate :aria-selected="$status === 'pending' ? 'true' : 'false'">
                 {{ __('Pending') }}
             </flux:button>
-            <flux:button variant="{{ $status === 'approved' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'approved']) }}" wire:navigate>
+            <flux:button variant="{{ $status === 'approved' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'approved']) }}" wire:navigate :aria-selected="$status === 'approved' ? 'true' : 'false'">
                 {{ __('Approved') }}
             </flux:button>
-            <flux:button variant="{{ $status === 'rejected' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'rejected']) }}" wire:navigate>
+            <flux:button variant="{{ $status === 'rejected' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'rejected']) }}" wire:navigate :aria-selected="$status === 'rejected' ? 'true' : 'false'">
                 {{ __('Rejected') }}
             </flux:button>
-            <flux:button variant="{{ $status === 'all' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'all']) }}" wire:navigate>
+            <flux:button variant="{{ $status === 'all' ? 'filled' : 'subtle' }}" size="sm" href="{{ route('admin.approvals.index', ['status' => 'all']) }}" wire:navigate :aria-selected="$status === 'all' ? 'true' : 'false'" :aria-selected="$status === 'all' ? 'true' : 'false'">
                 {{ __('All') }}
             </flux:button>
         </div>
@@ -30,13 +30,51 @@
                 <option value="notice" @selected(request('type') === 'notice')>{{ __('Notices') }}</option>
                 <option value="quiz" @selected(request('type') === 'quiz')>{{ __('Quizzes') }}</option>
                 <option value="game" @selected(request('type') === 'game')>{{ __('Games') }}</option>
+                <option value="exam" @selected(request('type') === 'exam')>{{ __('Exams') }}</option>
+                <option value="report_card" @selected(request('type') === 'report_card')>{{ __('Report Cards') }}</option>
             </flux:select>
+        </div>
+
+        {{-- Bulk selection controls (pending/all tabs only) --}}
+        @php $pendingIds = $actions->getCollection()->where('status', 'pending')->pluck('id')->values(); @endphp
+        @if (in_array($status, ['pending', 'all']) && $pendingIds->isNotEmpty())
+            <div class="flex items-center gap-3 flex-wrap">
+                <flux:button variant="outline" size="sm" @click="selected.length === {{ $pendingIds->count() }} ? selected = [] : selected = {{ $pendingIds->toJson() }}">
+                    <span x-text="selected.length === {{ $pendingIds->count() }} ? '{{ __('Deselect All') }}' : '{{ __('Select All Pending') }}'">{{ __('Select All Pending') }}</span>
+                </flux:button>
+                <span x-show="selected.length > 0" x-cloak class="text-sm text-zinc-500" x-text="selected.length + ' {{ __('selected') }}'"></span>
+            </div>
+        @endif
+
+        {{-- Bulk actions toolbar --}}
+        <div x-show="selected.length > 0" x-cloak x-transition class="sticky top-4 z-30 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-lg p-3 flex flex-wrap items-center gap-3">
+            <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300" x-text="selected.length + ' {{ __('submissions selected') }}'"></span>
+            <form method="POST" action="{{ route('admin.approvals.bulk-approve') }}" class="inline-flex">
+                @csrf
+                <template x-for="id in selected" :key="id">
+                    <input type="hidden" name="action_ids[]" :value="id">
+                </template>
+                <flux:button type="submit" variant="primary" size="sm">{{ __('Approve Selected') }}</flux:button>
+            </form>
+            <flux:button variant="danger" size="sm" @click="showBulkReject = true">{{ __('Reject Selected') }}</flux:button>
+            <flux:button variant="subtle" size="sm" @click="selected = []">{{ __('Clear Selection') }}</flux:button>
         </div>
 
         <div class="space-y-4">
             @forelse ($actions as $action)
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
-                    <div class="flex items-start justify-between gap-4">
+                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4" :class="selected.includes({{ $action->id }}) ? 'ring-2 ring-blue-500' : ''">
+                    <div class="flex items-start gap-4">
+                        @if ($action->status === 'pending')
+                            <input
+                                type="checkbox"
+                                :value="{{ $action->id }}"
+                                x-model="selected"
+                                class="mt-1 size-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+                                aria-label="{{ __('Select this submission') }}"
+                            >
+                        @else
+                            <div class="mt-1 size-4 shrink-0"></div>
+                        @endif
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2 mb-1">
                                 @if ($action->entity_type === 'result')
@@ -49,6 +87,17 @@
                                     <flux:badge color="indigo" size="sm">{{ __('Quiz') }}</flux:badge>
                                 @elseif ($action->entity_type === 'game')
                                     <flux:badge color="cyan" size="sm">{{ __('Game') }}</flux:badge>
+                                @elseif ($action->entity_type === 'exam')
+                                    @php $examEntity = \App\Models\Exam::find($action->entity_id); @endphp
+                                    @if ($examEntity?->category === 'assessment')
+                                        <flux:badge color="violet" size="sm">{{ __('Assessment') }}</flux:badge>
+                                    @elseif ($examEntity?->category === 'assignment')
+                                        <flux:badge color="orange" size="sm">{{ __('Assignment') }}</flux:badge>
+                                    @else
+                                        <flux:badge color="rose" size="sm">{{ __('Exam') }}</flux:badge>
+                                    @endif
+                                @elseif ($action->entity_type === 'report_card')
+                                    <flux:badge color="teal" size="sm">{{ __('Report Card') }}</flux:badge>
                                 @else
                                     <flux:badge size="sm">{{ ucfirst($action->entity_type) }}</flux:badge>
                                 @endif
@@ -66,6 +115,14 @@
                                 {{ __('by') }} {{ $action->teacher?->name ?? __('Unknown') }}
                             </p>
                             <p class="text-xs text-zinc-500 mt-1">{{ $action->created_at->diffForHumans() }}</p>
+                            @if ($action->entity_type === 'report_card')
+                                @php $reportCard = $reportCards[$action->entity_id] ?? null; @endphp
+                                @if ($reportCard)
+                                    <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                                        {{ $reportCard->student?->name ?? '' }} &middot; {{ $reportCard->class?->name ?? '' }} &middot; {{ $reportCard->term?->name ?? '' }}, {{ $reportCard->session?->name ?? '' }}
+                                    </p>
+                                @endif
+                            @endif
                             @if ($action->rejection_reason)
                                 <p class="text-xs text-red-600 mt-1">{{ __('Reason:') }} {{ $action->rejection_reason }}</p>
                             @endif
@@ -79,6 +136,14 @@
                                 </flux:button>
                             @elseif ($action->entity_type === 'game')
                                 <flux:button variant="subtle" size="xs" href="{{ route('admin.games.show', $action->entity_id) }}" wire:navigate>
+                                    <flux:icon name="eye" class="size-3.5 mr-1" /> {{ __('Preview') }}
+                                </flux:button>
+                            @elseif ($action->entity_type === 'exam')
+                                @php
+                                    $examPreview = \App\Models\Exam::find($action->entity_id);
+                                    $examPreviewRoute = 'admin.exams.show';
+                                @endphp
+                                <flux:button variant="subtle" size="xs" href="{{ route($examPreviewRoute, $action->entity_id) }}" wire:navigate>
                                     <flux:icon name="eye" class="size-3.5 mr-1" /> {{ __('Preview') }}
                                 </flux:button>
                             @elseif ($action->entity_type === 'notice')
@@ -442,5 +507,43 @@
         </div>
 
         {{ $actions->links() }}
+    </div>
+
+    {{-- Bulk reject modal --}}
+    <div x-show="showBulkReject" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="showBulkReject = false" @keydown.escape.window="showBulkReject = false">
+        <div class="bg-white dark:bg-zinc-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4" @click.stop>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                    <flux:icon name="x-circle" class="size-5 text-red-600" />
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Reject Selected Submissions') }}</h3>
+                    <p class="text-xs text-zinc-500" x-text="selected.length + ' {{ __('submission(s) will be rejected') }}'"></p>
+                </div>
+            </div>
+            <form method="POST" action="{{ route('admin.approvals.bulk-reject') }}">
+                @csrf
+                <template x-for="id in selected" :key="id">
+                    <input type="hidden" name="action_ids[]" :value="id">
+                </template>
+                <div class="mb-4">
+                    <label for="bulk_rejection_reason" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Reason for rejection') }}</label>
+                    <textarea
+                        id="bulk_rejection_reason"
+                        name="rejection_reason"
+                        rows="3"
+                        required
+                        maxlength="500"
+                        x-model="bulkReason"
+                        placeholder="{{ __('Explain why these submissions are being rejected...') }}"
+                        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    ></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <flux:button type="button" variant="subtle" size="sm" @click="showBulkReject = false">{{ __('Cancel') }}</flux:button>
+                    <flux:button type="submit" variant="danger" size="sm">{{ __('Reject All') }}</flux:button>
+                </div>
+            </form>
+        </div>
     </div>
 </x-layouts::app>

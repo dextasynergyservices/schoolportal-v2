@@ -8,6 +8,9 @@
             <flux:button variant="subtle" size="sm" href="{{ route('admin.students.import') }}" wire:navigate icon="arrow-up-tray">
                 {{ __('Import CSV') }}
             </flux:button>
+            <flux:button variant="subtle" size="sm" icon="arrow-down-tray" href="{{ route('admin.students.export', request()->query()) }}">
+                {{ __('Export CSV') }}
+            </flux:button>
         </x-admin-header>
 
         @if (session('success'))

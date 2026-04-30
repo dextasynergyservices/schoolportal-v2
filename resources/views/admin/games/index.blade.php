@@ -97,16 +97,15 @@
                                         <form method="POST" action="{{ route('admin.approvals.reject', $game->latestTeacherAction) }}" @submit="rejecting = true">
                                             @csrf
                                             <div class="mb-4">
-                                                <label for="rejection_reason_game_{{ $game->id }}" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ __('Reason for rejection') }}</label>
-                                                <textarea
+                                                <flux:label for="rejection_reason_game_{{ $game->id }}">{{ __('Reason for rejection') }}</flux:label>
+                                                <flux:textarea
                                                     id="rejection_reason_game_{{ $game->id }}"
                                                     name="rejection_reason"
                                                     rows="3"
                                                     required
                                                     maxlength="500"
                                                     placeholder="{{ __('Explain why this game is being rejected...') }}"
-                                                    class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                                                ></textarea>
+                                                />
                                             </div>
                                             <div class="flex justify-end gap-2">
                                                 <flux:button type="button" variant="subtle" size="sm" @click="showRejectModal = false">{{ __('Cancel') }}</flux:button>

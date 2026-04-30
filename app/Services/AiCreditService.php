@@ -85,6 +85,12 @@ class AiCreditService
             'credits_used' => 1,
         ]);
 
+        // Warn school admins when credits drop to or below the warning threshold
+        $remaining = $this->getSchoolBalance($school);
+        if ($remaining <= 3) {
+            app(NotificationService::class)->notifyLowCredits($school->id, $remaining);
+        }
+
         return true;
     }
 

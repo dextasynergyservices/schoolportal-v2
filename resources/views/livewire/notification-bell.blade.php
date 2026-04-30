@@ -8,7 +8,10 @@
             const vh = window.innerHeight;
             const top = rect.bottom + 8;
             const maxH = Math.min(480, vh - top - 16);
-            if (rect.left < vw / 2) {
+            if (vw < 640) {
+                // Mobile: pin to 1rem from each side (matches w-[calc(100vw-2rem)] width class)
+                this.dropStyle = { top: top + 'px', left: '1rem', right: '1rem', maxHeight: maxH + 'px' };
+            } else if (rect.left < vw / 2) {
                 this.dropStyle = { top: top + 'px', left: Math.max(8, rect.left) + 'px', right: 'auto', maxHeight: maxH + 'px' };
             } else {
                 this.dropStyle = { top: top + 'px', left: 'auto', right: Math.max(8, vw - rect.right) + 'px', maxHeight: maxH + 'px' };

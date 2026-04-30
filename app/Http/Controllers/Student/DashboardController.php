@@ -6,12 +6,16 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
+use App\Models\Exam;
+use App\Models\ExamAttempt;
 use App\Models\Game;
 use App\Models\GamePlay;
 use App\Models\Notice;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\Result;
+use App\Models\StudentTermReport;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -29,23 +33,58 @@ class DashboardController extends Controller
         // Load class with teacher info
         $class = $profile?->class()->with(['teacher:id,name', 'level:id,name'])->first();
 
-        // ── Core counts ──────────────────────────────────────────────
-        $resultsCount = Result::where('student_id', $student->id)
-            ->where('status', 'approved')
-            ->count();
+        // ── Core counts (cached 5 min) ───────────────────────────────
+        $statsCacheKey = "school:{$school->id}:student:{$student->id}:dashboard:stats";
+        $stats = Cache::remember($statsCacheKey, now()->addMinutes(5), function () use ($student, $classId, $currentSession, $currentTerm): array {
+            $resultsCount = Result::where('student_id', $student->id)->where('status', 'approved')->count();
+            $reportCardsCount = StudentTermReport::where('student_id', $student->id)->where('status', 'published')->count();
+            $cbtResultsCount = ExamAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])->count();
 
-        $assignmentsCount = 0;
-        if ($classId && $currentSession && $currentTerm) {
-            $assignmentsCount = Assignment::where('class_id', $classId)
-                ->where('session_id', $currentSession->id)
-                ->where('term_id', $currentTerm->id)
-                ->where('status', 'approved')
-                ->count();
-        }
+            $assignmentsCount = 0;
+            if ($classId && $currentSession && $currentTerm) {
+                $assignmentsCount = Assignment::where('class_id', $classId)
+                    ->where('session_id', $currentSession->id)
+                    ->where('term_id', $currentTerm->id)
+                    ->where('status', 'approved')
+                    ->count();
+            }
+
+            $quizzesTaken = QuizAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out'])->count();
+            $quizAvgScore = QuizAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out'])->avg('percentage');
+            $quizPassRate = 0;
+            if ($quizzesTaken > 0) {
+                $quizPassed = QuizAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out'])->where('passed', true)->count();
+                $quizPassRate = round(($quizPassed / $quizzesTaken) * 100);
+            }
+
+            $examsTaken = ExamAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out', 'grading'])->count();
+            $examAvgScore = ExamAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out'])->whereNotNull('percentage')->avg('percentage');
+            $examPassRate = 0;
+            if ($examsTaken > 0) {
+                $examPassed = ExamAttempt::where('student_id', $student->id)->whereIn('status', ['submitted', 'timed_out'])->where('passed', true)->count();
+                $examPassRate = round(($examPassed / $examsTaken) * 100);
+            }
+
+            return compact('resultsCount', 'reportCardsCount', 'cbtResultsCount', 'assignmentsCount', 'quizzesTaken', 'quizAvgScore', 'quizPassRate', 'examsTaken', 'examAvgScore', 'examPassRate');
+        });
+
+        $resultsCount = $stats['resultsCount'];
+        $reportCardsCount = $stats['reportCardsCount'];
+        $cbtResultsCount = $stats['cbtResultsCount'];
+        $assignmentsCount = $stats['assignmentsCount'];
+        $quizzesTaken = $stats['quizzesTaken'];
+        $quizAvgScore = $stats['quizAvgScore'];
+        $quizPassRate = $stats['quizPassRate'];
+        $examsTaken = $stats['examsTaken'];
+        $examAvgScore = $stats['examAvgScore'];
+        $examPassRate = $stats['examPassRate'];
 
         // ── Quizzes & Games counts ───────────────────────────────────
         $availableQuizzes = 0;
         $availableGames = 0;
+        $availableExamsCount = 0;
+        $availableAssessmentsCount = 0;
+        $availableCbtAssignmentsCount = 0;
         if ($classId) {
             $availableQuizzes = Quiz::published()
                 ->where('class_id', $classId)
@@ -54,24 +93,33 @@ class DashboardController extends Controller
             $availableGames = Game::published()
                 ->where('class_id', $classId)
                 ->count();
+
+            $availableExamsCount = Exam::available()
+                ->forClass($classId)
+                ->forCategory('exam')
+                ->count();
+
+            $availableAssessmentsCount = Exam::available()
+                ->forClass($classId)
+                ->forCategory('assessment')
+                ->count();
+
+            $availableCbtAssignmentsCount = Exam::available()
+                ->forClass($classId)
+                ->forCategory('assignment')
+                ->count();
         }
 
-        // ── Quiz performance summary ─────────────────────────────────
-        $quizzesTaken = QuizAttempt::where('student_id', $student->id)
-            ->whereIn('status', ['submitted', 'timed_out'])
-            ->count();
-
-        $quizAvgScore = QuizAttempt::where('student_id', $student->id)
-            ->whereIn('status', ['submitted', 'timed_out'])
-            ->avg('percentage');
-
-        $quizPassRate = 0;
-        if ($quizzesTaken > 0) {
-            $quizPassed = QuizAttempt::where('student_id', $student->id)
-                ->whereIn('status', ['submitted', 'timed_out'])
-                ->where('passed', true)
-                ->count();
-            $quizPassRate = round(($quizPassed / $quizzesTaken) * 100);
+        // ── Upcoming CBT exams (nearest deadlines) ──────────────
+        $upcomingExams = collect();
+        if ($classId) {
+            $upcomingExams = Exam::available()
+                ->forClass($classId)
+                ->with('subject:id,name')
+                ->whereNotNull('available_until')
+                ->orderBy('available_until')
+                ->take(5)
+                ->get(['id', 'title', 'category', 'subject_id', 'total_questions', 'time_limit_minutes', 'available_until', 'max_attempts', 'school_id', 'class_id', 'is_published', 'available_from']);
         }
 
         // ── My Learning: unified quiz + game items ────────────────
@@ -231,9 +279,12 @@ class DashboardController extends Controller
         return view('student.dashboard', compact(
             'student', 'school', 'profile', 'class',
             'currentSession', 'currentTerm',
-            'resultsCount', 'assignmentsCount', 'noticesCount',
+            'resultsCount', 'reportCardsCount', 'cbtResultsCount', 'assignmentsCount', 'noticesCount',
             'availableQuizzes', 'availableGames',
+            'availableExamsCount', 'availableAssessmentsCount', 'availableCbtAssignmentsCount',
             'quizzesTaken', 'quizAvgScore', 'quizPassRate',
+            'examsTaken', 'examAvgScore', 'examPassRate',
+            'upcomingExams',
             'learningItems', 'totalPublishedQuizzes', 'quizzesCompletedCount',
             'totalPublishedGames', 'gamesCompletedCount',
             'upcomingDeadlines',

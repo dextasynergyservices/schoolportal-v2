@@ -82,7 +82,7 @@
                             <div class="max-w-xs mx-auto mb-4">
                                 <input type="text" x-model="guess"
                                     @keydown.enter="checkWord()"
-                                    class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-center text-lg"
+                                    class="w-full rounded-lg border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-center text-lg text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                     :placeholder="'{{ __('Type the word...') }}'"
                                     x-ref="wordInput">
                             </div>

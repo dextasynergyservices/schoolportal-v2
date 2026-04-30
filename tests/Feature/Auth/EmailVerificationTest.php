@@ -25,22 +25,30 @@ class EmailVerificationTest extends TestCase
         $this->setUpSchoolContext();
     }
 
-    public function test_email_verification_screen_can_be_rendered(): void
+    public function test_already_verified_user_visiting_notice_is_redirected(): void
     {
-        $user = User::factory()->unverified()->create([
+        // All users on this platform are auto-verified on creation (see User::booted).
+        // Fortify's EmailVerificationPromptController redirects verified users away.
+        $user = User::factory()->create([
             'school_id' => $this->school->id,
         ]);
+
+        $this->assertTrue($user->hasVerifiedEmail());
 
         $response = $this->actingAs($user)->get(route('verification.notice'));
 
-        $response->assertOk();
+        $response->assertRedirect();
     }
 
-    public function test_email_can_be_verified(): void
+    public function test_already_verified_user_visiting_verification_link_is_redirected(): void
     {
-        $user = User::factory()->unverified()->create([
+        // Users are auto-verified on creation; markEmailAsVerified() returns false (already
+        // verified) so the Verified event is NOT dispatched, but Fortify still redirects.
+        $user = User::factory()->create([
             'school_id' => $this->school->id,
         ]);
+
+        $this->assertTrue($user->hasVerifiedEmail());
 
         Event::fake();
 
@@ -52,17 +60,20 @@ class EmailVerificationTest extends TestCase
 
         $response = $this->actingAs($user)->get($verificationUrl);
 
-        Event::assertDispatched(Verified::class);
+        Event::assertNotDispatched(Verified::class);
 
         $this->assertTrue($user->fresh()->hasVerifiedEmail());
         $response->assertRedirect(route('dashboard', absolute: false).'?verified=1');
     }
 
-    public function test_email_is_not_verified_with_invalid_hash(): void
+    public function test_invalid_hash_does_not_affect_already_verified_user(): void
     {
-        $user = User::factory()->unverified()->create([
+        // Users are auto-verified on creation; an invalid hash cannot un-verify them.
+        $user = User::factory()->create([
             'school_id' => $this->school->id,
         ]);
+
+        $this->assertTrue($user->hasVerifiedEmail());
 
         $verificationUrl = URL::temporarySignedRoute(
             'verification.verify',
@@ -72,7 +83,7 @@ class EmailVerificationTest extends TestCase
 
         $this->actingAs($user)->get($verificationUrl);
 
-        $this->assertFalse($user->fresh()->hasVerifiedEmail());
+        $this->assertTrue($user->fresh()->hasVerifiedEmail());
     }
 
     public function test_already_verified_user_visiting_verification_link_is_redirected_without_firing_event_again(): void

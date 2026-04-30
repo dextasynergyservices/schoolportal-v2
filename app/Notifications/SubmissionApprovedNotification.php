@@ -24,6 +24,7 @@ class SubmissionApprovedNotification extends DatabaseNotification
             'notice' => __('notice'),
             'quiz' => __('quiz'),
             'game' => __('educational game'),
+            'report_card' => __('report card'),
             default => $this->entityType,
         };
 

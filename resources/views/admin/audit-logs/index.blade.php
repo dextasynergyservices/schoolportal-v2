@@ -1,6 +1,10 @@
 <x-layouts::app :title="__('Audit Logs')">
     <div class="space-y-6">
-        <x-admin-header :title="__('Audit Logs')" />
+        <x-admin-header :title="__('Audit Logs')">
+            <flux:button variant="subtle" size="sm" icon="arrow-down-tray" href="{{ route('admin.audit-logs.export', request()->query()) }}">
+                {{ __('Export CSV') }}
+            </flux:button>
+        </x-admin-header>
 
         <form method="GET" action="{{ route('admin.audit-logs.index') }}" class="flex flex-wrap items-end gap-3">
             <div class="flex-1 max-w-sm">

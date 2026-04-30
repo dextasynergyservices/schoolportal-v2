@@ -99,7 +99,12 @@
         {{-- Recent Usage --}}
         @if ($recentUsage->isNotEmpty())
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 sm:p-5">
-                <h3 class="text-base font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Recent Usage') }}</h3>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Recent Usage') }}</h3>
+                    <flux:button variant="subtle" size="sm" icon="arrow-down-tray" href="{{ route('admin.credits.usage.export') }}">
+                        {{ __('Export CSV') }}
+                    </flux:button>
+                </div>
                 <div class="space-y-2">
                     @foreach ($recentUsage as $log)
                         <div class="flex items-center justify-between text-sm">

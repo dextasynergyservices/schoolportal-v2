@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StorePlatformAnnouncementRequest;
+use App\Http\Requests\UpdatePlatformAnnouncementRequest;
 use App\Models\PlatformAnnouncement;
 use App\Models\School;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AnnouncementController extends Controller
@@ -30,18 +31,10 @@ class AnnouncementController extends Controller
         return view('super-admin.announcements.create');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StorePlatformAnnouncementRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'content' => ['required', 'string'],
-            'priority' => ['required', 'in:info,warning,critical'],
-            'starts_at' => ['nullable', 'date'],
-            'expires_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-        ]);
-
         PlatformAnnouncement::create([
-            ...$data,
+            ...$request->validated(),
             'is_active' => true,
             'created_by' => auth()->id(),
         ]);
@@ -72,17 +65,9 @@ class AnnouncementController extends Controller
         return view('super-admin.announcements.edit', compact('announcement'));
     }
 
-    public function update(Request $request, PlatformAnnouncement $announcement): RedirectResponse
+    public function update(UpdatePlatformAnnouncementRequest $request, PlatformAnnouncement $announcement): RedirectResponse
     {
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'content' => ['required', 'string'],
-            'priority' => ['required', 'in:info,warning,critical'],
-            'starts_at' => ['nullable', 'date'],
-            'expires_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-        ]);
-
-        $announcement->update($data);
+        $announcement->update($request->validated());
 
         return redirect()->route('super-admin.announcements.show', $announcement)
             ->with('success', __('Announcement updated.'));

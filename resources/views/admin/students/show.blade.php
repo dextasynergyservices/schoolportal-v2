@@ -3,6 +3,11 @@
         <x-admin-header :title="$student->name">
             <div class="flex gap-2">
                 @if ($student->is_active)
+                    @if ($student->studentProfile?->class && $siblingClasses->isNotEmpty())
+                        <flux:modal.trigger name="transfer-class">
+                            <flux:button variant="subtle" size="sm" icon="arrows-right-left">{{ __('Transfer Class') }}</flux:button>
+                        </flux:modal.trigger>
+                    @endif
                     <flux:modal.trigger name="deactivate-student">
                         <flux:button variant="danger" size="sm" icon="pause-circle">{{ __('Deactivate') }}</flux:button>
                     </flux:modal.trigger>
@@ -49,6 +54,35 @@
                             <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
                         </flux:modal.close>
                         <flux:button type="submit" variant="danger">{{ __('Deactivate') }}</flux:button>
+                    </div>
+                </form>
+            </flux:modal>
+        @endif
+
+        {{-- Transfer Class modal --}}
+        @if ($student->is_active && $student->studentProfile?->class && $siblingClasses->isNotEmpty())
+            <flux:modal name="transfer-class" class="max-w-md">
+                <form method="POST" action="{{ route('admin.students.transfer-class', $student) }}" class="space-y-4">
+                    @csrf
+                    <div>
+                        <flux:heading size="lg">{{ __('Transfer :name', ['name' => $student->name]) }}</flux:heading>
+                        <flux:text class="mt-1">{{ __('Move this student to another class within :level.', ['level' => $student->studentProfile->class->level->name]) }}</flux:text>
+                    </div>
+                    <div class="rounded-lg bg-zinc-50 dark:bg-zinc-700/50 p-3 text-sm">
+                        <flux:text class="text-zinc-500">{{ __('Current class') }}</flux:text>
+                        <flux:text class="font-medium">{{ $student->studentProfile->class->name }}</flux:text>
+                    </div>
+                    <flux:select name="class_id" :label="__('Transfer to')" required>
+                        <option value="">{{ __('Select a class...') }}</option>
+                        @foreach ($siblingClasses as $siblingClass)
+                            <option value="{{ $siblingClass->id }}">{{ $siblingClass->name }}</option>
+                        @endforeach
+                    </flux:select>
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.close>
+                        <flux:button type="submit" variant="primary">{{ __('Transfer') }}</flux:button>
                     </div>
                 </form>
             </flux:modal>

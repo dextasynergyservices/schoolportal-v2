@@ -5,6 +5,8 @@
             :description="__('View and adjust credit balances across schools.')"
         />
 
+        @include('partials.credits-subnav')
+
         @if (session('success'))
             <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
         @endif

@@ -95,6 +95,14 @@
                     <form method="POST" action="{{ route('teacher.games.store') }}" x-data="manualGameCreator()" @submit="return onSubmit($event)">
                         @csrf
                         <input type="hidden" name="source_type" value="manual">
+
+                        {{-- Inline validation error --}}
+                        <div x-show="validationError" x-cloak x-transition class="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 flex items-center gap-2">
+                            <flux:icon name="exclamation-triangle" class="size-5 text-red-500 shrink-0" />
+                            <span class="text-sm text-red-700 dark:text-red-300" x-text="validationError"></span>
+                            <button type="button" @click="validationError = ''" class="ml-auto text-red-400 hover:text-red-600">&times;</button>
+                        </div>
+
                         <div class="space-y-5">
                             {{-- Game settings --}}
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -184,13 +192,13 @@
                                                     <div>
                                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" x-text="gameType === 'memory_match' ? '{{ __("Term") }}' : '{{ __("Front (question)") }}'"></label>
                                                         <input type="text" x-model="item.a"
-                                                            class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                            class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                             :placeholder="gameType === 'memory_match' ? '{{ __("e.g., Photosynthesis") }}' : '{{ __("e.g., What is the capital of Nigeria?") }}'" required>
                                                     </div>
                                                     <div>
                                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1" x-text="gameType === 'memory_match' ? '{{ __("Definition") }}' : '{{ __("Back (answer)") }}'"></label>
                                                         <input type="text" x-model="item.b"
-                                                            class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                            class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                             :placeholder="gameType === 'memory_match' ? '{{ __("e.g., Process plants use to make food") }}' : '{{ __("e.g., Abuja") }}'" required>
                                                     </div>
                                                 </div>
@@ -202,13 +210,13 @@
                                                     <div>
                                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Word') }}</label>
                                                         <input type="text" x-model="item.a"
-                                                            class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                            class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                             placeholder="{{ __('e.g., PHOTOSYNTHESIS') }}" required>
                                                     </div>
                                                     <div>
                                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Hint') }}</label>
                                                         <input type="text" x-model="item.b"
-                                                            class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                            class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                             placeholder="{{ __('e.g., Process plants use to make food') }}" required>
                                                     </div>
                                                 </div>
@@ -220,7 +228,7 @@
                                                     <div>
                                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Question') }}</label>
                                                         <input type="text" x-model="item.a"
-                                                            class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                            class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                             placeholder="{{ __('e.g., What is the chemical symbol for water?') }}" required>
                                                     </div>
                                                     <div>
@@ -229,25 +237,25 @@
                                                             <div class="flex items-center gap-2">
                                                                 <span class="text-xs font-medium text-green-600 w-5">A.</span>
                                                                 <input type="text" x-model="item.options[0]"
-                                                                    class="flex-1 rounded-lg border-green-300 dark:border-green-700 dark:bg-zinc-700 text-sm ring-1 ring-green-200 dark:ring-green-800"
+                                                                    class="flex-1 rounded-lg border border-green-300 dark:border-green-700 bg-white dark:bg-white/10 text-sm ring-1 ring-green-200 dark:ring-green-800 shadow-xs px-2 py-1 text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                                     placeholder="{{ __('Correct answer') }}" required>
                                                             </div>
                                                             <div class="flex items-center gap-2">
                                                                 <span class="text-xs font-medium text-zinc-500 w-5">B.</span>
                                                                 <input type="text" x-model="item.options[1]"
-                                                                    class="flex-1 rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                                    class="flex-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                                     placeholder="{{ __('Option B') }}" required>
                                                             </div>
                                                             <div class="flex items-center gap-2">
                                                                 <span class="text-xs font-medium text-zinc-500 w-5">C.</span>
                                                                 <input type="text" x-model="item.options[2]"
-                                                                    class="flex-1 rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                                    class="flex-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                                     placeholder="{{ __('Option C') }}" required>
                                                             </div>
                                                             <div class="flex items-center gap-2">
                                                                 <span class="text-xs font-medium text-zinc-500 w-5">D.</span>
                                                                 <input type="text" x-model="item.options[3]"
-                                                                    class="flex-1 rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                                    class="flex-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                                     placeholder="{{ __('Option D') }}" required>
                                                             </div>
                                                         </div>
@@ -293,6 +301,7 @@
         function manualGameCreator() {
             return {
                 submitting: false,
+                validationError: '',
                 gameType: 'memory_match',
                 items: [{ a: '', b: '', options: ['', '', '', ''] }],
 
@@ -337,9 +346,10 @@
                 },
 
                 onSubmit(event) {
+                    this.validationError = '';
                     const hasContent = this.items.some(item => item.a.trim() !== '' || item.b.trim() !== '');
                     if (!hasContent) {
-                        alert('{{ __("Please add at least one item with content.") }}');
+                        this.validationError = '{{ __("Please add at least one item with content.") }}';
                         event.preventDefault();
                         return false;
                     }
@@ -347,7 +357,7 @@
                     if (this.gameType === 'quiz_race') {
                         for (let i = 0; i < this.items.length; i++) {
                             if (this.items[i].a.trim() && !this.items[i].options[0].trim()) {
-                                alert('{{ __("Please fill in the correct answer for question") }} ' + (i + 1));
+                                this.validationError = '{{ __("Please fill in the correct answer for question") }} ' + (i + 1);
                                 event.preventDefault();
                                 return false;
                             }

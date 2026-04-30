@@ -97,7 +97,8 @@
                     </div>
 
                     <form method="POST" action="{{ route('admin.promotions.store') }}" class="space-y-4"
-                          x-on:submit="if(!confirm('{{ __('Are you sure you want to promote this student?') }}')) $event.preventDefault();">
+                          x-data="{ showConfirm: false }"
+                          @submit.prevent="showConfirm = true">
                         @csrf
                         <input type="hidden" name="student_ids[]" :value="selectedStudent?.id">
                         <input type="hidden" name="from_class_id" :value="selectedStudent?.class_id">
@@ -119,7 +120,28 @@
                             </flux:select>
                         </div>
 
-                        <flux:button variant="primary" type="submit" size="sm">{{ __('Promote Student') }}</flux:button>
+                        <flux:button variant="primary" type="button" size="sm" @click="showConfirm = true">{{ __('Promote Student') }}</flux:button>
+
+                        {{-- Confirmation dialog --}}
+                        <template x-teleport="body">
+                            <div x-show="showConfirm" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/50">
+                                <div @click.outside="showConfirm = false" class="bg-white dark:bg-zinc-800 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex-shrink-0 size-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                            <flux:icon name="exclamation-triangle" class="size-5 text-amber-600" />
+                                        </div>
+                                        <div>
+                                            <h3 class="text-base font-semibold text-zinc-900 dark:text-white">{{ __('Confirm Promotion') }}</h3>
+                                            <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ __('Are you sure you want to promote this student? This action cannot be easily undone.') }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end gap-2">
+                                        <flux:button variant="ghost" type="button" @click="showConfirm = false">{{ __('Cancel') }}</flux:button>
+                                        <flux:button variant="primary" type="button" @click="showConfirm = false; $el.closest('form').removeAttribute('x-on:submit.prevent'); $nextTick(() => $el.closest('form').submit())">{{ __('Yes, Promote') }}</flux:button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </form>
                 </div>
             </div>

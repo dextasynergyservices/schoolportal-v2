@@ -128,6 +128,21 @@
             </div>
         </div>
 
+        {{-- ── Tabs ─────────────────────────────────────────────── --}}
+        <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-700">
+            <a href="{{ route('admin.analytics', array_filter(['session_id' => request('session_id'), 'term_id' => request('term_id')])) }}"
+               class="px-4 py-2.5 text-sm font-medium border-b-2 transition {{ ($tab ?? 'overview') === 'overview' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300' }}"
+               wire:navigate>
+                {{ __('Overview') }}
+            </a>
+            <a href="{{ route('admin.analytics', array_filter(['tab' => 'insights', 'session_id' => request('session_id'), 'term_id' => request('term_id')])) }}"
+               class="px-4 py-2.5 text-sm font-medium border-b-2 transition {{ ($tab ?? 'overview') === 'insights' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300' }}"
+               wire:navigate>
+                {{ __('Student Insights') }}
+            </a>
+        </div>
+
+        @if (($tab ?? 'overview') === 'overview')
         {{-- ── Snapshot Cards ─────────────────────────────────────── --}}
         <section aria-label="{{ __('Snapshot metrics') }}">
             <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
@@ -544,6 +559,17 @@
                 </div>
                 </div>{{-- /x-collapse --}}
             </div>
+        @endif
+
+        @else
+        {{-- ── Student Insights (Full Mode) ───────────────────── --}}
+        <div class="max-w-5xl mx-auto">
+            <livewire:admin.student-insights
+                :session-id="$currentSession?->id"
+                :term-id="$currentTerm?->id"
+                :compact="false"
+            />
+        </div>
         @endif
 
         {{-- ── Back to Dashboard Link ─────────────────────────────── --}}

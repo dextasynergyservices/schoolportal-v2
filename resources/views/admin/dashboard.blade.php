@@ -164,7 +164,7 @@
                             <flux:icon.document-check class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                         </div>
                         <div class="min-w-0">
-                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Results') }}</p>
+                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Uploaded Results') }}</p>
                             <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($termResultsCount) }}</p>
                         </div>
                     </div>
@@ -196,6 +196,26 @@
                     </div>
                     <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('This term') }}</p>
                 </div>
+            </div>
+        </section>
+        </div>
+
+        {{-- ── CBT Stats Row ──────────────────────────────────────── --}}
+        <div style="order: {{ $widgetOrder['term_stats']['order'] ?? 2 }}" @class(['hidden' => !($widgetOrder['term_stats']['visible'] ?? true)])>
+        <section aria-label="{{ __('CBT statistics') }}">
+            <div class="grid grid-cols-1 gap-3 sm:gap-4">
+                <a href="{{ route('admin.exams.index') }}" wire:navigate class="stat-card dash-animate dash-animate-delay-3 block" style="border-left-color: #6366f1;">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon bg-indigo-500/15">
+                            <flux:icon.computer-desktop class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('CBT') }}</p>
+                            <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($cbtExamsCount + $cbtAssessmentsCount + $cbtAssignmentsCount) }}</p>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('Published') }}</p>
+                </a>
             </div>
         </section>
         </div>

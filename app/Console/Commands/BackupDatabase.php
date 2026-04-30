@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Notifications\BackupFailedNotification;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 
 class BackupDatabase extends Command
@@ -54,6 +56,7 @@ class BackupDatabase extends Command
         if (! $result->successful()) {
             $this->error('Backup failed: '.$result->errorOutput());
             Log::error('Database backup failed', ['error' => $result->errorOutput()]);
+            $this->notifyFailure($result->errorOutput(), $database);
 
             return self::FAILURE;
         }
@@ -86,8 +89,8 @@ class BackupDatabase extends Command
             $this->warn('Google Drive backup is disabled. Set GOOGLE_DRIVE_BACKUP_ENABLED=true to enable.');
         }
 
-        // Step 4: Clean up old local backups (keep last 7)
-        $this->cleanOldBackups($directory, 7);
+        // Step 4: Clean up old local backups (configurable retention)
+        $this->cleanOldBackups($directory, (int) config('services.backup.keep_local', 7));
 
         $this->info('Backup completed successfully.');
         Log::info('Database backup completed', ['file' => $uploadFilename, 'size' => filesize($uploadFile)]);
@@ -167,6 +170,7 @@ class BackupDatabase extends Command
                 'error' => $e->getMessage(),
                 'file' => $filename,
             ]);
+            $this->notifyFailure('Google Drive upload failed: '.$e->getMessage(), config('database.connections.mysql.database', 'unknown'));
         }
     }
 
@@ -272,5 +276,24 @@ class BackupDatabase extends Command
     private function base64urlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    /**
+     * Send a failure alert email if BACKUP_ALERT_EMAIL is configured.
+     */
+    private function notifyFailure(string $reason, string $database): void
+    {
+        $alertEmail = config('services.backup.alert_email');
+
+        if (! $alertEmail) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $alertEmail)
+                ->notify(new BackupFailedNotification($reason, $database));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send backup failure notification', ['error' => $e->getMessage()]);
+        }
     }
 }

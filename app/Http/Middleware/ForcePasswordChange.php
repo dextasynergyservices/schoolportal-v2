@@ -24,6 +24,12 @@ class ForcePasswordChange
             return $next($request);
         }
 
+        // During impersonation the super_admin is viewing as the school admin;
+        // we should not force a password change on their behalf.
+        if ($request->session()->has('impersonating_original_id')) {
+            return $next($request);
+        }
+
         // Allow access to password change and logout routes
         $allowedRoutes = ['password.change', 'password.change.update', 'logout'];
 

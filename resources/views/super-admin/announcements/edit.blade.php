@@ -9,7 +9,12 @@
 
                 <flux:input name="title" :label="__('Title')" :value="old('title', $announcement->title)" required />
 
-                <flux:textarea name="content" :label="__('Message')" rows="5" required>{{ old('content', $announcement->content) }}</flux:textarea>
+                <x-rich-editor
+                    name="content"
+                    :label="__('Message')"
+                    :value="old('content', $announcement->content)"
+                    :placeholder="__('Write your announcement message here...')"
+                    required />
 
                 <flux:select name="priority" :label="__('Priority')">
                     <option value="info" @selected(old('priority', $announcement->priority) === 'info')>{{ __('Info — Blue banner') }}</option>

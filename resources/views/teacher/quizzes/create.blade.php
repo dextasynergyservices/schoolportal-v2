@@ -126,6 +126,14 @@
                             <input type="hidden" name="source_type" value="document">
                             <input type="hidden" name="document_url" :value="documentUrl">
                             <input type="hidden" name="document_public_id" :value="documentPublicId">
+
+                            {{-- Inline validation error --}}
+                            <div x-show="validationError" x-cloak x-transition class="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 flex items-center gap-2">
+                                <flux:icon name="exclamation-triangle" class="size-5 text-red-500 shrink-0" />
+                                <span class="text-sm text-red-700 dark:text-red-300" x-text="validationError"></span>
+                                <button type="button" @click="validationError = ''" class="ml-auto text-red-400 hover:text-red-600">&times;</button>
+                            </div>
+
                             <div class="space-y-4">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
@@ -219,6 +227,14 @@
                     <form method="POST" action="{{ route('teacher.quizzes.store') }}" x-data="manualQuizCreator()" @submit="return onManualSubmit($event)">
                         @csrf
                         <input type="hidden" name="source_type" value="manual">
+
+                        {{-- Inline validation error --}}
+                        <div x-show="validationError" x-cloak x-transition class="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 flex items-center gap-2">
+                            <flux:icon name="exclamation-triangle" class="size-5 text-red-500 shrink-0" />
+                            <span class="text-sm text-red-700 dark:text-red-300" x-text="validationError"></span>
+                            <button type="button" @click="validationError = ''" class="ml-auto text-red-400 hover:text-red-600">&times;</button>
+                        </div>
+
                         <div class="space-y-5">
                             {{-- Quiz settings --}}
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -290,7 +306,7 @@
                                                 <div class="flex items-center gap-3">
                                                     <span class="flex items-center justify-center size-7 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold" x-text="qIndex + 1"></span>
                                                     <select :name="'questions[' + qIndex + '][type]'" x-model="question.type" @change="onTypeChange(qIndex)"
-                                                        class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm py-1.5">
+                                                        class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 shadow-xs text-sm py-1.5 px-20 text-zinc-700 dark:text-zinc-300 shadow-xs text-sm py-1.5 px-2">
                                                         <option value="multiple_choice">{{ __('Multiple Choice') }}</option>
                                                         <option value="true_false">{{ __('True / False') }}</option>
                                                         <option value="fill_blank">{{ __('Fill in the Blank') }}</option>
@@ -307,7 +323,7 @@
                                                 <div>
                                                     <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Question') }}</label>
                                                     <textarea :name="'questions[' + qIndex + '][question_text]'" x-model="question.question_text" rows="2"
-                                                        class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                        class="w-full rounded-lg border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                         placeholder="{{ __('Enter your question here...') }}" required></textarea>
                                                 </div>
 
@@ -326,7 +342,7 @@
                                                                     <input type="text" x-model="question.options[oIndex]"
                                                                         @input="if(question.correct_answer === question.options[oIndex]) question.correct_answer = $event.target.value"
                                                                         :name="'questions[' + qIndex + '][options][' + oIndex + ']'"
-                                                                        class="flex-1 rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                                        class="flex-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                                         :placeholder="'{{ __('Option') }} ' + String.fromCharCode(65 + oIndex)" required>
                                                                 </div>
                                                             </template>
@@ -365,7 +381,7 @@
                                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Correct Answer') }}</label>
                                                         <input type="hidden" :name="'questions[' + qIndex + '][options][0]'" value="">
                                                         <input type="text" :name="'questions[' + qIndex + '][correct_answer]'" x-model="question.correct_answer"
-                                                            class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                            class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                             placeholder="{{ __('Type the correct answer...') }}" required>
                                                     </div>
                                                 </template>
@@ -374,7 +390,7 @@
                                                 <div>
                                                     <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Explanation (optional)') }}</label>
                                                     <textarea :name="'questions[' + qIndex + '][explanation]'" x-model="question.explanation" rows="1"
-                                                        class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                                        class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                                         placeholder="{{ __('Explain why this is the correct answer...') }}"></textarea>
                                                 </div>
                                             </div>
@@ -416,6 +432,7 @@
         function manualQuizCreator() {
             return {
                 submitting: false,
+                validationError: '',
                 questions: [{
                     type: 'multiple_choice',
                     question_text: '',
@@ -451,10 +468,11 @@
                     }
                 },
                 onManualSubmit(event) {
+                    this.validationError = '';
                     // Validate at least one question has content
                     const hasContent = this.questions.some(q => q.question_text.trim() !== '');
                     if (!hasContent) {
-                        alert('{{ __('Please add at least one question.') }}');
+                        this.validationError = '{{ __('Please add at least one question.') }}';
                         event.preventDefault();
                         return false;
                     }
@@ -462,7 +480,7 @@
                     for (let i = 0; i < this.questions.length; i++) {
                         const q = this.questions[i];
                         if (!q.correct_answer || q.correct_answer.trim() === '') {
-                            alert('{{ __('Please select the correct answer for Question') }} ' + (i + 1));
+                            this.validationError = '{{ __('Please select the correct answer for Question') }} ' + (i + 1);
                             event.preventDefault();
                             return false;
                         }
@@ -480,6 +498,7 @@
                 fileName: '',
                 uploading: false,
                 submitting: false,
+                validationError: '',
                 openUploader() {
                     if (typeof cloudinary !== 'undefined') {
                         const widget = cloudinary.createUploadWidget({
@@ -503,7 +522,7 @@
                         });
                         widget.open();
                     } else {
-                        alert('{{ __("Document upload service is not available. Please check Cloudinary configuration.") }}');
+                        this.validationError = '{{ __("Document upload service is not available. Please check Cloudinary configuration.") }}';
                     }
                 },
                 removeDocument() {
@@ -512,8 +531,9 @@
                     this.fileName = '';
                 },
                 onSubmit(event) {
+                    this.validationError = '';
                     if (!this.documentUrl) {
-                        alert('{{ __("Please upload a document first.") }}');
+                        this.validationError = '{{ __("Please upload a document first.") }}';
                         event.preventDefault();
                         return false;
                     }

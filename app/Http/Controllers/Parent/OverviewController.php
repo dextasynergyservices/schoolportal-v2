@@ -6,9 +6,11 @@ namespace App\Http\Controllers\Parent;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
+use App\Models\ExamAttempt;
 use App\Models\GamePlay;
 use App\Models\QuizAttempt;
 use App\Models\Result;
+use App\Models\StudentTermReport;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\View;
@@ -56,6 +58,26 @@ class OverviewController extends Controller
     }
 
     /**
+     * Report Cards overview — show all children with report card counts.
+     */
+    public function reportCards(): View
+    {
+        $children = $this->getChildrenWithStats('report_cards');
+
+        return view('parent.overview.report-cards', compact('children'));
+    }
+
+    /**
+     * CBT overview — show all children with CBT exam/assessment/assignment stats.
+     */
+    public function cbt(): View
+    {
+        $children = $this->getChildrenWithStats('cbt');
+
+        return view('parent.overview.cbt', compact('children'));
+    }
+
+    /**
      * Load children with relevant stats based on context.
      *
      * @return Collection<int, User>
@@ -84,6 +106,8 @@ class OverviewController extends Controller
             'assignments' => $this->attachAssignmentStats($children, $school),
             'quizzes' => $this->attachQuizStats($children),
             'games' => $this->attachGameStats($children),
+            'cbt' => $this->attachCbtStats($children),
+            'report_cards' => $this->attachReportCardStats($children),
         };
 
         return $children;
@@ -175,6 +199,49 @@ class OverviewController extends Controller
             $child->stat_games_played = $gs ? (int) $gs->played : 0;
             $child->stat_game_avg = $gs ? round((float) $gs->avg_pct, 1) : null;
             $child->stat_game_best = $gs ? round((float) $gs->best_pct, 1) : null;
+        }
+    }
+
+    private function attachCbtStats(Collection $children): void
+    {
+        $childIds = $children->pluck('id');
+
+        $stats = ExamAttempt::whereIn('student_id', $childIds)
+            ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
+            ->selectRaw('student_id, count(*) as taken, avg(percentage) as avg_pct, sum(case when passed = 1 then 1 else 0 end) as passed_count')
+            ->groupBy('student_id')
+            ->get()
+            ->keyBy('student_id');
+
+        foreach ($children as $child) {
+            $cs = $stats[$child->id] ?? null;
+            $child->stat_cbt_taken = $cs ? (int) $cs->taken : 0;
+            $child->stat_cbt_avg = $cs ? round((float) $cs->avg_pct, 1) : null;
+            $child->stat_cbt_passed = $cs ? (int) $cs->passed_count : 0;
+        }
+    }
+
+    private function attachReportCardStats(Collection $children): void
+    {
+        $childIds = $children->pluck('id');
+
+        $counts = StudentTermReport::whereIn('student_id', $childIds)
+            ->where('status', 'published')
+            ->selectRaw('student_id, count(*) as total')
+            ->groupBy('student_id')
+            ->pluck('total', 'student_id');
+
+        $latestReports = StudentTermReport::whereIn('student_id', $childIds)
+            ->where('status', 'published')
+            ->with(['session:id,name', 'term:id,name'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('student_id')
+            ->map(fn ($group) => $group->first());
+
+        foreach ($children as $child) {
+            $child->stat_report_cards_count = (int) ($counts[$child->id] ?? 0);
+            $child->stat_latest_report = $latestReports[$child->id] ?? null;
         }
     }
 }
