@@ -70,7 +70,7 @@
                             <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition"
                                 :class="answeredQuestions[{{ $question->id }}] === '{{ addslashes($option) }}'
                                     ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
-                                    : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:bg-zinc-50 dark:hover:bg-zinc-750'">
+                                    : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:bg-zinc-50 dark:hover:bg-zinc-700/70'">
                                 <input type="radio" name="answer_{{ $question->id }}" value="{{ $option }}"
                                     @change="selectAnswer({{ $question->id }}, '{{ addslashes($option) }}')"
                                     :checked="answeredQuestions[{{ $question->id }}] === '{{ addslashes($option) }}'"
@@ -84,7 +84,7 @@
                     <input type="text" placeholder="{{ __('Type your answer...') }}"
                         :value="answeredQuestions[{{ $question->id }}] || ''"
                         @input.debounce.500ms="selectAnswer({{ $question->id }}, $event.target.value)"
-                        class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm">
+                        class="w-full rounded-lg border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500">
                 @endif
             </div>
         @endforeach

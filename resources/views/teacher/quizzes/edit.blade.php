@@ -90,7 +90,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-medium text-zinc-600 dark:text-zinc-400" x-text="'Q' + (qIndex + 1)"></span>
                                 <select :name="'questions[' + qIndex + '][type]'" x-model="question.type" @change="onTypeChange(qIndex)"
-                                    class="rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-xs py-1">
+                                    class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 text-zinc-700 dark:text-zinc-300 shadow-xs text-xs py-1 px-2">
                                     <option value="multiple_choice">{{ __('Multiple Choice') }}</option>
                                     <option value="true_false">{{ __('True / False') }}</option>
                                     <option value="fill_blank">{{ __('Fill in Blank') }}</option>
@@ -103,7 +103,7 @@
 
                         <div class="space-y-3">
                             <textarea :name="'questions[' + qIndex + '][question_text]'" x-model="question.question_text" rows="2"
-                                class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" required></textarea>
+                                class="w-full rounded-lg border border-zinc-200 border-b-zinc-300/80 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" required></textarea>
 
                             <template x-if="question.type === 'multiple_choice'">
                                 <div class="space-y-2">
@@ -115,7 +115,7 @@
                                                 class="text-indigo-600 focus:ring-indigo-500">
                                             <input type="text" x-model="question.options[oIndex]"
                                                 :name="'questions[' + qIndex + '][options][' + oIndex + ']'"
-                                                class="flex-1 rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" required>
+                                                class="flex-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300" required>
                                         </div>
                                     </template>
                                     <input type="hidden" :name="'questions[' + qIndex + '][correct_answer]'" :value="question.correct_answer">
@@ -148,13 +148,13 @@
                                 <div>
                                     <input type="hidden" :name="'questions[' + qIndex + '][options][0]'" value="">
                                     <input type="text" :name="'questions[' + qIndex + '][correct_answer]'" x-model="question.correct_answer"
-                                        class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                        class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                         placeholder="{{ __('Correct answer...') }}" required>
                                 </div>
                             </template>
 
                             <textarea :name="'questions[' + qIndex + '][explanation]'" x-model="question.explanation" rows="1"
-                                class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm"
+                                class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500"
                                 placeholder="{{ __('Explanation (optional)') }}"></textarea>
                         </div>
                     </div>

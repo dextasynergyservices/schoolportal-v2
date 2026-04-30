@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class School extends Model
 {
@@ -32,6 +33,7 @@ class School extends Model
         'ai_purchased_credits',
         'ai_free_credits_reset_at',
         'ai_credits_total_purchased',
+        'timezone',
         'is_active',
         'deactivation_reason',
         'deactivated_at',
@@ -116,5 +118,52 @@ class School extends Model
     public function currentTerm(): ?Term
     {
         return $this->terms()->where('is_current', true)->first();
+    }
+
+    public function subjects(): HasMany
+    {
+        return $this->hasMany(Subject::class)->orderBy('sort_order');
+    }
+
+    public function gradingScales(): HasMany
+    {
+        return $this->hasMany(GradingScale::class);
+    }
+
+    public function scoreComponents(): HasMany
+    {
+        return $this->hasMany(ScoreComponent::class)->orderBy('sort_order');
+    }
+
+    public function reportCardConfig(): HasOne
+    {
+        return $this->hasOne(ReportCardConfig::class);
+    }
+
+    // ── Content relationships (used by super-admin content overview) ──
+
+    public function quizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class);
+    }
+
+    public function games(): HasMany
+    {
+        return $this->hasMany(Game::class);
+    }
+
+    public function exams(): HasMany
+    {
+        return $this->hasMany(Exam::class);
+    }
+
+    public function results(): HasMany
+    {
+        return $this->hasMany(Result::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(Assignment::class);
     }
 }

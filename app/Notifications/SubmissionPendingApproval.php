@@ -33,6 +33,7 @@ class SubmissionPendingApproval extends Notification implements ShouldQueue
             'notice' => 'Notice',
             'quiz' => 'Quiz',
             'game' => 'Educational Game',
+            'report_card' => 'Report Card',
             default => ucfirst($this->action->entity_type),
         };
 

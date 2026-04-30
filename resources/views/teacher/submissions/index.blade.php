@@ -3,12 +3,13 @@
         <x-admin-header :title="__('My Submissions')" :description="__('Track the approval status of all your submitted content.')" />
 
         {{-- Status tabs --}}
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2" role="tablist" aria-label="{{ __('Status filter') }}">
             <flux:button
                 variant="{{ !request('status') ? 'filled' : 'subtle' }}"
                 size="sm"
                 href="{{ route('teacher.submissions.index') }}"
                 wire:navigate
+                :aria-selected="!request('status') ? 'true' : 'false'"
             >
                 {{ __('All') }} ({{ $counts['all'] }})
             </flux:button>
@@ -42,11 +43,13 @@
         <div class="flex flex-wrap items-end gap-3">
             <flux:select name="type" onchange="window.location.href = this.value ? '{{ route('teacher.submissions.index') }}?type=' + this.value + '{{ request('status') ? '&status=' . request('status') : '' }}' : '{{ route('teacher.submissions.index') }}{{ request('status') ? '?status=' . request('status') : '' }}'">
                 <option value="">{{ __('All Types') }}</option>
-                <option value="result" @selected(request('type') === 'result')>{{ __('Results') }}</option>
+                <option value="result" @selected(request('type') === 'result')>{{ __('Uploaded Results') }}</option>
                 <option value="assignment" @selected(request('type') === 'assignment')>{{ __('Assignments') }}</option>
                 <option value="notice" @selected(request('type') === 'notice')>{{ __('Notices') }}</option>
                 <option value="quiz" @selected(request('type') === 'quiz')>{{ __('Quizzes') }}</option>
                 <option value="game" @selected(request('type') === 'game')>{{ __('Games') }}</option>
+                <option value="exam" @selected(request('type') === 'exam')>{{ __('CBT Exams / Assessments / Assignments') }}</option>
+                <option value="report_card" @selected(request('type') === 'report_card')>{{ __('Report Cards') }}</option>
             </flux:select>
         </div>
 
@@ -80,6 +83,20 @@
                                 @case('game')
                                     <flux:badge color="emerald" size="sm">{{ __('Game') }}</flux:badge>
                                     @break
+                                @case('exam')
+                                    @php
+                                        $examEntity = \App\Models\Exam::find($submission->entity_id);
+                                        $examCategoryLabel = match ($examEntity?->category ?? 'exam') {
+                                            'assessment' => __('Assessment'),
+                                            'assignment' => __('CBT Assignment'),
+                                            default => __('CBT Exam'),
+                                        };
+                                    @endphp
+                                    <flux:badge color="indigo" size="sm">{{ $examCategoryLabel }}</flux:badge>
+                                    @break
+                                @case('report_card')
+                                    <flux:badge color="teal" size="sm">{{ __('Report Card') }}</flux:badge>
+                                    @break
                             @endswitch
                         </flux:table.cell>
                         <flux:table.cell class="capitalize">{{ str_replace('_', ' ', $submission->action_type) }}</flux:table.cell>
@@ -111,6 +128,12 @@
                                     'notice' => route('teacher.notices.index'),
                                     'quiz' => route('teacher.quizzes.show', $submission->entity_id),
                                     'game' => route('teacher.games.show', $submission->entity_id),
+                                    'exam' => (function () use ($submission) {
+                                        $exam = \App\Models\Exam::find($submission->entity_id);
+                                        if (! $exam) return null;
+                                        return route('teacher.exams.show', $exam);
+                                    })(),
+                                    'report_card' => route('teacher.scores.reports'),
                                     default => null,
                                 };
                             @endphp

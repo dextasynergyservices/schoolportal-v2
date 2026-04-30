@@ -33,6 +33,7 @@ class SubmissionReviewed extends Notification implements ShouldQueue
             'notice' => 'notice',
             'quiz' => 'quiz',
             'game' => 'educational game',
+            'report_card' => 'report card',
             default => $this->entityType,
         };
 

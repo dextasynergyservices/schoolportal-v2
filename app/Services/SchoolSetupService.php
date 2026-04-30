@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AcademicSession;
+use App\Models\PlatformSetting;
 use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
@@ -53,7 +54,7 @@ class SchoolSetupService
                 'country' => $data['country'] ?? 'Nigeria',
                 'website' => $data['website'] ?? null,
                 'motto' => $data['motto'] ?? null,
-                'ai_free_credits' => 15,
+                'ai_free_credits' => (int) PlatformSetting::get('default_free_ai_credits', 15),
                 'ai_purchased_credits' => 0,
                 'ai_free_credits_reset_at' => now()->addMonth()->startOfMonth()->toDateString(),
                 'ai_credits_total_purchased' => 0,

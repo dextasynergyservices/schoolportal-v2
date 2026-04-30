@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckMaintenanceMode;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\ForcePasswordChange;
 use App\Http\Middleware\ResolveTenant;
@@ -38,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register middleware aliases for route-level usage
         $middleware->alias([
             'role' => EnsureRole::class,
+            'maintenance' => CheckMaintenanceMode::class,
             'tenant' => ResolveTenant::class,
             'session.timeout' => SessionTimeout::class,
             'force.password.change' => ForcePasswordChange::class,
@@ -50,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ResolveTenant::class,
             SessionTimeout::class,
             ForcePasswordChange::class,
+            CheckMaintenanceMode::class,
         ]);
 
         // Redirect unauthenticated users to /portal/login

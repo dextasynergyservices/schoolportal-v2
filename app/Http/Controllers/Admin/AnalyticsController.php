@@ -113,6 +113,8 @@ class AnalyticsController extends Controller
         $maleStudents = User::where('role', 'student')->where('gender', 'male')->count();
         $femaleStudents = User::where('role', 'student')->where('gender', 'female')->count();
 
+        $tab = $request->query('tab', 'overview');
+
         return view('admin.analytics', compact(
             'school', 'currentSession', 'currentTerm',
             'allSessions', 'sessionTerms',
@@ -122,6 +124,7 @@ class AnalyticsController extends Controller
             'resultsUploaded', 'resultsTotal',
             'assignmentCoverage', 'weeksPerTerm',
             'recentLogins',
+            'tab',
         ));
     }
 }

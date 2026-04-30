@@ -12,19 +12,23 @@ class PlatformEmail extends Model
     protected $fillable = [
         'subject',
         'body',
+        'attachments',
         'recipient_school_ids',
         'total_recipients',
         'sent_count',
         'failed_count',
         'sent_by',
         'sent_at',
+        'queued_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'attachments' => 'array',
             'recipient_school_ids' => 'array',
             'sent_at' => 'datetime',
+            'queued_at' => 'datetime',
         ];
     }
 

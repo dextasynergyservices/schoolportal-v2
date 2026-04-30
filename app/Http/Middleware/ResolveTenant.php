@@ -33,7 +33,7 @@ class ResolveTenant
                 abort(403, $reason);
             }
 
-            app()->instance('current.school', $school);
+            $this->bindSchool($school);
 
             return $next($request);
         }
@@ -55,7 +55,7 @@ class ResolveTenant
                 $school = School::withoutGlobalScopes()->where('id', $schoolId)->where('is_active', true)->first();
 
                 if ($school) {
-                    app()->instance('current.school', $school);
+                    $this->bindSchool($school);
 
                     return $next($request);
                 }
@@ -70,7 +70,7 @@ class ResolveTenant
 
             if ($nonPlatformSchools->count() === 1) {
                 $school = $nonPlatformSchools->first();
-                app()->instance('current.school', $school);
+                $this->bindSchool($school);
                 $request->session()->put('school_id', $school->id);
 
                 return $next($request);
@@ -90,7 +90,7 @@ class ResolveTenant
             ->first();
 
         if ($school) {
-            app()->instance('current.school', $school);
+            $this->bindSchool($school);
 
             return $next($request);
         }
@@ -106,7 +106,7 @@ class ResolveTenant
                 ->get();
 
             if ($nonPlatformSchools->count() === 1) {
-                app()->instance('current.school', $nonPlatformSchools->first());
+                $this->bindSchool($nonPlatformSchools->first());
             }
 
             // Allow through — landing page and login will work
@@ -115,5 +115,18 @@ class ResolveTenant
 
         // Unknown domain — not platform, not a registered school
         abort(404, 'School not found. Please check the URL and try again.');
+    }
+
+    /**
+     * Bind the resolved school into the container and set the app timezone.
+     */
+    private function bindSchool(School $school): void
+    {
+        app()->instance('current.school', $school);
+
+        // Set timezone to the school's configured timezone
+        $timezone = $school->timezone ?? 'Africa/Lagos';
+        config(['app.timezone' => $timezone]);
+        date_default_timezone_set($timezone);
     }
 }

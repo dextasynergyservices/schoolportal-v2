@@ -1,7 +1,7 @@
-<x-layouts::app :title="__('Results')">
+<x-layouts::app :title="__('Uploaded Results')">
     <div class="space-y-6">
         <x-admin-header
-            :title="__('Results')"
+            :title="__('Uploaded Results')"
             :action="route('admin.results.create')"
             :actionLabel="__('Upload Result')"
         >

@@ -14,6 +14,7 @@ use App\Services\PaystackService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AiCreditController extends Controller
 {
@@ -192,5 +193,34 @@ class AiCreditController extends Controller
 
         return redirect()->route('admin.credits.index')
             ->with('success', __('Credit allocations updated.'));
+    }
+
+    public function exportUsageCsv(): StreamedResponse
+    {
+        $school = app('current.school');
+
+        $usageLogs = AiCreditUsageLog::where('school_id', $school->id)
+            ->with(['user:id,name', 'level:id,name'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $filename = 'credit-usage-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($usageLogs) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['Date', 'User', 'Level', 'Type', 'Entity ID', 'Credits Used']);
+            foreach ($usageLogs as $log) {
+                fputcsv($handle, [
+                    $log->created_at->format('Y-m-d H:i:s'),
+                    $log->user?->name ?? '',
+                    $log->level?->name ?? 'School Pool',
+                    $log->usage_type,
+                    $log->entity_id ?? '',
+                    $log->credits_used,
+                ]);
+            }
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

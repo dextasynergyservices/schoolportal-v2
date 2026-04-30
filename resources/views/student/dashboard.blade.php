@@ -76,14 +76,30 @@
 
         {{-- ── Stats Cards ────────────────────────────────────────── --}}
         <section aria-label="{{ __('Your statistics') }}">
-            <div class="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-5">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                {{-- Row 1: Academics --}}
+                <a href="{{ route('student.report-cards.index') }}" wire:navigate class="stat-card dash-animate dash-animate-delay-1 block" style="border-left-color: #0891b2;">
+                    <div class="flex items-center gap-2.5">
+                        <div class="stat-icon bg-teal-500/15">
+                            <flux:icon.document-chart-bar class="w-4 h-4 sm:w-5 sm:h-5 text-teal-600 dark:text-teal-400" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Report Cards') }}</p>
+                            <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($reportCardsCount) }}</p>
+                            @if ($cbtResultsCount > 0)
+                                <p class="text-[9px] sm:text-[10px] text-zinc-400 dark:text-zinc-500">{{ $cbtResultsCount }} {{ __('CBT result' . ($cbtResultsCount === 1 ? '' : 's')) }}</p>
+                            @endif
+                        </div>
+                    </div>
+                </a>
+
                 <a href="{{ route('student.results.index') }}" wire:navigate class="stat-card stat-card-emerald dash-animate dash-animate-delay-1 block">
                     <div class="flex items-center gap-2.5">
                         <div class="stat-icon bg-emerald-500/15">
                             <flux:icon.document-text class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div class="min-w-0">
-                            <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Results') }}</p>
+                            <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Uploaded Results') }}</p>
                             <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($resultsCount) }}</p>
                         </div>
                     </div>
@@ -101,14 +117,15 @@
                     </div>
                 </a>
 
-                <a href="{{ route('student.notices.index') }}" wire:navigate class="stat-card stat-card-cyan dash-animate dash-animate-delay-3 block">
+                {{-- Row 2: Interactive + Communication --}}
+                <a href="{{ route('student.exams.index') }}" wire:navigate class="stat-card dash-animate dash-animate-delay-3 block" style="border-left-color: #6366f1;">
                     <div class="flex items-center gap-2.5">
-                        <div class="stat-icon bg-cyan-500/15">
-                            <flux:icon.megaphone class="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
+                        <div class="stat-icon bg-indigo-500/15">
+                            <flux:icon.computer-desktop class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         <div class="min-w-0">
-                            <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Notices') }}</p>
-                            <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($noticesCount) }}</p>
+                            <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('CBT') }}</p>
+                            <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($availableExamsCount + $availableAssessmentsCount + $availableCbtAssignmentsCount) }}</p>
                         </div>
                     </div>
                 </a>
@@ -125,7 +142,7 @@
                     </div>
                 </a>
 
-                <a href="{{ route('student.games.index') }}" wire:navigate class="stat-card stat-card-pink dash-animate dash-animate-delay-5 block col-span-3 sm:col-span-1 lg:col-span-1">
+                <a href="{{ route('student.games.index') }}" wire:navigate class="stat-card stat-card-pink dash-animate dash-animate-delay-5 block">
                     <div class="flex items-center gap-2.5">
                         <div class="stat-icon bg-pink-500/15">
                             <flux:icon.puzzle-piece class="w-4 h-4 sm:w-5 sm:h-5 text-pink-600 dark:text-pink-400" />
@@ -133,6 +150,18 @@
                         <div class="min-w-0">
                             <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Games') }}</p>
                             <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($availableGames) }}</p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="{{ route('student.notices.index') }}" wire:navigate class="stat-card stat-card-cyan dash-animate dash-animate-delay-5 block">
+                    <div class="flex items-center gap-2.5">
+                        <div class="stat-icon bg-cyan-500/15">
+                            <flux:icon.megaphone class="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] sm:text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Notices') }}</p>
+                            <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($noticesCount) }}</p>
                         </div>
                     </div>
                 </a>
@@ -165,6 +194,90 @@
                         </p>
                         <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Pass Rate') }}</p>
                     </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- ── CBT Exam Performance Summary ───────────────────────── --}}
+        @if ($examsTaken > 0)
+            <div class="dash-panel dash-animate dash-animate-delay-2" style="padding: 0;">
+                <div class="dash-panel-header">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                        <flux:icon.computer-desktop class="w-4 h-4 text-indigo-500" />
+                        {{ __('My CBT Performance') }}
+                    </h2>
+                    <a href="{{ route('student.exams.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
+                </div>
+                <div class="grid grid-cols-3 divide-x divide-zinc-100 dark:divide-zinc-700/50 p-1">
+                    <div class="p-3 text-center">
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $examsTaken }}</p>
+                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Taken') }}</p>
+                    </div>
+                    <div class="p-3 text-center">
+                        <p class="text-2xl font-bold {{ ($examAvgScore ?? 0) >= 70 ? 'text-emerald-600 dark:text-emerald-400' : (($examAvgScore ?? 0) >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                            {{ number_format((float) ($examAvgScore ?? 0), 0) }}%
+                        </p>
+                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Average') }}</p>
+                    </div>
+                    <div class="p-3 text-center">
+                        <p class="text-2xl font-bold {{ $examPassRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($examPassRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                            {{ $examPassRate }}%
+                        </p>
+                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Pass Rate') }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Upcoming CBT Exams ─────────────────────────────────── --}}
+        @if ($upcomingExams->isNotEmpty())
+            <div class="dash-panel dash-animate dash-animate-delay-3" style="padding: 0;">
+                <div class="dash-panel-header">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                        <flux:icon.clock class="w-4 h-4 text-indigo-500" />
+                        {{ __('Upcoming CBT Exams') }}
+                    </h2>
+                    <a href="{{ route('student.exams.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
+                </div>
+                <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
+                    @foreach ($upcomingExams as $upExam)
+                        @php
+                            $daysLeft = (int) now()->diffInDays($upExam->available_until, false);
+                            $urgent = $daysLeft <= 2;
+                            $catRoute = 'student.exams.show';
+                        @endphp
+                        <a href="{{ route($catRoute, $upExam) }}" wire:navigate class="activity-item hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
+                            <div class="activity-dot {{ $urgent ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30' }}">
+                                <flux:icon.computer-desktop class="w-4 h-4 {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-indigo-600 dark:text-indigo-400' }}" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $upExam->title }}</p>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $upExam->subject?->name }}</span>
+                                    <span class="text-xs text-zinc-400">&middot;</span>
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $upExam->total_questions }} {{ __('questions') }}</span>
+                                    @if ($upExam->time_limit_minutes)
+                                        <span class="text-xs text-zinc-400">&middot;</span>
+                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $upExam->time_limit_minutes }} {{ __('min') }}</span>
+                                    @endif
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
+                                        {{ ucfirst($upExam->category) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-semibold {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300' }}">
+                                    {{ $upExam->available_until->format('M j') }}
+                                </p>
+                                <p class="text-xs {{ $urgent ? 'text-red-500 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400' }}">
+                                    @if ($daysLeft == 0) {{ __('Today') }}
+                                    @elseif ($daysLeft == 1) {{ __('Tomorrow') }}
+                                    @else {{ __(':days days', ['days' => $daysLeft]) }}
+                                    @endif
+                                </p>
+                            </div>
+                        </a>
+                    @endforeach
                 </div>
             </div>
         @endif

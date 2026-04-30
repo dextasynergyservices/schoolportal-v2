@@ -5,19 +5,25 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Assignment;
+use App\Models\Exam;
 use App\Models\Game;
 use App\Models\Notice;
 use App\Models\Quiz;
 use App\Models\Result;
 use App\Models\School;
+use App\Models\StudentTermReport;
 use App\Models\User;
+use App\Notifications\AcademicPeriodChangedNotification;
 use App\Notifications\CreditPurchaseNotification;
+use App\Notifications\LowCreditsWarningNotification;
 use App\Notifications\NewAssignmentNotification;
+use App\Notifications\NewExamNotification;
 use App\Notifications\NewGameNotification;
 use App\Notifications\NewNoticeNotification;
 use App\Notifications\NewQuizNotification;
 use App\Notifications\NewResultNotification;
 use App\Notifications\NewSchoolNotification;
+use App\Notifications\ReportCardPublishedNotification;
 use App\Notifications\SubmissionApprovedNotification;
 use App\Notifications\SubmissionRejectedNotification;
 use Illuminate\Support\Facades\Notification;
@@ -202,6 +208,79 @@ class NotificationService
     }
 
     /**
+     * Notify students in the class (and their parents) when an exam/assessment/assignment is published.
+     */
+    public function notifyExamPublished(Exam $exam): void
+    {
+        if (! $exam->is_published) {
+            return;
+        }
+
+        $exam->loadMissing(['class:id,name']);
+        $className = $exam->class?->name ?? '';
+
+        // Notify students in the class
+        $students = User::where('role', 'student')
+            ->whereHas('studentProfile', fn ($q) => $q->where('class_id', $exam->class_id))
+            ->get();
+
+        foreach ($students as $student) {
+            $student->notify(new NewExamNotification($exam->title, $className, $exam->category, $exam->id, 'student'));
+        }
+
+        // Notify parents
+        $studentIds = $students->pluck('id');
+        $parents = User::where('role', 'parent')
+            ->whereHas('children', fn ($q) => $q->whereIn('student_id', $studentIds))
+            ->get();
+
+        foreach ($parents as $parent) {
+            $parent->notify(new NewExamNotification($exam->title, $className, $exam->category, $exam->id, 'parent'));
+        }
+    }
+
+    /**
+     * Notify student and parents that a report card has been published.
+     */
+    public function notifyReportCardPublished(StudentTermReport $report): void
+    {
+        $report->loadMissing(['student', 'session', 'term']);
+
+        $student = $report->student;
+        if (! $student) {
+            return;
+        }
+
+        $sessionName = $report->session?->name ?? '';
+        $termName = $report->term?->name ?? '';
+
+        // Notify the student
+        $student->notify(new ReportCardPublishedNotification(
+            studentName: $student->name,
+            sessionName: $sessionName,
+            termName: $termName,
+            reportId: $report->id,
+            recipientRole: 'student',
+        ));
+
+        // Notify parents
+        $parents = User::where('role', 'parent')
+            ->where('is_active', true)
+            ->whereHas('children', fn ($q) => $q->where('student_id', $student->id))
+            ->get();
+
+        foreach ($parents as $parent) {
+            $parent->notify(new ReportCardPublishedNotification(
+                studentName: $student->name,
+                sessionName: $sessionName,
+                termName: $termName,
+                reportId: $report->id,
+                recipientRole: 'parent',
+            ));
+        }
+    }
+
+    /**
      * Notify teacher that their submission was approved.
      */
     public function notifySubmissionApproved(User $teacher, string $entityType, string $entityTitle): void
@@ -228,6 +307,32 @@ class NotificationService
             ->get();
 
         Notification::send($superAdmins, new NewSchoolNotification($school->name, $school->id));
+    }
+
+    /**
+     * Notify all active school users (students, teachers, parents, admins) when a term or session changes.
+     */
+    public function notifyAcademicPeriodChanged(int $schoolId, string $periodType, string $name): void
+    {
+        $users = User::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->whereIn('role', ['student', 'teacher', 'parent', 'school_admin'])
+            ->get();
+
+        Notification::send($users, new AcademicPeriodChangedNotification($periodType, $name));
+    }
+
+    /**
+     * Notify school admins when AI credits fall at or below the warning threshold.
+     */
+    public function notifyLowCredits(int $schoolId, int $remainingCredits): void
+    {
+        $admins = User::where('school_id', $schoolId)
+            ->where('role', 'school_admin')
+            ->where('is_active', true)
+            ->get();
+
+        Notification::send($admins, new LowCreditsWarningNotification($remainingCredits));
     }
 
     /**
@@ -259,6 +364,8 @@ class NotificationService
             'notice' => Notice::find($entityId)?->title ?? __('Notice'),
             'quiz' => Quiz::find($entityId)?->title ?? __('Quiz'),
             'game' => Game::find($entityId)?->title ?? __('Game'),
+            'exam' => Exam::find($entityId)?->title ?? __('Exam'),
+            'report_card' => StudentTermReport::with('student:id,name')->find($entityId)?->student?->name ?? __('Report Card'),
             default => ucfirst($entityType),
         };
     }

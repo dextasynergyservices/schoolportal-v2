@@ -82,7 +82,7 @@
                     {{-- Icon --}}
                     <span @class([
                         'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                        'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' => in_array($data['type_label'] ?? '', ['result', 'assignment', 'quiz', 'notice']),
+                        'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' => in_array($data['type_label'] ?? '', ['result', 'assignment', 'quiz', 'notice', 'exam']),
                         'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' => ($data['type_label'] ?? '') === 'approval',
                         'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' => ($data['type_label'] ?? '') === 'rejection',
                         'bg-purple-100 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400' => ($data['type_label'] ?? '') === 'game',

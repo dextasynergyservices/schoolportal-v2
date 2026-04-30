@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Term;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -87,6 +88,9 @@ class SessionController extends Controller
             'status' => 'active',
         ]);
 
+        app(NotificationService::class)
+            ->notifyAcademicPeriodChanged($session->school_id, 'session', $session->name);
+
         return redirect()->route('admin.sessions.index')
             ->with('success', __('Session ":name" is now active.', ['name' => $session->name]));
     }
@@ -103,6 +107,9 @@ class SessionController extends Controller
             'is_current' => true,
             'status' => 'active',
         ]);
+
+        app(NotificationService::class)
+            ->notifyAcademicPeriodChanged($term->school_id, 'term', $term->name);
 
         return redirect()->route('admin.sessions.index')
             ->with('success', __('":name" is now the active term.', ['name' => $term->name]));

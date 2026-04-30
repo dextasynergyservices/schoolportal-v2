@@ -4,7 +4,7 @@
         $primaryColor = $branding['primary_color'] ?? '#4F46E5';
         $secondaryColor = $branding['secondary_color'] ?? '#F59E0B';
         $accentColor = $branding['accent_color'] ?? '#10B981';
-        $serverIp = env('SERVER_IP', '');
+        $serverIp = config('app.server_ip', '');
         $platformDomain = parse_url(config('app.url'), PHP_URL_HOST) ?: 'your-platform-domain.com';
     @endphp
 
@@ -36,7 +36,26 @@
                 @endif
             </div>
             <div class="ml-auto flex flex-wrap items-center gap-2">
+                {{-- Preview Portal branding --}}
+                <button
+                    type="button"
+                    x-data
+                    @click="$dispatch('open-preview-portal')"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                >
+                    <flux:icon.eye class="h-4 w-4 text-zinc-500" />
+                    {{ __('Preview Portal') }}
+                </button>
+
                 @if ($school->is_active)
+                    {{-- Impersonate: log in as this school's admin for support/debugging --}}
+                    <form method="POST" action="{{ route('super-admin.schools.impersonate', $school) }}">
+                        @csrf
+                        <flux:button type="submit" variant="filled" size="sm" icon="eye">
+                            {{ __('Login as Admin') }}
+                        </flux:button>
+                    </form>
+
                     <flux:modal.trigger name="deactivate-school">
                         <flux:button variant="subtle" size="sm" icon="pause-circle">{{ __('Deactivate') }}</flux:button>
                     </flux:modal.trigger>
@@ -46,16 +65,137 @@
                         <flux:button type="submit" variant="subtle" size="sm" icon="play-circle">{{ __('Activate') }}</flux:button>
                     </form>
                 @endif
-                <x-confirm-delete
-                    :action="route('super-admin.schools.destroy', $school)"
-                    :title="__('Delete School')"
-                    :message="__('This will permanently delete this school and ALL its data including students, teachers, results, and quizzes. This action cannot be undone.')"
-                    :confirmLabel="__('Delete School')"
-                    buttonVariant="danger"
-                    buttonSize="sm"
-                    :buttonLabel="__('Delete')"
-                    :ariaLabel="__('Delete :name', ['name' => $school->name])"
-                />
+                {{-- Danger zone: typed-confirmation delete modal --}}
+                <div
+                    x-data="{
+                        open: false,
+                        submitting: false,
+                        nameInput: '',
+                        expectedName: '{{ addslashes($school->name) }}',
+                        get canDelete() { return this.nameInput === this.expectedName; },
+                    }"
+                >
+                    <flux:button
+                        variant="danger"
+                        size="sm"
+                        icon="trash"
+                        x-on:click.prevent="open = true"
+                        aria-label="{{ __('Permanently delete :name', ['name' => $school->name]) }}"
+                    >
+                        {{ __('Delete') }}
+                    </flux:button>
+
+                    <template x-teleport="body">
+                        <div
+                            x-show="open"
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0"
+                            x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            x-on:keydown.escape.window="open = false"
+                            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="delete-school-modal-title"
+                            x-cloak
+                        >
+                            <div class="fixed inset-0 bg-black/50 dark:bg-black/70" x-on:click="open = false" aria-hidden="true"></div>
+
+                            <div
+                                x-show="open"
+                                x-transition:enter="transition ease-out duration-200"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-150"
+                                x-transition:leave-start="opacity-100 scale-100"
+                                x-transition:leave-end="opacity-0 scale-95"
+                                x-trap.noscroll="open"
+                                class="relative w-full max-w-lg rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-6 shadow-xl"
+                            >
+                                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+                                    <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                </div>
+
+                                <div class="text-center mb-6">
+                                    <h3 id="delete-school-modal-title" class="text-lg font-semibold text-zinc-900 dark:text-white">
+                                        {{ __('Permanently Delete School') }}
+                                    </h3>
+                                    <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                        {{ __('This will irreversibly delete :name and ALL its data — students, teachers, results, quizzes, games, and audit logs. There is no undo.', ['name' => $school->name]) }}
+                                    </p>
+                                    <div class="mt-3 flex flex-wrap justify-center gap-4 text-xs font-medium text-red-600 dark:text-red-400">
+                                        <span>{{ $school->students_count }} {{ __('students') }}</span>
+                                        <span>{{ $school->teachers_count }} {{ __('teachers') }}</span>
+                                        <span>{{ $school->admins_count }} {{ __('admins') }}</span>
+                                    </div>
+                                </div>
+
+                                <form
+                                    method="POST"
+                                    action="{{ route('super-admin.schools.destroy', $school) }}"
+                                    x-on:submit="submitting = true"
+                                >
+                                    @csrf
+                                    @method('DELETE')
+
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label for="delete-reason" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                                                {{ __('Reason for deletion') }} <span class="text-red-500" aria-hidden="true">*</span>
+                                            </label>
+                                            <textarea
+                                                id="delete-reason"
+                                                name="reason"
+                                                rows="3"
+                                                required
+                                                minlength="10"
+                                                maxlength="1000"
+                                                placeholder="{{ __('Why is this school being permanently deleted?') }}"
+                                                class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                            ></textarea>
+                                        </div>
+
+                                        <div>
+                                            <label for="delete-name-confirm" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                                                {{ __('Type') }} <strong class="text-zinc-900 dark:text-white select-all">{{ $school->name }}</strong> {{ __('to confirm') }}
+                                            </label>
+                                            <input
+                                                id="delete-name-confirm"
+                                                type="text"
+                                                name="name_confirmation"
+                                                autocomplete="off"
+                                                x-model="nameInput"
+                                                placeholder="{{ $school->name }}"
+                                                class="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                        <flux:button variant="ghost" type="button" x-on:click="open = false; nameInput = ''" x-bind:disabled="submitting">
+                                            {{ __('Cancel') }}
+                                        </flux:button>
+                                        <button
+                                            type="submit"
+                                            x-bind:disabled="!canDelete || submitting"
+                                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-zinc-800"
+                                        >
+                                            <svg x-show="submitting" style="display:none" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span x-text="submitting ? '{{ __('Deleting…') }}' : '{{ __('Permanently Delete') }}'">{{ __('Permanently Delete') }}</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
 
@@ -506,5 +646,613 @@
                 @endif
             </div>
         </div>
+
+        {{-- Portal Settings (S17) --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <flux:heading size="lg">{{ __('Portal Settings') }}</flux:heading>
+                <flux:subheading>{{ __('Override feature flags, limits, and notifications for this school') }}</flux:subheading>
+            </div>
+            @if ($errors->any())
+                <flux:callout variant="danger" icon="exclamation-triangle" class="m-4">
+                    <flux:callout.text>{{ $errors->first() }}</flux:callout.text>
+                </flux:callout>
+            @endif
+            <form
+                method="POST"
+                action="{{ route('super-admin.schools.update-settings', $school) }}"
+                x-data="{
+                    portal: {
+                        enable_parent_portal:             {{ $school->setting('portal.enable_parent_portal', true) ? 'true' : 'false' }},
+                        enable_quiz_generator:            {{ $school->setting('portal.enable_quiz_generator', true) ? 'true' : 'false' }},
+                        enable_game_generator:            {{ $school->setting('portal.enable_game_generator', true) ? 'true' : 'false' }},
+                        enable_teacher_approval:          {{ $school->setting('portal.enable_teacher_approval', true) ? 'true' : 'false' }},
+                        enable_cbt_results_for_parents:   {{ $school->setting('portal.enable_cbt_results_for_parents', true) ? 'true' : 'false' }},
+                    },
+                    notifications: {
+                        email_enabled:           {{ $school->setting('notifications.email_enabled', true) ? 'true' : 'false' }},
+                        notify_parent_on_result: {{ $school->setting('notifications.notify_parent_on_result', true) ? 'true' : 'false' }},
+                        notify_parent_on_notice: {{ $school->setting('notifications.notify_parent_on_notice', true) ? 'true' : 'false' }},
+                    }
+                }"
+            >
+                @csrf
+                <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {{-- Feature toggles --}}
+                    <div class="p-4">
+                        <flux:text size="sm" class="mb-3 font-semibold text-zinc-700 dark:text-zinc-300">{{ __('Feature Toggles') }}</flux:text>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ([
+                                ['key' => 'enable_parent_portal',    'label' => __('Parent Portal'),          'desc' => __('Allow parents to log in and view their children\u2019s progress')],
+                                ['key' => 'enable_quiz_generator',   'label' => __('AI Quiz Generator'),      'desc' => __('Teachers can generate quizzes using AI')],
+                                ['key' => 'enable_game_generator',   'label' => __('AI Game Generator'),           'desc' => __('Teachers can generate educational games using AI')],
+                                ['key' => 'enable_teacher_approval', 'label' => __('Teacher Approval Flow'),        'desc' => __('Require admin approval before teacher content goes live')],
+                                ['key' => 'enable_cbt_results_for_parents', 'label' => __('CBT Results for Parents'), 'desc' => __('Show CBT exam results in the parent dashboard')],
+                            ] as $toggle)
+                                <div class="flex items-start justify-between gap-3 rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 dark:border-zinc-700/50 dark:bg-zinc-800/30">
+                                    <input type="hidden"
+                                        name="portal[{{ $toggle['key'] }}]"
+                                        :value="portal.{{ $toggle['key'] }} ? '1' : '0'">
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $toggle['label'] }}</div>
+                                        <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $toggle['desc'] }}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        :aria-checked="portal.{{ $toggle['key'] }}.toString()"
+                                        @click="portal.{{ $toggle['key'] }} = !portal.{{ $toggle['key'] }}"
+                                        :class="portal.{{ $toggle['key'] }} ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-zinc-300 dark:bg-zinc-600'"
+                                        class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                                        aria-label="{{ $toggle['label'] }}"
+                                    >
+                                        <span
+                                            :class="portal.{{ $toggle['key'] }} ? 'translate-x-5' : 'translate-x-0'"
+                                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                        ></span>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Limits --}}
+                    <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+                        <flux:field>
+                            <flux:label for="settings-session-timeout">{{ __('Session Timeout') }}</flux:label>
+                            <div class="flex items-center gap-2">
+                                <flux:input
+                                    id="settings-session-timeout"
+                                    name="portal[session_timeout_minutes]"
+                                    type="number"
+                                    min="5"
+                                    max="1440"
+                                    :value="$school->setting('portal.session_timeout_minutes', 30)"
+                                    class="w-28"
+                                />
+                                <flux:text size="sm" class="text-zinc-500">{{ __('minutes') }}</flux:text>
+                            </div>
+                            <flux:description>{{ __('How long before an inactive session expires (5–1440 min)') }}</flux:description>
+                            @error('portal.session_timeout_minutes') <flux:error>{{ $message }}</flux:error> @enderror
+                        </flux:field>
+                        <flux:field>
+                            <flux:label for="settings-max-upload">{{ __('Max File Upload') }}</flux:label>
+                            <div class="flex items-center gap-2">
+                                <flux:input
+                                    id="settings-max-upload"
+                                    name="portal[max_file_upload_mb]"
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    :value="$school->setting('portal.max_file_upload_mb', 10)"
+                                    class="w-28"
+                                />
+                                <flux:text size="sm" class="text-zinc-500">{{ __('MB') }}</flux:text>
+                            </div>
+                            <flux:description>{{ __('Maximum size for uploaded files (results, assignments, etc.)') }}</flux:description>
+                            @error('portal.max_file_upload_mb') <flux:error>{{ $message }}</flux:error> @enderror
+                        </flux:field>
+                    </div>
+
+                    {{-- Email notifications --}}
+                    <div class="p-4">
+                        <flux:text size="sm" class="mb-3 font-semibold text-zinc-700 dark:text-zinc-300">{{ __('Email Notifications') }}</flux:text>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ([
+                                ['key' => 'email_enabled',            'label' => __('Email Notifications'),  'desc' => __('Master switch: send any emails to users of this school')],
+                                ['key' => 'notify_parent_on_result',  'label' => __('Notify on Result'),     'desc' => __('Email parents when a student result is published')],
+                                ['key' => 'notify_parent_on_notice',  'label' => __('Notify on Notice'),     'desc' => __('Email parents and students when a new notice is posted')],
+                            ] as $toggle)
+                                <div class="flex items-start justify-between gap-3 rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 dark:border-zinc-700/50 dark:bg-zinc-800/30">
+                                    <input type="hidden"
+                                        name="notifications[{{ $toggle['key'] }}]"
+                                        :value="notifications.{{ $toggle['key'] }} ? '1' : '0'">
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $toggle['label'] }}</div>
+                                        <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $toggle['desc'] }}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        :aria-checked="notifications.{{ $toggle['key'] }}.toString()"
+                                        @click="notifications.{{ $toggle['key'] }} = !notifications.{{ $toggle['key'] }}"
+                                        :class="notifications.{{ $toggle['key'] }} ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-zinc-300 dark:bg-zinc-600'"
+                                        class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                                        aria-label="{{ $toggle['label'] }}"
+                                    >
+                                        <span
+                                            :class="notifications.{{ $toggle['key'] }} ? 'translate-x-5' : 'translate-x-0'"
+                                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                        ></span>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                    <flux:button type="submit" variant="primary" size="sm" icon="check">
+                        {{ __('Save Settings') }}
+                    </flux:button>
+                </div>
+            </form>
+        </div>
+
+        {{-- School Levels & Classes --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <flux:heading size="lg">{{ __('School Levels & Classes') }}</flux:heading>
+            </div>
+            <div class="p-4">
+                @if ($levels->isEmpty())
+                    <flux:text class="text-zinc-500">{{ __('No levels configured. Set them up via the School Setup Wizard or by editing the school.') }}</flux:text>
+                @else
+                    <div class="space-y-4">
+                        @foreach ($levels as $level)
+                            <div class="rounded-md border border-zinc-200 dark:border-zinc-700">
+                                <div class="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
+                                    <div class="flex items-center gap-2">
+                                        <flux:icon.academic-cap class="size-4 text-zinc-500" />
+                                        <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $level->name }}</span>
+                                        <span class="text-xs text-zinc-500">({{ $level->classes->count() }} {{ Str::plural('class', $level->classes->count()) }})</span>
+                                    </div>
+                                    @if ($level->is_active)
+                                        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">{{ __('Active') }}</span>
+                                    @else
+                                        <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">{{ __('Inactive') }}</span>
+                                    @endif
+                                </div>
+                                @if ($level->classes->isEmpty())
+                                    <p class="px-3 py-2 text-sm text-zinc-400">{{ __('No classes in this level.') }}</p>
+                                @else
+                                    <div class="flex flex-wrap gap-2 px-3 py-2">
+                                        @foreach ($level->classes as $class)
+                                            <span class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                                                {{ $class->name }}
+                                                @unless ($class->is_active)
+                                                    <span class="text-zinc-400">(off)</span>
+                                                @endunless
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Academic Session --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <flux:heading size="lg">{{ __('Academic Session') }}</flux:heading>
+            </div>
+            <div class="p-4">
+                @if ($currentSession)
+                    <div class="flex flex-wrap items-center gap-3">
+                        <flux:icon.calendar class="size-5 text-zinc-500" />
+                        <span class="font-semibold text-zinc-900 dark:text-zinc-100">{{ $currentSession->name }}</span>
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">{{ __('Active') }}</span>
+                        <span class="text-sm text-zinc-500">{{ $currentSession->start_date->format('M j, Y') }} – {{ $currentSession->end_date->format('M j, Y') }}</span>
+                    </div>
+
+                    @if ($currentTerm)
+                        <div class="mt-3 flex flex-wrap items-center gap-2 pl-7">
+                            <flux:icon.arrow-right class="size-4 text-zinc-400" />
+                            <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ $currentTerm->name }}</span>
+                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">{{ __('Current Term') }}</span>
+                            @if ($currentTerm->start_date && $currentTerm->end_date)
+                                <span class="text-xs text-zinc-500">{{ $currentTerm->start_date->format('M j') }} – {{ $currentTerm->end_date->format('M j, Y') }}</span>
+                            @endif
+                            <span class="text-xs text-zinc-500 capitalize">• {{ $currentTerm->status }}</span>
+                        </div>
+                    @else
+                        <p class="mt-2 pl-7 text-sm text-zinc-400">{{ __('No active term set for this session.') }}</p>
+                    @endif
+                @else
+                    <flux:text class="text-zinc-500">{{ __('No active academic session. The school admin can create one in Session Management.') }}</flux:text>
+                @endif
+            </div>
+        </div>
+
+        {{-- Portal Settings --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <flux:heading size="lg">{{ __('Portal Settings') }}</flux:heading>
+            </div>
+            @php
+                $portal = $school->settings['portal'] ?? [];
+                $portalItems = [
+                    ['label' => __('Session Timeout'),       'value' => ($portal['session_timeout_minutes'] ?? 30) . ' min'],
+                    ['label' => __('Max File Upload'),        'value' => ($portal['max_file_upload_mb'] ?? 10) . ' MB'],
+                    ['label' => __('Parent Portal'),          'value' => ($portal['enable_parent_portal'] ?? true) ? __('Enabled') : __('Disabled'), 'bool' => ($portal['enable_parent_portal'] ?? true)],
+                    ['label' => __('Teacher Approval'),       'value' => ($portal['enable_teacher_approval'] ?? true) ? __('Required') : __('Disabled'), 'bool' => ($portal['enable_teacher_approval'] ?? true)],
+                    ['label' => __('AI Quiz Generator'),      'value' => ($portal['enable_quiz_generator'] ?? true) ? __('Enabled') : __('Disabled'), 'bool' => ($portal['enable_quiz_generator'] ?? true)],
+                    ['label' => __('AI Game Generator'),      'value' => ($portal['enable_game_generator'] ?? true) ? __('Enabled') : __('Disabled'), 'bool' => ($portal['enable_game_generator'] ?? true)],
+                    ['label' => __('CBT Results (Parents)'),  'value' => ($portal['enable_cbt_results_for_parents'] ?? true) ? __('Visible') : __('Hidden'), 'bool' => ($portal['enable_cbt_results_for_parents'] ?? true)],
+                ];
+            @endphp
+            <div class="grid grid-cols-2 divide-x divide-y divide-zinc-100 sm:grid-cols-3 lg:grid-cols-4 dark:divide-zinc-800">
+                @foreach ($portalItems as $item)
+                    <div class="px-4 py-3">
+                        <dt class="text-xs text-zinc-500">{{ $item['label'] }}</dt>
+                        <dd class="mt-1 text-sm font-medium
+                            @if (isset($item['bool']))
+                                {{ $item['bool'] ? 'text-green-700 dark:text-green-400' : 'text-zinc-400' }}
+                            @else
+                                text-zinc-900 dark:text-zinc-100
+                            @endif">
+                            {{ $item['value'] }}
+                        </dd>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Content Library (S16) --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <div>
+                    <flux:heading size="lg">{{ __('Content Library') }}</flux:heading>
+                    <flux:subheading>{{ __('All educational content created for this school') }}</flux:subheading>
+                </div>
+                <flux:button
+                    variant="subtle"
+                    size="sm"
+                    icon="arrow-top-right-on-square"
+                    href="{{ route('super-admin.content.index', ['search' => $school->name]) }}"
+                    wire:navigate
+                >
+                    {{ __('Platform View') }}
+                </flux:button>
+            </div>
+            <div class="grid grid-cols-2 gap-px bg-zinc-100 dark:bg-zinc-800 sm:grid-cols-3 lg:grid-cols-5">
+                @foreach ([
+                    ['key' => 'quizzes',     'label' => __('Quizzes'),     'icon' => 'document-text'],
+                    ['key' => 'games',       'label' => __('Games'),       'icon' => 'puzzle-piece'],
+                    ['key' => 'exams',       'label' => __('Exams'),       'icon' => 'clipboard-document-list'],
+                    ['key' => 'results',     'label' => __('Results'),     'icon' => 'chart-bar'],
+                    ['key' => 'assignments', 'label' => __('Assignments'), 'icon' => 'paper-clip'],
+                ] as $ct)
+                    @php $counts = $contentCounts[$ct['key']]; @endphp
+                    <div class="bg-white p-4 dark:bg-zinc-900">
+                        <div class="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+                            <flux:icon :name="$ct['icon']" class="size-4 shrink-0" />
+                            <span class="text-xs font-medium uppercase tracking-wide">{{ $ct['label'] }}</span>
+                        </div>
+                        <div class="mt-2 text-2xl font-bold text-zinc-900 dark:text-white">
+                            {{ number_format($counts['total']) }}
+                        </div>
+                        <div class="mt-1 space-y-0.5">
+                            @if (isset($counts['published']) && $counts['published'] > 0)
+                                <div class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                    <span class="size-1.5 rounded-full bg-green-500"></span>
+                                    {{ $counts['published'] }} {{ __('published') }}
+                                </div>
+                            @endif
+                            @if (isset($counts['approved']) && $counts['approved'] > 0)
+                                <div class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                    <span class="size-1.5 rounded-full bg-green-500"></span>
+                                    {{ $counts['approved'] }} {{ __('approved') }}
+                                </div>
+                            @endif
+                            @if (($counts['pending'] ?? 0) > 0)
+                                <div class="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                    <span class="size-1.5 rounded-full bg-amber-500"></span>
+                                    {{ $counts['pending'] }} {{ __('pending') }}
+                                </div>
+                            @endif
+                            @if ($counts['total'] === 0)
+                                <div class="text-xs text-zinc-400">{{ __('None yet') }}</div>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Audit Log --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <flux:heading size="lg">{{ __('Recent Activity') }}</flux:heading>
+                <flux:subheading>{{ __('Last 20 events for this school') }}</flux:subheading>
+            </div>
+            <div class="p-4">
+                @if ($auditLogs->isEmpty())
+                    <flux:text class="text-zinc-500">{{ __('No activity recorded yet.') }}</flux:text>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-700">
+                            <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">{{ __('When') }}</th>
+                                    <th scope="col" class="px-3 py-2">{{ __('Who') }}</th>
+                                    <th scope="col" class="px-3 py-2">{{ __('Action') }}</th>
+                                    <th scope="col" class="px-3 py-2">{{ __('Entity') }}</th>
+                                    <th scope="col" class="px-3 py-2">{{ __('IP') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                @foreach ($auditLogs as $log)
+                                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                        <td class="whitespace-nowrap px-3 py-2 text-zinc-500" title="{{ $log->created_at->format('Y-m-d H:i:s') }}">
+                                            {{ $log->created_at->diffForHumans() }}
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            @if ($log->user)
+                                                <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $log->user->name }}</span>
+                                                <span class="ml-1 text-xs text-zinc-400">({{ $log->user->role }})</span>
+                                            @else
+                                                <span class="text-zinc-400">{{ __('System') }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2">
+                                            <code class="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{{ $log->action }}</code>
+                                        </td>
+                                        <td class="px-3 py-2 text-xs text-zinc-500">
+                                            @if ($log->entity_type)
+                                                {{ $log->entity_type }}
+                                                @if ($log->entity_id) <span class="text-zinc-400">#{{ $log->entity_id }}</span>@endif
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-zinc-500">
+                                            {{ $log->ip_address ?? '—' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         S5 — Portal Branding Preview Modal
+         Shows a faithful mockup of what the school's login page looks like
+         using their actual colors, logo, name, motto, and role buttons.
+    ══════════════════════════════════════════════════════════════════════════ --}}
+    @php
+        $previewPrimary   = $primaryColor;
+        $previewSecondary = $secondaryColor;
+        $previewAccent    = $accentColor;
+        $previewTextOnPrimary = '#ffffff'; // white works on almost all dark brand colors
+        // Derive a subtle tinted background for the login page body
+        // We'll just use a CSS inline style so no Tailwind scan needed
+    @endphp
+
+    <div
+        x-data="{ open: false }"
+        @open-preview-portal.window="open = true"
+        @keydown.escape.window="open = false"
+    >
+        {{-- Backdrop + modal shell --}}
+        <template x-teleport="body">
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-250"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
+                role="dialog" aria-modal="true" aria-labelledby="preview-portal-title"
+                x-cloak
+            >
+                <div @click="open = false" class="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-hidden="true"></div>
+
+                {{-- Modal panel --}}
+                <div
+                    x-show="open"
+                    x-transition:enter="transition ease-out duration-250"
+                    x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+                    x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="relative z-10 flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                    {{-- Modal header --}}
+                    <div class="flex items-center justify-between border-b border-zinc-200 bg-white px-5 py-3 dark:border-zinc-700 dark:bg-zinc-800">
+                        <div class="flex items-center gap-2.5">
+                            <div class="flex gap-1.5">
+                                <div class="h-3 w-3 rounded-full bg-red-400"></div>
+                                <div class="h-3 w-3 rounded-full bg-amber-400"></div>
+                                <div class="h-3 w-3 rounded-full bg-emerald-400"></div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <flux:icon.globe-alt class="h-3.5 w-3.5 text-zinc-400" />
+                                <span class="font-mono text-xs text-zinc-500">
+                                    {{ $school->custom_domain ? 'https://' . $school->custom_domain . '/portal/login' : url('/portal/login') }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <p id="preview-portal-title" class="text-xs font-medium text-zinc-500">
+                                {{ __('Portal Branding Preview — :name', ['name' => $school->name]) }}
+                            </p>
+                            <button
+                                type="button"
+                                @click="open = false"
+                                class="rounded-md p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                aria-label="{{ __('Close preview') }}"
+                            >
+                                <flux:icon.x-mark class="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- ── Simulated Browser Viewport ────────────────────────────────── --}}
+                    {{-- Mirrors the actual two-column auth/modern.blade.php layout --}}
+                    <div class="flex min-h-[480px] overflow-hidden">
+
+                        {{-- LEFT: Brand panel (mirrors .login-brand-panel) --}}
+                        <div
+                            class="relative hidden w-5/12 flex-col justify-between overflow-hidden p-8 sm:flex"
+                            style="background: {{ $previewPrimary }};"
+                        >
+                            {{-- Grid overlay --}}
+                            <div class="pointer-events-none absolute inset-0" style="background-image: repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0px,rgba(255,255,255,.03) 1px,transparent 1px,transparent 40px),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0px,rgba(255,255,255,.03) 1px,transparent 1px,transparent 40px);"></div>
+                            {{-- Orbs --}}
+                            <div class="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-30" style="background: {{ $previewSecondary }}; filter: blur(50px);"></div>
+                            <div class="pointer-events-none absolute -bottom-6 -left-6 h-28 w-28 rounded-full opacity-25" style="background: {{ $previewPrimary }}; filter: blur(40px);"></div>
+
+                            {{-- Top: school logo + name --}}
+                            <div class="relative z-10 flex items-center gap-2.5">
+                                @if ($school->logo_url)
+                                    <img src="{{ $school->logo_url }}" alt="" class="h-8 w-8 rounded-lg object-contain bg-white/10 p-0.5" />
+                                @else
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white">
+                                        {{ mb_strtoupper(mb_substr($school->name, 0, 1)) }}
+                                    </div>
+                                @endif
+                                <span class="text-sm font-bold text-white">{{ $school->name }}</span>
+                            </div>
+
+                            {{-- Middle: welcome heading + motto --}}
+                            <div class="relative z-10">
+                                <h2 class="text-xl font-extrabold leading-tight text-white">
+                                    {{ __('Welcome to') }}
+                                    <span style="color: {{ $previewSecondary }};">{{ $school->name }}</span>
+                                </h2>
+                                @if ($school->motto)
+                                    <p class="mt-1.5 text-xs leading-relaxed text-white/60">{{ $school->motto }}</p>
+                                @endif
+
+                                {{-- Mini feature cards --}}
+                                <div class="mt-5 space-y-2">
+                                    @foreach ([
+                                        [__('AI-Powered Quizzes'),          __('Generate from documents in seconds')],
+                                        [__('Results & Analytics'),          __('Track student performance')],
+                                        [__('Parent–Teacher Collaboration'), __('Keep parents in the loop')],
+                                    ] as $card)
+                                        <div class="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
+                                            <div class="h-1.5 w-1.5 rounded-full flex-shrink-0" style="background: {{ $previewSecondary }};"></div>
+                                            <div>
+                                                <p class="text-[11px] font-semibold text-white">{{ $card[0] }}</p>
+                                                <p class="text-[10px] text-white/50">{{ $card[1] }}</p>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            {{-- Bottom: copyright --}}
+                            <div class="relative z-10">
+                                <p class="text-[10px] text-white/30">&copy; {{ date('Y') }} {{ $school->name }}.</p>
+                            </div>
+                        </div>
+
+                        {{-- RIGHT: Login form panel --}}
+                        <div class="flex flex-1 flex-col items-center justify-center bg-white px-8 py-10 dark:bg-zinc-900">
+                            <div class="w-full max-w-xs space-y-5">
+
+                                {{-- School logo + heading --}}
+                                <div class="flex flex-col items-center gap-2 text-center">
+                                    @if ($school->logo_url)
+                                        <img src="{{ $school->logo_url }}" alt="" class="h-12 w-12 rounded-xl object-contain shadow-md" />
+                                    @endif
+                                    <h3 class="text-base font-bold text-zinc-900">
+                                        {{ __('Welcome to') }}
+                                        <span style="color: {{ $previewPrimary }};">{{ $school->name }}</span>
+                                    </h3>
+                                    @if ($school->motto)
+                                        <p class="text-[11px] italic text-zinc-500">{{ $school->motto }}</p>
+                                    @endif
+                                    <div class="mt-0.5 h-0.5 w-10 rounded-full" style="background: {{ $previewPrimary }};"></div>
+                                </div>
+
+                                {{-- Fake form fields --}}
+                                <div class="space-y-3">
+                                    <div>
+                                        <p class="mb-1 text-[11px] font-medium text-zinc-600">{{ __('Username or Email') }}</p>
+                                        <div class="flex h-9 w-full items-center rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-[11px] text-zinc-400">
+                                            {{ __('Enter your username or email') }}&hellip;
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="mb-1 flex items-center justify-between">
+                                            <p class="text-[11px] font-medium text-zinc-600">{{ __('Password') }}</p>
+                                            <span class="text-[10px]" style="color: {{ $previewPrimary }};">{{ __('Forgot your password?') }}</span>
+                                        </div>
+                                        <div class="flex h-9 w-full items-center rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-[11px] text-zinc-400">
+                                            ••••••••
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="h-3.5 w-3.5 rounded border border-zinc-300 bg-white"></div>
+                                        <span class="text-[11px] text-zinc-500">{{ __('Remember me') }}</span>
+                                    </div>
+                                    <div
+                                        class="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-white shadow-sm"
+                                        style="background: {{ $previewPrimary }};"
+                                    >
+                                        {{ __('Log in') }}
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+                                    </div>
+                                </div>
+
+                                <p class="text-center text-[10px] text-zinc-400">&copy; {{ date('Y') }} DX-SchoolPortal</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Color swatches footer --}}
+                    <div class="flex items-center gap-4 border-t border-zinc-200 bg-white px-5 py-3 dark:border-zinc-700 dark:bg-zinc-800">
+                        <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Brand Colors:') }}</p>
+                        @foreach ([
+                            ['label' => __('Primary'),   'color' => $previewPrimary],
+                            ['label' => __('Secondary'), 'color' => $previewSecondary],
+                            ['label' => __('Accent'),    'color' => $previewAccent],
+                        ] as $swatch)
+                            <div class="flex items-center gap-1.5">
+                                <div
+                                    class="h-4 w-4 rounded-full border border-white shadow-sm"
+                                    style="background: {{ $swatch['color'] }};"
+                                    title="{{ $swatch['label'] }}: {{ $swatch['color'] }}"
+                                ></div>
+                                <span class="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{{ $swatch['color'] }}</span>
+                                <span class="text-[10px] text-zinc-400">{{ $swatch['label'] }}</span>
+                            </div>
+                        @endforeach
+                        <div class="ml-auto">
+                            <flux:button
+                                size="sm" variant="subtle"
+                                icon="pencil-square"
+                                href="{{ route('super-admin.schools.edit', $school) }}"
+                                wire:navigate
+                            >
+                                {{ __('Edit Branding') }}
+                            </flux:button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </x-layouts::app>

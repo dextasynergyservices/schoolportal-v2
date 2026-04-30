@@ -11,6 +11,7 @@ use App\Traits\BelongsToTenant;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -68,6 +69,17 @@ class User extends Authenticatable
     }
 
     // ── Role Checks ──
+
+    /**
+     * Users are always created by platform admins, never through self-registration.
+     * Auto-verify email on creation so the `verified` middleware never blocks access.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $user): void {
+            $user->email_verified_at ??= now();
+        });
+    }
 
     public function sendPasswordResetNotification($token): void
     {
@@ -143,11 +155,19 @@ class User extends Authenticatable
     }
 
     /**
-     * Parents linked to this student.
+     * Parents linked to this student (ParentStudent pivot records).
      */
     public function parents(): HasMany
     {
         return $this->hasMany(ParentStudent::class, 'student_id');
+    }
+
+    /**
+     * Parent Users linked to this student (through the pivot table).
+     */
+    public function parentUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'parent_student', 'student_id', 'parent_id');
     }
 
     /**

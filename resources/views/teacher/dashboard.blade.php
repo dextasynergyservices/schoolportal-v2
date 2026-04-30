@@ -90,7 +90,7 @@
                             <flux:icon.document-text class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div class="min-w-0">
-                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Results') }}</p>
+                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('Uploaded Results') }}</p>
                             <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($totalResults) }}</p>
                         </div>
                     </div>
@@ -163,8 +163,39 @@
                     </div>
                     <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('Quiz average') }}</p>
                 </div>
+            </div>
+        </section>
 
-                <div class="stat-card stat-card-indigo dash-animate dash-animate-delay-5">
+        {{-- ── CBT Stats + AI Credits ────────────────────────────── --}}
+        <section aria-label="{{ __('CBT statistics') }}">
+            <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+                <a href="{{ route('teacher.exams.index') }}" wire:navigate class="stat-card dash-animate dash-animate-delay-3 block" style="border-left-color: #6366f1;">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon bg-indigo-500/15">
+                            <flux:icon.computer-desktop class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('CBT') }}</p>
+                            <p class="stat-value text-zinc-900 dark:text-white">{{ number_format($publishedCbtExams + $publishedAssessments + $publishedCbtAssignments) }}</p>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('Published') }}</p>
+                </a>
+
+                <div class="stat-card dash-animate dash-animate-delay-5" style="border-left-color: #14b8a6;">
+                    <div class="flex items-center gap-3">
+                        <div class="stat-icon bg-teal-500/15">
+                            <flux:icon.chart-bar class="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate">{{ __('CBT Avg Score') }}</p>
+                            <p class="stat-value text-zinc-900 dark:text-white">{{ $avgCbtScore !== null ? number_format((float) $avgCbtScore, 0) . '%' : '—' }}</p>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __(':count attempts', ['count' => number_format($cbtAttempts)]) }}</p>
+                </div>
+
+                <div class="stat-card dash-animate dash-animate-delay-5" style="border-left-color: #6366f1;">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-indigo-500/15">
                             <flux:icon.sparkles class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />

@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Mail\PlatformEmail as PlatformEmailMailable;
+use App\Http\Requests\StorePlatformEmailRequest;
+use App\Jobs\SendPlatformEmailJob;
 use App\Models\PlatformEmail;
 use App\Models\School;
+use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class EmailController extends Controller
@@ -30,19 +30,14 @@ class EmailController extends Controller
         $schools = School::tenants()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'custom_domain']);
 
         return view('super-admin.emails.create', compact('schools'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StorePlatformEmailRequest $request, FileUploadService $uploadService): RedirectResponse
     {
-        $data = $request->validate([
-            'subject' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string'],
-            'school_ids' => ['required', 'array', 'min:1'],
-            'school_ids.*' => ['required', 'integer', 'exists:schools,id'],
-        ]);
+        $data = $request->validated();
 
         $schools = School::whereIn('id', $data['school_ids'])
             ->whereNotNull('email')
@@ -54,41 +49,46 @@ class EmailController extends Controller
                 ->with('error', __('None of the selected schools have an email address.'));
         }
 
+        // Upload attachments to Cloudinary before creating the record so that
+        // disk space on the server is never consumed (cPanel shared hosting).
+        $attachments = [];
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                try {
+                    $attachments[] = $uploadService->uploadEmailAttachment($file);
+                } catch (\Throwable $e) {
+                    Log::error('Email attachment upload to Cloudinary failed', [
+                        'file' => $file->getClientOriginalName(),
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    return back()->withInput()
+                        ->with('error', __('Failed to upload attachment ":file". Please try again.', [
+                            'file' => $file->getClientOriginalName(),
+                        ]));
+                }
+            }
+        }
+
         $record = PlatformEmail::create([
             'subject' => $data['subject'],
             'body' => $data['body'],
+            'attachments' => $attachments ?: null,
             'recipient_school_ids' => $data['school_ids'],
             'total_recipients' => $schools->count(),
             'sent_by' => auth()->id(),
             'sent_at' => now(),
+            'queued_at' => now(),
         ]);
 
-        $sentCount = 0;
-        $failedCount = 0;
-
+        // Dispatch one lightweight job per school — non-blocking.
         foreach ($schools as $school) {
-            try {
-                Mail::to($school->email, $school->name)
-                    ->send(new PlatformEmailMailable($data['subject'], $data['body']));
-                $sentCount++;
-            } catch (\Throwable $e) {
-                Log::error('Platform email failed', [
-                    'school_id' => $school->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $failedCount++;
-            }
+            SendPlatformEmailJob::dispatch($record->id, $school->id);
         }
 
-        $record->update([
-            'sent_count' => $sentCount,
-            'failed_count' => $failedCount,
-        ]);
-
         return redirect()->route('super-admin.emails.index')
-            ->with('success', __('Email sent to :count school(s). :failed failed.', [
-                'count' => $sentCount,
-                'failed' => $failedCount,
+            ->with('success', __('Email queued for :count school(s). Delivery is in progress in the background.', [
+                'count' => $schools->count(),
             ]));
     }
 

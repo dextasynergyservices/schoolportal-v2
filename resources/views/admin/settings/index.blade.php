@@ -36,6 +36,17 @@
                         <flux:input name="motto" :label="__('Motto')" :value="old('motto', $school->motto)" />
                     </div>
 
+                    <div>
+                        <flux:select name="timezone" :label="__('Timezone')" searchable>
+                            @foreach (timezone_identifiers_list() as $tz)
+                                <flux:select.option :value="$tz" :selected="old('timezone', $school->timezone ?? 'Africa/Lagos') === $tz">
+                                    {{ $tz }} ({{ now()->setTimezone($tz)->format('P') }})
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:description class="mt-1">{{ __('All dates and times in the portal will use this timezone.') }}</flux:description>
+                    </div>
+
                     <flux:button variant="primary" type="submit">{{ __('Save Information') }}</flux:button>
                 </form>
             </div>

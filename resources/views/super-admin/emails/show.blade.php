@@ -60,6 +60,35 @@
                         </div>
                     </dd>
                 </div>
+
+                {{-- Attachments --}}
+                @if ($email->attachments && count($email->attachments) > 0)
+                    <div>
+                        <dt class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+                            {{ __('Attachments') }}
+                            <span class="ml-1 normal-case text-zinc-400">({{ count($email->attachments) }})</span>
+                        </dt>
+                        <dd>
+                            <ul class="space-y-1.5" role="list">
+                                @foreach ($email->attachments as $attachment)
+                                    <li class="flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-3 py-2">
+                                        <svg class="size-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/>
+                                        </svg>
+                                        <span class="flex-1 truncate text-sm text-zinc-700 dark:text-zinc-300">{{ $attachment['name'] }}</span>
+                                        @if (isset($attachment['size']))
+                                            <span class="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                                                {{ $attachment['size'] < 1048576
+                                                    ? number_format($attachment['size'] / 1024, 1) . ' KB'
+                                                    : number_format($attachment['size'] / 1048576, 1) . ' MB' }}
+                                            </span>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </dd>
+                    </div>
+                @endif
             </div>
         </div>
 

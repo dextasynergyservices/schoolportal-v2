@@ -1,4 +1,191 @@
 /**
+ * Rich text editor — global Alpine component.
+ *
+ * Features: undo/redo, bold/italic/underline/strikethrough, headings,
+ * blockquote, code, text alignment, bullet/numbered lists, indent/outdent,
+ * link insert/remove, horizontal rule, text color, highlight color,
+ * remove formatting, word + char count.
+ */
+document.addEventListener('alpine:init', () => {
+    Alpine.data('richEditor', () => ({
+        showLinkDialog: false,
+        showTextColorPicker: false,
+        showHighlightPicker: false,
+        linkUrl: 'https://',
+        savedSelection: null,
+        charCount: 0,
+        wordCount: 0,
+
+        textColors: [
+            '#000000',
+            '#374151',
+            '#6b7280',
+            '#ef4444',
+            '#f97316',
+            '#eab308',
+            '#22c55e',
+            '#3b82f6',
+            '#6366f1',
+            '#a855f7',
+            '#ec4899',
+            '#ffffff',
+        ],
+
+        highlightColors: ['#fef08a', '#bbf7d0', '#a5f3fc', '#fecaca', '#fed7aa', '#e9d5ff', '#f9a8d4'],
+
+        init() {
+            const hidden = this.$refs.hiddenBody ?? this.$refs.hiddenContent;
+            if (hidden?.value) {
+                this.$refs.editor.innerHTML = hidden.value;
+            }
+            this._updateCounts();
+            document.addEventListener('selectionchange', () => this.$nextTick(() => {}));
+        },
+
+        exec(command, value = null) {
+            this.$refs.editor.focus();
+            if (command === 'formatBlock') {
+                document.execCommand('formatBlock', false, `<${value}>`);
+            } else {
+                document.execCommand(command, false, value);
+            }
+            this.updateHidden();
+        },
+
+        execColor(type, color) {
+            this.restoreSelection();
+            this.$refs.editor.focus();
+            if (type === 'text') {
+                document.execCommand('foreColor', false, color);
+                this.showTextColorPicker = false;
+            } else {
+                document.execCommand('hiliteColor', false, color);
+                this.showHighlightPicker = false;
+            }
+            this.updateHidden();
+        },
+
+        insertHR() {
+            this.$refs.editor.focus();
+            document.execCommand('insertHorizontalRule', false, null);
+            this.updateHidden();
+        },
+
+        removeLink() {
+            this.$refs.editor.focus();
+            document.execCommand('unlink', false, null);
+            this.updateHidden();
+        },
+
+        isActive(command) {
+            try {
+                return document.queryCommandState(command);
+            } catch {
+                return false;
+            }
+        },
+
+        isInLink() {
+            try {
+                const sel = window.getSelection();
+                if (!sel || sel.rangeCount === 0) return false;
+                let node = sel.getRangeAt(0).commonAncestorContainer;
+                while (node && node !== this.$refs.editor) {
+                    if (node.nodeName === 'A') return true;
+                    node = node.parentNode;
+                }
+                return false;
+            } catch {
+                return false;
+            }
+        },
+
+        saveSelection() {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                this.savedSelection = sel.getRangeAt(0).cloneRange();
+            }
+        },
+
+        restoreSelection() {
+            if (this.savedSelection) {
+                const sel = window.getSelection();
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(this.savedSelection);
+                }
+            }
+        },
+
+        openLinkDialog() {
+            this.saveSelection();
+            // Pre-fill URL if cursor is already inside a link
+            let existingUrl = 'https://';
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.getRangeAt(0).commonAncestorContainer;
+                while (node && node !== this.$refs.editor) {
+                    if (node.nodeName === 'A') {
+                        existingUrl = node.href || 'https://';
+                        break;
+                    }
+                    node = node.parentNode;
+                }
+            }
+            this.linkUrl = existingUrl;
+            this.showLinkDialog = true;
+            this.showTextColorPicker = false;
+            this.showHighlightPicker = false;
+            this.$nextTick(() => {
+                this.$refs.linkUrlInput?.focus();
+                this.$refs.linkUrlInput?.select();
+            });
+        },
+
+        applyLink() {
+            const url = this.linkUrl.trim();
+            if (url && url !== 'https://') {
+                this.restoreSelection();
+                this.$refs.editor.focus();
+                document.execCommand('createLink', false, url);
+                this.updateHidden();
+            }
+            this.closeLinkDialog();
+        },
+
+        closeLinkDialog() {
+            this.showLinkDialog = false;
+            this.linkUrl = 'https://';
+            this.savedSelection = null;
+        },
+
+        toggleColorPicker(type) {
+            this.saveSelection();
+            this.showLinkDialog = false;
+            if (type === 'text') {
+                this.showHighlightPicker = false;
+                this.showTextColorPicker = !this.showTextColorPicker;
+            } else {
+                this.showTextColorPicker = false;
+                this.showHighlightPicker = !this.showHighlightPicker;
+            }
+        },
+
+        updateHidden() {
+            const hidden = this.$refs.hiddenBody ?? this.$refs.hiddenContent;
+            if (hidden) hidden.value = this.$refs.editor.innerHTML;
+            this._updateCounts();
+        },
+
+        _updateCounts() {
+            const text = this.$refs.editor?.innerText ?? '';
+            this.charCount = text.replace(/\n/g, '').length;
+            this.wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+        },
+    }));
+});
+
+/**
  * Global form loading state enhancement.
  *
  * Automatically shows a spinner and disables submit buttons when

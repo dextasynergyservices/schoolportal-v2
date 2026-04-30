@@ -18,6 +18,7 @@
                 <li><a href="#sessions-terms" class="underline hover:text-[var(--color-primary)]">{{ __('Academic Sessions & Terms') }}</a></li>
                 <li><a href="#results-assignments" class="underline hover:text-[var(--color-primary)]">{{ __('Results & Assignments') }}</a></li>
                 <li><a href="#quizzes-games" class="underline hover:text-[var(--color-primary)]">{{ __('AI Quizzes & Games') }}</a></li>
+                <li><a href="#cbt" class="underline hover:text-[var(--color-primary)]">{{ __('CBT (Computer-Based Testing)') }}</a></li>
                 <li><a href="#approvals" class="underline hover:text-[var(--color-primary)]">{{ __('Teacher Approvals') }}</a></li>
                 <li><a href="#notices" class="underline hover:text-[var(--color-primary)]">{{ __('Notices') }}</a></li>
                 <li><a href="#promotions" class="underline hover:text-[var(--color-primary)]">{{ __('Promoting Students') }}</a></li>
@@ -81,9 +82,9 @@
         <section id="results-assignments" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('5. Results & Assignments') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
-                <p><strong>{{ __('Results:') }}</strong> {{ __('Upload result PDFs for each student per term. Go to Academics → Results → "Upload Result". Select the student, session, term, and upload the PDF file.') }}</p>
+                <p><strong>{{ __('Results:') }}</strong> {{ __('Upload result PDFs for each student per term. Go to Scores & Reports → Uploaded Results → "Upload Result". Select the student, session, term, and upload the PDF file.') }}</p>
                 <p><strong>{{ __('Bulk results:') }}</strong> {{ __('Click "Bulk Upload" to upload multiple result PDFs at once. Name each file as the student\'s username (e.g., "john_doe.pdf") and the system auto-matches them.') }}</p>
-                <p><strong>{{ __('Assignments:') }}</strong> {{ __('Upload assignments per class, per week, per term. Students in that class can view and download them.') }}</p>
+                <p><strong>{{ __('Assignments:') }}</strong> {{ __('Upload assignments per class, per week, per term under Academics → Assignments. Students in that class can view and download them.') }}</p>
                 <p>{{ __('Results you upload are approved immediately. Results uploaded by teachers require your approval first.') }}</p>
             </div>
         </section>
@@ -106,9 +107,33 @@
             </div>
         </section>
 
+        {{-- CBT --}}
+        <section id="cbt" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('7. CBT (Computer-Based Testing)') }}</h2>
+            <div class="prose prose-sm dark:prose-invert max-w-none">
+                <p>{{ __('Create online exams, assessments, and assignments that students take directly on the portal. Go to CBT & Interactive → CBT.') }}</p>
+                <p><strong>{{ __('Three categories:') }}</strong></p>
+                <ul>
+                    <li><strong>{{ __('Exams') }}</strong> — {{ __('Formal end-of-term or mid-term examinations') }}</li>
+                    <li><strong>{{ __('Assessments') }}</strong> — {{ __('Continuous assessment tests (CA tests)') }}</li>
+                    <li><strong>{{ __('Assignments') }}</strong> — {{ __('Homework or take-home work with flexible deadlines') }}</li>
+                </ul>
+                <p><strong>{{ __('Creating a CBT exam:') }}</strong></p>
+                <ol>
+                    <li>{{ __('Click "Create" and choose the category (Exam, Assessment, or Assignment).') }}</li>
+                    <li>{{ __('Set the title, class, subject, session, term, and optional time limit.') }}</li>
+                    <li>{{ __('Add questions — multiple choice, true/false, or fill-in-the-blank.') }}</li>
+                    <li>{{ __('Use "Bulk Grade" to import questions from a spreadsheet if you have many.') }}</li>
+                    <li>{{ __('Publish when ready — students see it on their dashboard under the matching category tab.') }}</li>
+                </ol>
+                <p><strong>{{ __('Scoring:') }}</strong> {{ __('CBT scores can feed into report cards. Scores from CBT exams/assessments appear in the Score Entry section under Scores & Reports.') }}</p>
+                <p>{{ __('Teacher-created CBT content follows the same approval flow as other uploads.') }}</p>
+            </div>
+        </section>
+
         {{-- Approvals --}}
         <section id="approvals" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('7. Teacher Approvals') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('8. Teacher Approvals') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
                 <p>{{ __('When teachers upload results, assignments, notices, quizzes, or games, these go into a pending approval queue.') }}</p>
                 <p>{{ __('Go to Management → Approvals to review pending items. For each item, you can:') }}</p>
@@ -123,7 +148,7 @@
 
         {{-- Notices --}}
         <section id="notices" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('8. Notices') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('9. Notices') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
                 <p>{{ __('Post school announcements under Communication → Notices. You can:') }}</p>
                 <ul>
@@ -137,7 +162,7 @@
 
         {{-- Promotions --}}
         <section id="promotions" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('9. Promoting Students') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('10. Promoting Students') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
                 <p>{{ __('At the end of a session, go to Management → Promotions to move students to the next class.') }}</p>
                 <ol>
@@ -153,7 +178,7 @@
 
         {{-- Settings --}}
         <section id="settings" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('10. School Settings & Branding') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('11. School Settings & Branding') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
                 <p>{{ __('Go to Management → School Settings to customize:') }}</p>
                 <ul>
@@ -166,7 +191,7 @@
 
         {{-- AI Credits --}}
         <section id="ai-credits" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('11. AI Credits') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('12. AI Credits') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
                 <p>{{ __('Your school receives 15 free AI credits each month (resets on the 1st). Each AI quiz or game generation costs 1 credit. Manual creation is always free.') }}</p>
                 <p><strong>{{ __('Purchasing more:') }}</strong> {{ __('Go to Management → AI Credits → "Purchase Credits". Credits are sold in multiples of 5 at ₦1,000 per 5 credits. Purchased credits never expire.') }}</p>
@@ -176,7 +201,7 @@
 
         {{-- Security --}}
         <section id="security" class="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('12. Security & Passwords') }}</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-white mb-3">{{ __('13. Security & Passwords') }}</h2>
             <div class="prose prose-sm dark:prose-invert max-w-none">
                 <p><strong>{{ __('Your password:') }}</strong> {{ __('Change it regularly from your Profile page (click your name in the top-right corner). Enable Two-Factor Authentication (2FA) for extra security.') }}</p>
                 <p><strong>{{ __('Student/teacher passwords:') }}</strong> {{ __('When you create accounts, a default password is set. Users can change it after logging in. If someone forgets their password, you can reset it from their edit page.') }}</p>

@@ -8,6 +8,14 @@
 
         <form method="POST" action="{{ route('teacher.games.store') }}" x-data="gameReviewer()" @submit="return onSubmit($event)">
             @csrf
+
+            {{-- Inline validation error --}}
+            <div x-show="validationError" x-cloak x-transition class="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 flex items-center gap-2">
+                <flux:icon name="exclamation-triangle" class="size-5 text-red-500 shrink-0" />
+                <span class="text-sm text-red-700 dark:text-red-300" x-text="validationError"></span>
+                <button type="button" @click="validationError = ''" class="ml-auto text-red-400 hover:text-red-600">&times;</button>
+            </div>
+
             <input type="hidden" name="game_type" value="{{ $gameType }}">
             <input type="hidden" name="source_type" value="{{ $sourceType }}">
             <input type="hidden" name="difficulty" value="{{ $difficulty }}">
@@ -81,11 +89,11 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
                                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Term') }}</label>
-                                            <input type="text" x-model="item.term" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Term') }}" required>
+                                            <input type="text" x-model="item.term" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Term') }}" required>
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Definition') }}</label>
-                                            <input type="text" x-model="item.definition" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Definition') }}" required>
+                                            <input type="text" x-model="item.definition" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Definition') }}" required>
                                         </div>
                                     </div>
                                 </template>
@@ -93,18 +101,18 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
                                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Word') }}</label>
-                                            <input type="text" x-model="item.word" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Word') }}" required>
+                                            <input type="text" x-model="item.word" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Word') }}" required>
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Hint') }}</label>
-                                            <input type="text" x-model="item.hint" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Hint') }}" required>
+                                            <input type="text" x-model="item.hint" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Hint') }}" required>
                                         </div>
                                     </div>
                                 </template>
                                 <template x-if="gameType === 'quiz_race'">
                                     <div>
                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Question') }}</label>
-                                        <input type="text" x-model="item.question" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm mb-2" placeholder="{{ __('Question') }}" required>
+                                        <input type="text" x-model="item.question" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500 mb-2" placeholder="{{ __('Question') }}" required>
                                         <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Options (first is correct)') }}</label>
                                         <div class="grid grid-cols-2 gap-2">
                                             <template x-for="(opt, oi) in item.options" :key="oi">
@@ -112,7 +120,7 @@
                                                     <span class="text-xs font-medium w-4 shrink-0" :class="oi === 0 ? 'text-green-600' : 'text-zinc-400'" x-text="String.fromCharCode(65 + oi) + '.'"></span>
                                                     <input type="text" x-model="item.options[oi]"
                                                         class="flex-1 rounded-lg text-sm"
-                                                        :class="oi === 0 ? 'border-green-300 dark:border-green-700 ring-1 ring-green-200 dark:ring-green-800 dark:bg-zinc-700' : 'border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700'"
+                                                        :class="oi === 0 ? 'border border-green-300 dark:border-green-700 ring-1 ring-green-200 dark:ring-green-800 bg-white dark:bg-white/10' : 'border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs'"
                                                         :placeholder="oi === 0 ? '{{ __("Correct answer") }}' : '{{ __("Option") }} ' + String.fromCharCode(65 + oi)" required>
                                                 </div>
                                             </template>
@@ -123,11 +131,11 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
                                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Front (question)') }}</label>
-                                            <input type="text" x-model="item.front" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Front (question)') }}" required>
+                                            <input type="text" x-model="item.front" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Front (question)') }}" required>
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{{ __('Back (answer)') }}</label>
-                                            <input type="text" x-model="item.back" class="w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700 text-sm" placeholder="{{ __('Back (answer)') }}" required>
+                                            <input type="text" x-model="item.back" class="w-full rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/10 shadow-xs px-2 py-1 text-sm text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-500" placeholder="{{ __('Back (answer)') }}" required>
                                         </div>
                                     </div>
                                 </template>
@@ -206,6 +214,7 @@
 
             return {
                 submitting: false,
+                validationError: '',
                 gameType,
                 items,
                 itemLabel: itemLabels[gameType] || '{{ __("items") }}',
@@ -226,8 +235,9 @@
                 },
 
                 onSubmit(event) {
+                    this.validationError = '';
                     if (this.items.length === 0) {
-                        alert('{{ __("Please add at least one item.") }}');
+                        this.validationError = '{{ __("Please add at least one item.") }}';
                         event.preventDefault();
                         return false;
                     }

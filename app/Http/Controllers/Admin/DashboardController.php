@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\Assignment;
 use App\Models\AuditLog;
+use App\Models\Exam;
 use App\Models\Notice;
 use App\Models\Result;
 use App\Models\SchoolClass;
@@ -89,7 +90,10 @@ class DashboardController extends Controller
             ->where('is_active', true)
             ->whereDoesntHave('assignedClasses')
             ->get(['id', 'name']);
-
+        // ── CBT Counts (published across school) ─────────────────────
+        $cbtExamsCount = Exam::published()->forCategory('exam')->count();
+        $cbtAssessmentsCount = Exam::published()->forCategory('assessment')->count();
+        $cbtAssignmentsCount = Exam::published()->forCategory('assignment')->count();
         // ── Pending Approvals ────────────────────────────────────────
         $pendingApprovals = TeacherAction::with(['teacher:id,name,avatar_url', 'reviewer:id,name'])
             ->where('status', 'pending')
@@ -122,6 +126,7 @@ class DashboardController extends Controller
             'totalTeachers', 'totalParents', 'totalClasses',
             'aiFreeCredits', 'aiPurchasedCredits', 'aiTotalCredits', 'aiFreeResetDate',
             'termResultsCount', 'termAssignmentsCount', 'termNoticesCount',
+            'cbtExamsCount', 'cbtAssessmentsCount', 'cbtAssignmentsCount',
             'unassignedTeachers',
             'pendingApprovals', 'pendingCount',
             'recentActivity',

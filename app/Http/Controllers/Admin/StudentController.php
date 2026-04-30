@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\ParentProfile;
 use App\Models\ParentStudent;
 use App\Models\SchoolClass;
@@ -12,6 +13,7 @@ use App\Models\SchoolLevel;
 use App\Models\StudentProfile;
 use App\Models\User;
 use App\Notifications\PasswordResetByAdmin;
+use App\Notifications\StudentMovedClassNotification;
 use App\Notifications\WelcomeNewUser;
 use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
@@ -20,9 +22,130 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StudentController extends Controller
 {
+    /**
+     * Show the bulk move student UI.
+     */
+    public function moveForm(Request $request): View
+    {
+        $schoolId = app('current.school')->id;
+        $levels = SchoolLevel::where('school_id', $schoolId)->orderBy('sort_order')->get();
+        $selectedLevel = $request->input('level_id');
+        $selectedClass = $request->input('class_id');
+        $classes = $selectedLevel
+            ? SchoolClass::where('school_id', $schoolId)->where('level_id', $selectedLevel)->orderBy('sort_order')->get()
+            : collect();
+        $students = $selectedClass
+            ? User::where('school_id', $schoolId)->where('role', 'student')->where('level_id', $selectedLevel)->whereHas('studentProfile', function ($q) use ($selectedClass) {
+                $q->where('class_id', $selectedClass);
+            })->orderBy('name')->get()
+            : collect();
+
+        return view('admin.students.move', compact('levels', 'classes', 'students', 'selectedLevel', 'selectedClass'));
+    }
+
+    /**
+     * Process bulk move of students to another class within a level.
+     */
+    public function moveProcess(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'level_id' => ['required', 'exists:school_levels,id'],
+            'class_id' => ['required', 'exists:classes,id'],
+            'target_class_id' => ['required', 'exists:classes,id', 'different:class_id'],
+            'student_ids' => ['required', 'array', 'min:1'],
+            'student_ids.*' => ['exists:users,id'],
+        ]);
+
+        $levelId = (int) $validated['level_id'];
+        $fromClassId = (int) $validated['class_id'];
+        $toClassId = (int) $validated['target_class_id'];
+        $studentIds = $validated['student_ids'];
+
+        // Ensure both classes belong to the selected level and current school.
+        $schoolId = app('current.school')->id;
+        $fromClass = SchoolClass::where('school_id', $schoolId)
+            ->where('id', $fromClassId)
+            ->where('level_id', $levelId)
+            ->firstOrFail();
+
+        $toClass = SchoolClass::where('school_id', $schoolId)
+            ->where('id', $toClassId)
+            ->where('level_id', $levelId)
+            ->firstOrFail();
+
+        $students = User::with(['studentProfile', 'parentUsers'])
+            ->where('school_id', $schoolId)
+            ->whereIn('id', $studentIds)
+            ->where('role', 'student')
+            ->whereHas('studentProfile', function ($q) use ($fromClassId) {
+                $q->where('class_id', $fromClassId);
+            })
+            ->get();
+
+        $moved = 0;
+
+        DB::transaction(function () use ($students, $toClassId, $fromClassId, $studentIds, $request, &$moved) {
+            foreach ($students as $student) {
+                $student->studentProfile->update([
+                    'class_id' => $toClassId,
+                ]);
+
+                $moved++;
+            }
+
+            // Optional audit log.
+            if (class_exists(AuditLog::class)) {
+                AuditLog::create([
+                    'school_id' => auth()->user()->school_id,
+                    'user_id' => auth()->id(),
+                    'action' => 'students.moved_class',
+                    'entity_type' => 'class',
+                    'entity_id' => $toClassId,
+                    'old_values' => json_encode(['from_class_id' => $fromClassId, 'student_ids' => $studentIds]),
+                    'new_values' => json_encode(['to_class_id' => $toClassId, 'student_ids' => $studentIds]),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+            }
+        });
+
+        // Send notifications after the database transaction succeeds.
+        foreach ($students as $student) {
+            try {
+                $student->notify(new StudentMovedClassNotification(
+                    fromClassName: $fromClass->name,
+                    toClassName: $toClass->name,
+                    studentName: $student->name,
+                    recipientRole: 'student',
+                ));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            foreach ($student->parentUsers as $parentUser) {
+                try {
+                    $parentUser->notify(new StudentMovedClassNotification(
+                        fromClassName: $fromClass->name,
+                        toClassName: $toClass->name,
+                        studentName: $student->name,
+                        recipientRole: 'parent',
+                    ));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
+        return redirect()->route('admin.students.move', [
+            'level_id' => $levelId,
+            'class_id' => $fromClassId,
+        ])->with('success', "{$moved} student(s) moved to {$toClass->name} successfully.");
+    }
+
     public function index(Request $request): View
     {
         $query = User::where('role', 'student')
@@ -53,6 +176,55 @@ class StudentController extends Controller
         $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
 
         return view('admin.students.index', compact('students', 'classes', 'levels'));
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $query = User::where('role', 'student')
+            ->with(['studentProfile.class:id,name', 'level:id,name']);
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('class_id')) {
+            $query->whereHas('studentProfile', fn ($q) => $q->where('class_id', $request->input('class_id')));
+        }
+
+        if ($request->filled('level_id')) {
+            $query->where('level_id', $request->input('level_id'));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->input('status') === 'active');
+        }
+
+        $students = $query->orderBy('name')->get();
+        $filename = 'students-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($students) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['Name', 'Username', 'Gender', 'Level', 'Class', 'Admission No.', 'Date of Birth', 'Status', 'Created At']);
+            foreach ($students as $student) {
+                fputcsv($handle, [
+                    $student->name,
+                    $student->username,
+                    $student->gender ?? '',
+                    $student->level?->name ?? '',
+                    $student->studentProfile?->class?->name ?? '',
+                    $student->studentProfile?->admission_number ?? '',
+                    $student->studentProfile?->date_of_birth?->format('Y-m-d') ?? '',
+                    $student->is_active ? 'Active' : 'Inactive',
+                    $student->created_at->format('Y-m-d H:i'),
+                ]);
+            }
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function create(): View
@@ -181,7 +353,18 @@ class StudentController extends Controller
 
         $student->load(['studentProfile.class.level', 'studentProfile.class.teacher', 'level']);
 
-        return view('admin.students.show', compact('student'));
+        // Sibling classes: same level, active, excluding current class
+        $siblingClasses = collect();
+        if ($student->studentProfile?->class?->level_id) {
+            $siblingClasses = SchoolClass::where('level_id', $student->studentProfile->class->level_id)
+                ->where('is_active', true)
+                ->where('id', '!=', $student->studentProfile->class_id)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        return view('admin.students.show', compact('student', 'siblingClasses'));
     }
 
     public function edit(User $student): View
@@ -371,5 +554,40 @@ class StudentController extends Controller
         ]);
 
         return back()->with('success', __('":name" has been activated.', ['name' => $student->name]));
+    }
+
+    public function transferClass(Request $request, User $student): RedirectResponse
+    {
+        abort_unless($student->role === 'student', 404);
+        abort_unless($student->studentProfile, 404);
+
+        $validated = $request->validate([
+            'class_id' => ['required', 'exists:classes,id'],
+        ]);
+
+        $newClass = SchoolClass::findOrFail($validated['class_id']);
+        $currentClass = $student->studentProfile->class;
+
+        // Ensure the new class is within the same level
+        abort_unless(
+            $currentClass && $newClass->level_id === $currentClass->level_id,
+            422,
+            __('Students can only be transferred to another class within the same level.')
+        );
+
+        // Ensure the new class is different from current
+        if ($newClass->id === $currentClass->id) {
+            return back()->with('error', __('The student is already in this class.'));
+        }
+
+        $student->studentProfile->update([
+            'class_id' => $newClass->id,
+        ]);
+
+        return back()->with('success', __('":name" has been transferred from :from to :to.', [
+            'name' => $student->name,
+            'from' => $currentClass->name,
+            'to' => $newClass->name,
+        ]));
     }
 }

@@ -1,8 +1,8 @@
-<x-layouts::app :title="__('Results')">
+<x-layouts::app :title="__('Uploaded Results')">
     <div class="space-y-6">
         <x-admin-header
-            :title="__('Results')"
-            :description="__('View your children\'s academic results')"
+            :title="__('Uploaded Results')"
+            :description="__('View your children\'s uploaded academic results')"
         />
 
         @if ($children->isEmpty())
@@ -43,7 +43,7 @@
                             {{-- Stats --}}
                             <div class="grid grid-cols-2 gap-3">
                                 <div class="rounded-md bg-zinc-50 dark:bg-zinc-700/30 px-3 py-2">
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Total Results') }}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Total Uploaded') }}</p>
                                     <p class="text-lg font-bold text-zinc-900 dark:text-white">{{ $child->stat_results_count }}</p>
                                 </div>
                                 <div class="rounded-md bg-zinc-50 dark:bg-zinc-700/30 px-3 py-2">
@@ -59,7 +59,7 @@
                         </div>
 
                         <div class="px-5 py-2.5 border-t border-zinc-100 dark:border-zinc-700/50 bg-zinc-50/50 dark:bg-zinc-800/50">
-                            <span class="text-xs font-medium text-indigo-600 dark:text-indigo-400 group-hover:underline">{{ __('View all results') }} &rarr;</span>
+                            <span class="text-xs font-medium text-indigo-600 dark:text-indigo-400 group-hover:underline">{{ __('View all uploaded results') }} &rarr;</span>
                         </div>
                     </a>
                 @endforeach

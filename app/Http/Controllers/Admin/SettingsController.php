@@ -32,6 +32,7 @@ class SettingsController extends Controller
             'state' => ['nullable', 'string', 'max:100'],
             'website' => ['nullable', 'url', 'max:255'],
             'motto' => ['nullable', 'string', 'max:255'],
+            'timezone' => ['required', 'string', 'timezone:all'],
         ]);
 
         $school->update($validated);

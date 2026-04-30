@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\AiCreditAllocation;
 use App\Models\Assignment;
+use App\Models\Exam;
+use App\Models\ExamAttempt;
 use App\Models\Game;
 use App\Models\Notice;
 use App\Models\Quiz;
@@ -15,6 +17,7 @@ use App\Models\QuizAttempt;
 use App\Models\Result;
 use App\Models\TeacherAction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -56,10 +59,37 @@ class DashboardController extends Controller
 
         $totalStudents = $assignedClasses->sum('students_count');
 
-        // ── Submission stats ─────────────────────────────────────────
-        $totalResults = Result::where('uploaded_by', $teacher->id)->count();
-        $totalAssignments = Assignment::where('uploaded_by', $teacher->id)->count();
-        $totalNotices = Notice::where('created_by', $teacher->id)->count();
+        // ── Submission stats (cached 5 min) ──────────────────────────
+        $statsCacheKey = "school:{$school->id}:teacher:{$teacher->id}:dashboard:stats";
+        $stats = Cache::remember($statsCacheKey, now()->addMinutes(5), function () use ($teacher, $classIds): array {
+            return [
+                'totalResults' => Result::where('uploaded_by', $teacher->id)->count(),
+                'totalAssignments' => Assignment::where('uploaded_by', $teacher->id)->count(),
+                'totalNotices' => Notice::where('created_by', $teacher->id)->count(),
+                'publishedQuizzes' => Quiz::whereIn('class_id', $classIds)->where('created_by', $teacher->id)->where('is_published', true)->count(),
+                'publishedGames' => Game::whereIn('class_id', $classIds)->where('created_by', $teacher->id)->where('is_published', true)->count(),
+                'quizAttempts' => QuizAttempt::whereHas('quiz', fn ($q) => $q->whereIn('class_id', $classIds)->where('created_by', $teacher->id))->whereIn('status', ['submitted', 'timed_out'])->count(),
+                'avgQuizScore' => QuizAttempt::whereHas('quiz', fn ($q) => $q->whereIn('class_id', $classIds)->where('created_by', $teacher->id))->whereIn('status', ['submitted', 'timed_out'])->avg('percentage'),
+                'publishedCbtExams' => Exam::whereIn('class_id', $classIds)->where('is_published', true)->forCategory('exam')->count(),
+                'publishedAssessments' => Exam::whereIn('class_id', $classIds)->where('is_published', true)->forCategory('assessment')->count(),
+                'publishedCbtAssignments' => Exam::whereIn('class_id', $classIds)->where('is_published', true)->forCategory('assignment')->count(),
+                'cbtAttempts' => ExamAttempt::whereHas('exam', fn ($q) => $q->whereIn('class_id', $classIds))->whereIn('status', ['submitted', 'timed_out'])->count(),
+                'avgCbtScore' => ExamAttempt::whereHas('exam', fn ($q) => $q->whereIn('class_id', $classIds))->whereIn('status', ['submitted', 'timed_out'])->avg('percentage'),
+            ];
+        });
+
+        $totalResults = $stats['totalResults'];
+        $totalAssignments = $stats['totalAssignments'];
+        $totalNotices = $stats['totalNotices'];
+        $publishedQuizzes = $stats['publishedQuizzes'];
+        $publishedGames = $stats['publishedGames'];
+        $quizAttempts = $stats['quizAttempts'];
+        $avgQuizScore = $stats['avgQuizScore'];
+        $publishedCbtExams = $stats['publishedCbtExams'];
+        $publishedAssessments = $stats['publishedAssessments'];
+        $publishedCbtAssignments = $stats['publishedCbtAssignments'];
+        $cbtAttempts = $stats['cbtAttempts'];
+        $avgCbtScore = $stats['avgCbtScore'];
 
         $pendingCount = TeacherAction::where('teacher_id', $teacher->id)
             ->where('status', 'pending')
@@ -128,13 +158,11 @@ class DashboardController extends Controller
             ->where('is_published', true)
             ->count();
 
-        $quizAttempts = QuizAttempt::whereHas('quiz', fn ($q) => $q->whereIn('class_id', $classIds)->where('created_by', $teacher->id))
-            ->whereIn('status', ['submitted', 'timed_out'])
-            ->count();
+        // ── Quiz & Game stats ────────────────────────────────────────
+        // (now covered by the cached $stats block above)
 
-        $avgQuizScore = QuizAttempt::whereHas('quiz', fn ($q) => $q->whereIn('class_id', $classIds)->where('created_by', $teacher->id))
-            ->whereIn('status', ['submitted', 'timed_out'])
-            ->avg('percentage');
+        // ── CBT Exam/Assessment/Assignment stats ─────────────────────
+        // (now covered by the cached $stats block above)
 
         // ── AI credits remaining (level allocation or school pool) ───
         $aiCreditsRemaining = $school->aiCreditsBalance();
@@ -170,6 +198,8 @@ class DashboardController extends Controller
             'rejectedSubmissions', 'recentSubmissions',
             'resultsProgress', 'assignmentsCoverage', 'weeksPerTerm',
             'publishedQuizzes', 'publishedGames', 'quizAttempts', 'avgQuizScore',
+            'publishedCbtExams', 'publishedAssessments', 'publishedCbtAssignments',
+            'cbtAttempts', 'avgCbtScore',
             'aiCreditsRemaining', 'aiCreditsLabel',
             'upcomingDeadlines',
         ));
