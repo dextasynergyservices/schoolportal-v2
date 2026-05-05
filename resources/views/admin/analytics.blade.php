@@ -143,6 +143,15 @@
         </div>
 
         @if (($tab ?? 'overview') === 'overview')
+        {{-- ── AI Key Insights card ──────────────────────────────── --}}
+        @if ($currentSession && $currentTerm)
+        <livewire:admin.ai-narrative
+            :session-id="$currentSession->id"
+            :term-id="$currentTerm->id"
+            lazy
+        />
+        @endif
+
         {{-- ── Snapshot Cards ─────────────────────────────────────── --}}
         <section aria-label="{{ __('Snapshot metrics') }}">
             <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
@@ -340,7 +349,7 @@
                     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($classOccupancy as $cls)
                             @php
-                                $occupancyPercent = $cls->capacity > 0 ? round(($cls->students_count / $cls->capacity) * 100) : 0;
+                                $occupancyPercent = $cls['capacity'] > 0 ? round(($cls['students_count'] / $cls['capacity']) * 100) : 0;
                                 $isFull = $occupancyPercent >= 100;
                                 $isNearFull = $occupancyPercent >= 85;
                                 $barColor = $isFull ? 'from-red-500 to-red-400' : ($isNearFull ? 'from-amber-500 to-amber-400' : 'from-emerald-500 to-emerald-400');
@@ -349,11 +358,11 @@
                                  class="rounded-xl border border-zinc-100 dark:border-zinc-700/50 p-3.5 hover:border-zinc-200 dark:hover:border-zinc-600 transition-colors">
                                 <div class="flex items-center justify-between mb-2">
                                     <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-zinc-900 dark:text-white truncate">{{ $cls->name }}</p>
-                                        <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $cls->level?->name }}</p>
+                                        <p class="text-sm font-semibold text-zinc-900 dark:text-white truncate">{{ $cls['name'] }}</p>
+                                        <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $cls['level_name'] }}</p>
                                     </div>
                                     <span class="text-sm font-bold shrink-0 {{ $isFull ? 'text-red-600 dark:text-red-400' : ($isNearFull ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">
-                                        {{ $cls->students_count }}/{{ $cls->capacity }}
+                                        {{ $cls['students_count'] }}/{{ $cls['capacity'] }}
                                     </span>
                                 </div>
                                 <div class="occupancy-bar bg-zinc-100 dark:bg-zinc-700/50">
@@ -362,9 +371,9 @@
                                 @if ($isFull)
                                     <p class="text-xs font-medium text-red-600 dark:text-red-400 mt-1.5">{{ __('At capacity') }}</p>
                                 @elseif ($isNearFull)
-                                    <p class="text-xs text-amber-600 dark:text-amber-400 mt-1.5">{{ $cls->capacity - $cls->students_count }} {{ __('spots left') }}</p>
+                                    <p class="text-xs text-amber-600 dark:text-amber-400 mt-1.5">{{ $cls['capacity'] - $cls['students_count'] }} {{ __('spots left') }}</p>
                                 @else
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">{{ $cls->capacity - $cls->students_count }} {{ __('spots available') }}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">{{ $cls['capacity'] - $cls['students_count'] }} {{ __('spots available') }}</p>
                                 @endif
                             </div>
                         @endforeach
@@ -515,26 +524,26 @@
                                     <tr x-show="{{ $loop->index }} >= (page - 1) * perPage && {{ $loop->index }} < page * perPage" class="login-row">
                                         <td class="px-4 py-3">
                                             <div class="flex items-center gap-2.5">
-                                                @if ($login->avatar_url)
-                                                    <img src="{{ $login->avatar_url }}" alt="" class="w-8 h-8 rounded-full object-cover shrink-0">
+                                                @if ($login['avatar_url'])
+                                                    <img src="{{ $login['avatar_thumb_url'] }}" alt="" class="w-8 h-8 rounded-full object-cover shrink-0">
                                                 @else
                                                     <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                                        {{ strtoupper(substr($login->name, 0, 1)) }}
+                                                        {{ strtoupper(substr($login['name'], 0, 1)) }}
                                                     </div>
                                                 @endif
-                                                <span class="font-medium text-zinc-900 dark:text-white">{{ $login->name }}</span>
+                                                <span class="font-medium text-zinc-900 dark:text-white">{{ $login['name'] }}</span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 hidden sm:table-cell">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                                                @if($login->role === 'school_admin') bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300
-                                                @elseif($login->role === 'teacher') bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300
+                                                @if($login['role'] === 'school_admin') bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300
+                                                @elseif($login['role'] === 'teacher') bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300
                                                 @else bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 @endif">
-                                                {{ ucfirst(str_replace('_', ' ', $login->role)) }}
+                                                {{ ucfirst(str_replace('_', ' ', $login['role'])) }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{{ $login->last_login_at->diffForHumans() }}</td>
-                                        <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-mono text-xs hidden md:table-cell">{{ $login->last_login_ip ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{{ \Carbon\Carbon::parse($login['last_login_at'])->diffForHumans() }}</td>
+                                        <td class="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-mono text-xs hidden md:table-cell">{{ $login['last_login_ip'] ?? '—' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

@@ -13,8 +13,17 @@
                 <p class="text-sm text-indigo-600 dark:text-indigo-400 font-medium mb-4">{{ $exam->subject->name }}</p>
             @endif
 
-            @if ($attempt->status === 'grading')
-                {{-- Partial score - awaiting manual grading --}}
+            @if ($attempt->status === 'submitted' || $attempt->status === 'timed_out' && $attempt->score === null)
+                {{-- Job dispatched but not yet processed by the queue worker --}}
+                <div class="text-4xl sm:text-5xl font-bold text-zinc-400">--</div>
+                <div class="text-sm text-zinc-500 mt-2">
+                    <flux:badge color="zinc" size="sm">{{ __('Grading in Progress') }}</flux:badge>
+                </div>
+                <p class="text-xs text-zinc-500 mt-2">
+                    {{ __('Your answers have been submitted. Results will appear shortly — please refresh this page in a moment.') }}
+                </p>
+            @elseif ($attempt->status === 'grading')
+                {{-- Partial score - awaiting manual grading for theory questions --}}
                 <div class="text-4xl sm:text-5xl font-bold text-amber-600">
                     {{ $attempt->score ?? '?' }}/{{ $attempt->total_points }}
                 </div>

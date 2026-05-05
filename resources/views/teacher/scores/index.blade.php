@@ -1,7 +1,11 @@
+{{-- Teacher Gradebook — all logic handled by the Livewire component below --}}
 <x-layouts::app :title="__('Score Entry')">
-    <div class="space-y-6" x-data="scoreGrid()">
+    <div class="space-y-6">
         <x-score-workflow-steps current="scores" />
 
+        @livewire('admin.gradebook', ['role' => 'teacher'])
+
+        <div style="display:none" aria-hidden="true">{{-- deprecated: old score form replaced by Livewire above --}}
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ __('Score Entry') }}</h1>
@@ -243,6 +247,7 @@
                 <p class="text-sm text-zinc-500">{{ __('Select a class to view scores.') }}</p>
             </div>
         @endif
+        </div>{{-- /deprecated --}}
     </div>
 
     @push('scripts')

@@ -11,7 +11,17 @@
 
     @include('partials.announcement-banners')
 
-    <div class="flex flex-col gap-6" x-data x-on:dashboard-updated.window="setTimeout(() => location.reload(), 150)">
+    <div class="flex flex-col gap-6"
+        x-data="{
+            widgetMap: @js($widgetOrder),
+            updateWidgets(widgets) {
+                const map = {};
+                widgets.forEach((w, i) => { map[w.id] = { order: i, visible: w.visible }; });
+                this.widgetMap = map;
+            }
+        }"
+        x-on:dashboard-updated.window="updateWidgets($event.detail.widgets)"
+    >
         {{-- ── Welcome Banner ─────────────────────────────────────── --}}
         <div class="dash-welcome dash-welcome-admin dash-animate" role="banner">
             <div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -54,8 +64,11 @@
         ])
 
         {{-- ── Alerts ─────────────────────────────────────────────── --}}
-        @if (($widgetOrder['alerts']['visible'] ?? true) && $unassignedTeachers->isNotEmpty())
-            <div style="order: {{ $widgetOrder['alerts']['order'] ?? 0 }}">
+        @if ($unassignedTeachers->isNotEmpty())
+            <div
+                :style="'order: ' + (widgetMap.alerts?.order ?? 0)"
+                :class="{ 'hidden': !(widgetMap.alerts?.visible ?? true) }"
+            >
             <div class="dash-alert dash-alert-amber dash-animate dash-animate-delay-1" role="alert" aria-label="{{ __('Unassigned teachers alert') }}">
                 <flux:icon.exclamation-triangle class="w-5 h-5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div class="min-w-0 flex-1">
@@ -75,10 +88,14 @@
         @endif
 
         {{-- ── Primary Stats ──────────────────────────────────────── --}}
-        <div style="order: {{ $widgetOrder['primary_stats']['order'] ?? 1 }}" @class(['hidden' => !($widgetOrder['primary_stats']['visible'] ?? true)])>
+        <div
+            :style="'order: ' + (widgetMap.primary_stats?.order ?? 1)"
+            :class="{ 'hidden': !(widgetMap.primary_stats?.visible ?? true) }"
+        >
         <section aria-label="{{ __('School statistics') }}">
             <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                <div class="stat-card stat-card-blue dash-animate dash-animate-delay-1" data-test="stat-students">
+                <div class="stat-card stat-card-blue dash-animate dash-animate-delay-1" data-test="stat-students" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 700)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-blue-500/15">
                             <flux:icon.academic-cap class="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -95,7 +112,8 @@
                     </div>
                 </div>
 
-                <div class="stat-card stat-card-emerald dash-animate dash-animate-delay-2" data-test="stat-teachers">
+                <div class="stat-card stat-card-emerald dash-animate dash-animate-delay-2" data-test="stat-teachers" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 850)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-emerald-500/15">
                             <flux:icon.user-group class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -112,7 +130,8 @@
                     @endif
                 </div>
 
-                <div class="stat-card stat-card-purple dash-animate dash-animate-delay-3" data-test="stat-parents">
+                <div class="stat-card stat-card-purple dash-animate dash-animate-delay-3" data-test="stat-parents" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 1000)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-purple-500/15">
                             <flux:icon.users class="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -124,7 +143,8 @@
                     </div>
                 </div>
 
-                <div class="stat-card stat-card-amber dash-animate dash-animate-delay-4" data-test="stat-classes">
+                <div class="stat-card stat-card-amber dash-animate dash-animate-delay-4" data-test="stat-classes" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 1150)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-amber-500/15">
                             <flux:icon.building-library class="w-5 h-5 text-amber-600 dark:text-amber-400" />
@@ -140,7 +160,10 @@
         </div>
 
         {{-- ── Term Stats Row ─────────────────────────────────────── --}}
-        <div style="order: {{ $widgetOrder['term_stats']['order'] ?? 2 }}" @class(['hidden' => !($widgetOrder['term_stats']['visible'] ?? true)])>
+        <div
+            :style="'order: ' + (widgetMap.term_stats?.order ?? 2)"
+            :class="{ 'hidden': !(widgetMap.term_stats?.visible ?? true) }"
+        >
         <section aria-label="{{ __('Term statistics') }}">
             <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                 <div class="stat-card stat-card-indigo dash-animate dash-animate-delay-2">
@@ -201,7 +224,10 @@
         </div>
 
         {{-- ── CBT Stats Row ──────────────────────────────────────── --}}
-        <div style="order: {{ $widgetOrder['term_stats']['order'] ?? 2 }}" @class(['hidden' => !($widgetOrder['term_stats']['visible'] ?? true)])>
+        <div
+            :style="'order: ' + (widgetMap.term_stats?.order ?? 2)"
+            :class="{ 'hidden': !(widgetMap.term_stats?.visible ?? true) }"
+        >
         <section aria-label="{{ __('CBT statistics') }}">
             <div class="grid grid-cols-1 gap-3 sm:gap-4">
                 <a href="{{ route('admin.exams.index') }}" wire:navigate class="stat-card dash-animate dash-animate-delay-3 block" style="border-left-color: #6366f1;">
@@ -221,7 +247,10 @@
         </div>
 
         {{-- ── Quick Actions ──────────────────────────────────────── --}}
-        <div style="order: {{ $widgetOrder['quick_actions']['order'] ?? 3 }}" @class(['hidden' => !($widgetOrder['quick_actions']['visible'] ?? true)])>
+        <div
+            :style="'order: ' + (widgetMap.quick_actions?.order ?? 3)"
+            :class="{ 'hidden': !(widgetMap.quick_actions?.visible ?? true) }"
+        >
         <section aria-labelledby="quick-actions-heading" class="dash-animate dash-animate-delay-3">
             <h2 id="quick-actions-heading" class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Quick Actions') }}</h2>
             <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8">
@@ -278,7 +307,10 @@
         </div>
 
         {{-- ── Pending Approvals + Recent Activity ────────────────── --}}
-        <div style="order: {{ $widgetOrder['approvals_activity']['order'] ?? 4 }}" @class(['hidden' => !($widgetOrder['approvals_activity']['visible'] ?? true)])>
+        <div
+            :style="'order: ' + (widgetMap.approvals_activity?.order ?? 4)"
+            :class="{ 'hidden': !(widgetMap.approvals_activity?.visible ?? true) }"
+        >
         <div x-data="{ open: window.innerWidth >= 768 }" x-init="window.addEventListener('resize', () => { if (window.innerWidth >= 768) open = true })" class="dash-animate dash-animate-delay-5">
             <button @click="open = !open" class="flex items-center justify-between w-full text-left md:hidden mb-3">
                 <div class="flex items-center gap-2">
@@ -307,7 +339,7 @@
                     @forelse ($pendingApprovals as $action)
                         <div class="activity-item">
                             @if ($action->teacher?->avatar_url)
-                                <img src="{{ $action->teacher->avatar_url }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
+                                <img src="{{ $action->teacher->avatarTableUrl() }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
                             @else
                                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                                     {{ $action->teacher ? strtoupper(substr($action->teacher->name, 0, 1)) : '?' }}
@@ -341,7 +373,7 @@
                     @forelse ($recentActivity as $log)
                         <div class="activity-item">
                             @if ($log->user?->avatar_url)
-                                <img src="{{ $log->user->avatar_url }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
+                                <img src="{{ $log->user->avatarTableUrl() }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
                             @elseif ($log->user)
                                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-600 ring-1 ring-zinc-300 dark:ring-zinc-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
                                     {{ strtoupper(substr($log->user->name, 0, 1)) }}
@@ -379,7 +411,10 @@
         </div>
 
         {{-- ── Analytics Link ─────────────────────────────────────── --}}
-        <div style="order: {{ $widgetOrder['analytics_link']['order'] ?? 5 }}" @class(['hidden' => !($widgetOrder['analytics_link']['visible'] ?? true)])>
+        <div
+            :style="'order: ' + (widgetMap.analytics_link?.order ?? 5)"
+            :class="{ 'hidden': !(widgetMap.analytics_link?.visible ?? true) }"
+        >
         <div class="text-center dash-animate dash-animate-delay-5">
             <a href="{{ route('admin.analytics') }}" wire:navigate class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:shadow-sm">
                 <flux:icon.chart-bar-square class="w-4 h-4" />

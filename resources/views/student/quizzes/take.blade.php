@@ -42,6 +42,19 @@
             </div>
         </div>
 
+        {{-- 📶 Offline queued-submit banner --}}
+        <div x-show="offlineSubmitQueued" x-cloak
+             class="mt-3 flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
+             role="alert" aria-live="assertive">
+            <svg class="size-5 shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.584 10.587a2 2 0 0 0 2.828 2.83m5.145 5.145A9.955 9.955 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.106.654-4.062 1.77-5.672m3.144-2.65A9.956 9.956 0 0 1 12 2c5.523 0 10 4.477 10 10 0 2.107-.655 4.063-1.77 5.673"/>
+            </svg>
+            <div>
+                <p class="font-semibold">{{ __("You're offline — submission queued") }}</p>
+                <p class="mt-0.5 text-xs opacity-80">{{ __('Your answers are saved on this device. The quiz will submit automatically when your connection is restored.') }}</p>
+            </div>
+        </div>
+
         {{-- Questions --}}
         @foreach ($questions as $index => $question)
             <div x-show="currentIndex === {{ $index }}" x-cloak
@@ -145,13 +158,17 @@
                             </p>
                         </div>
 
-                        <form method="POST" action="{{ route('student.quizzes.submit', $attempt) }}" id="submitForm" @submit="injectAnswers()" class="flex justify-end gap-2">
+                        <form method="POST" action="{{ route('student.quizzes.submit', $attempt) }}" id="submitForm" @submit.prevent="handleSubmit()" class="flex justify-end gap-2">
                             @csrf
                             <flux:modal.close>
                                 <flux:button type="button" variant="ghost">{{ __('Keep Reviewing') }}</flux:button>
                             </flux:modal.close>
-                            <flux:button type="submit" variant="primary" icon="paper-airplane">
-                                {{ __('Submit Now') }}
+                            <flux:button type="submit" variant="primary" icon="paper-airplane" :disabled="!isOnline">
+                                <span x-show="isOnline">{{ __('Submit Now') }}</span>
+                                <span x-show="!isOnline" class="flex items-center gap-1.5">
+                                    <svg class="size-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.584 10.587a2 2 0 0 0 2.828 2.83m5.145 5.145A9.955 9.955 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.106.654-4.062 1.77-5.672m3.144-2.65A9.956 9.956 0 0 1 12 2c5.523 0 10 4.477 10 10 0 2.107-.655 4.063-1.77 5.673"/></svg>
+                                    {{ __('Offline') }}
+                                </span>
                             </flux:button>
                         </form>
                     </div>
@@ -176,6 +193,8 @@
             const initialAnswers = @json($answers);
             const totalQuestions = {{ $questions->count() }};
             const timeLimit = {{ $remainingSeconds ?? 'null' }};
+            const attemptId = '{{ $attempt->id }}';
+            const draftKey = 'quiz_draft_' + attemptId;
 
             // Convert answers object: {question_id: selected_answer}
             const answeredQuestions = {};
@@ -183,12 +202,23 @@
                 answeredQuestions[qId] = answer;
             }
 
+            // Restore locally-saved draft (covers refresh after network drop)
+            try {
+                const saved = localStorage.getItem(draftKey);
+                if (saved) {
+                    const draft = JSON.parse(saved);
+                    Object.assign(answeredQuestions, draft);
+                }
+            } catch (e) {}
+
             return {
                 currentIndex: 0,
                 totalQuestions,
                 answeredQuestions,
                 timeRemaining: timeLimit,
                 timerInterval: null,
+                offlineSubmitQueued: false,
+                isOnline: navigator.onLine,
 
                 get answeredCount() {
                     return Object.values(this.answeredQuestions).filter(a => a !== null && a !== '').length;
@@ -198,6 +228,18 @@
                     if (this.timeRemaining !== null) {
                         this.startTimer();
                     }
+
+                    // Offline: track connectivity and auto-submit on reconnect
+                    this._offlineHandler = () => { this.isOnline = false; };
+                    this._onlineHandler = () => {
+                        this.isOnline = true;
+                        if (this.offlineSubmitQueued) {
+                            this.offlineSubmitQueued = false;
+                            this._doFinalSubmit();
+                        }
+                    };
+                    window.addEventListener('offline', this._offlineHandler);
+                    window.addEventListener('online', this._onlineHandler);
                 },
 
                 startTimer() {
@@ -225,9 +267,32 @@
                     }
                 },
 
+                handleSubmit() {
+                    if (!navigator.onLine) {
+                        this.offlineSubmitQueued = true;
+                        return;
+                    }
+                    this._doFinalSubmit();
+                },
+
                 forceSubmit() {
+                    if (!navigator.onLine) {
+                        this.offlineSubmitQueued = true;
+                        return;
+                    }
+                    this._doFinalSubmit();
+                },
+
+                _doFinalSubmit() {
+                    try { localStorage.removeItem(draftKey); } catch (e) {}
                     this.injectAnswers();
                     document.getElementById('submitForm').submit();
+                },
+
+                destroy() {
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this._offlineHandler) window.removeEventListener('offline', this._offlineHandler);
+                    if (this._onlineHandler) window.removeEventListener('online', this._onlineHandler);
                 },
 
                 formatTime(seconds) {
@@ -240,7 +305,10 @@
 
                 selectAnswer(questionId, answer) {
                     this.answeredQuestions[questionId] = answer;
+                    // Persist draft locally — survives a page reload if network drops
+                    try { localStorage.setItem(draftKey, JSON.stringify(this.answeredQuestions)); } catch (e) {}
                     // Save answer via form submission in background
+                    if (!navigator.onLine) return; // localStorage draft covers this
                     const form = document.getElementById('answerForm_' + questionId);
                     if (form) {
                         const input = form.querySelector('input[name="selected_answer"]');

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Jobs\GradeExamAttempt;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\StudentProfile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -14,9 +16,69 @@ class ExamMonitor extends Component
 {
     public Exam $exam;
 
+    /** Number of tab switches that marks a student as suspicious. */
+    public int $maxTabSwitchWarning = 3;
+
     public function mount(Exam $exam): void
     {
         $this->exam = $exam->load(['class:id,name', 'subject:id,name']);
+        $this->maxTabSwitchWarning = $exam->max_tab_switches ?? 3;
+    }
+
+    /**
+     * Force-end the exam for a single in-progress student.
+     * Marks the attempt as timed_out and dispatches grading.
+     */
+    public function forceEnd(int $studentId): void
+    {
+        $attempt = ExamAttempt::where('exam_id', $this->exam->id)
+            ->where('student_id', $studentId)
+            ->where('status', 'in_progress')
+            ->first();
+
+        if (! $attempt) {
+            return;
+        }
+
+        DB::transaction(function () use ($attempt): void {
+            $elapsed = $this->exam->time_limit_minutes
+                ? $this->exam->time_limit_minutes * 60
+                : (int) $attempt->started_at->diffInSeconds(now());
+
+            $attempt->update([
+                'submitted_at' => now(),
+                'time_spent_seconds' => $elapsed,
+                'status' => 'timed_out',
+            ]);
+        });
+
+        GradeExamAttempt::dispatch($attempt);
+    }
+
+    /**
+     * Force-end the exam for ALL currently in-progress students.
+     */
+    public function forceEndAll(): void
+    {
+        $attempts = ExamAttempt::where('exam_id', $this->exam->id)
+            ->where('status', 'in_progress')
+            ->get();
+
+        foreach ($attempts as $attempt) {
+            DB::transaction(function () use ($attempt): void {
+                $elapsed = $this->exam->time_limit_minutes
+                    ? $this->exam->time_limit_minutes * 60
+                    : (int) $attempt->started_at->diffInSeconds(now());
+
+                $attempt->update([
+                    'submitted_at' => now(),
+                    'time_spent_seconds' => $elapsed,
+                    'status' => 'timed_out',
+                ]);
+            });
+
+            GradeExamAttempt::dispatch($attempt);
+        }
     }
 
     public function render(): View
@@ -51,6 +113,7 @@ class ExamMonitor extends Component
                 'tab_switches' => $attempt?->tab_switches ?? 0,
                 'answered_count' => $attempt ? $attempt->answers()->whereNotNull('selected_answer')->count() : 0,
                 'attempt_status' => $attempt?->status,
+                'flagged' => ($attempt?->tab_switches ?? 0) > $this->maxTabSwitchWarning,
             ];
         })->sortBy('name')->values();
 

@@ -27,6 +27,7 @@ class ExamAttempt extends Model
         'time_spent_seconds',
         'status',
         'tab_switches',
+        'ip_address',
     ];
 
     protected function casts(): array

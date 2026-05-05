@@ -1,7 +1,22 @@
 <x-layouts::app :title="$student->name">
     <div class="space-y-6">
         <x-admin-header :title="$student->name">
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
+                {{-- Export dropdown --}}
+                <flux:dropdown>
+                    <flux:button variant="subtle" size="sm" icon="arrow-down-tray">{{ __('Export') }}</flux:button>
+                    <flux:navmenu>
+                        <flux:navmenu.item :href="route('admin.students.full-profile-export', $student)" icon="user">{{ __('Full Profile (CSV)') }}</flux:navmenu.item>
+                        <flux:navmenu.item :href="route('admin.students.academic-records-export', $student)" icon="academic-cap">{{ __('Academic Records (CSV)') }}</flux:navmenu.item>
+                    </flux:navmenu>
+                </flux:dropdown>
+
+                @if (! $student->is_anonymized)
+                    <flux:modal.trigger name="anonymize-student">
+                        <flux:button variant="subtle" size="sm" icon="trash">{{ __('Anonymize') }}</flux:button>
+                    </flux:modal.trigger>
+                @endif
+
                 @if ($student->is_active)
                     @if ($student->studentProfile?->class && $siblingClasses->isNotEmpty())
                         <flux:modal.trigger name="transfer-class">
@@ -59,6 +74,26 @@
             </flux:modal>
         @endif
 
+        {{-- Anonymize modal --}}
+        @if (! $student->is_anonymized)
+            <flux:modal name="anonymize-student" class="max-w-md">
+                <form method="POST" action="{{ route('admin.students.anonymize', $student) }}" class="space-y-4">
+                    @csrf
+                    <div>
+                        <flux:heading size="lg">{{ __('Anonymize :name', ['name' => $student->name]) }}</flux:heading>
+                        <flux:text class="mt-2 text-red-600 dark:text-red-400 font-medium">{{ __('⚠️ This action is irreversible.') }}</flux:text>
+                        <flux:text class="mt-1">{{ __('All personal data (name, contact info, photo, medical notes, etc.) will be permanently erased and replaced with anonymous placeholders. The account will be deactivated. Quiz scores and term reports are retained in anonymous form.') }}</flux:text>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.close>
+                        <flux:button type="submit" variant="danger">{{ __('Anonymize Permanently') }}</flux:button>
+                    </div>
+                </form>
+            </flux:modal>
+        @endif
+
         {{-- Transfer Class modal --}}
         @if ($student->is_active && $student->studentProfile?->class && $siblingClasses->isNotEmpty())
             <flux:modal name="transfer-class" class="max-w-md">
@@ -92,7 +127,7 @@
             {{-- Profile Card --}}
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
                 <div class="flex items-center gap-4 mb-6">
-                    <flux:avatar size="lg" :src="$student->avatar_url" :name="$student->name" />
+                    <flux:avatar size="lg" :src="$student->avatarProfileUrl()" :name="$student->name" />
                     <div>
                         <flux:heading size="lg">{{ $student->name }}</flux:heading>
                         <flux:text class="text-zinc-500">{{ '@' . $student->username }}</flux:text>

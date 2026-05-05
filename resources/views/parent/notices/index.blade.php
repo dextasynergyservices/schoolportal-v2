@@ -9,7 +9,7 @@
                     @if ($notice->image_url)
                         <div class="aspect-video w-full overflow-hidden bg-zinc-100 dark:bg-zinc-700">
                             <img
-                                src="{{ $notice->image_url }}"
+                                src="{{ $notice->imageCardUrl() }}"
                                 alt="{{ $notice->title }}"
                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 loading="lazy"

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ImportStudentsCsvJob;
 use App\Rules\SafeCsvFile;
 use App\Services\CsvImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -88,6 +90,10 @@ class StudentImportController extends Controller
 
     /**
      * Import the validated students.
+     *
+     * Dispatches an async job so large imports do not block the HTTP request.
+     * Teacher-scoped class restrictions are passed to the job so they are
+     * re-enforced during processing (mirrors the preview-step validation).
      */
     public function store(Request $request): RedirectResponse
     {
@@ -103,52 +109,21 @@ class StudentImportController extends Controller
                 ->with('error', __('Import file expired. Please upload again.'));
         }
 
-        try {
-            $school = app('current.school');
-            $teacher = auth()->user();
-            $allowedClassIds = $teacher->assignedClasses()->pluck('id')->toArray();
+        $school = app('current.school');
+        $teacher = auth()->user();
+        $allowedClassIds = $teacher->assignedClasses()->pluck('id')->toArray();
+        $importKey = Str::uuid()->toString();
 
-            $result = $this->csvImportService->parseCsv($fullPath, $school->id);
-
-            // Re-validate teacher's class scope
-            foreach ($result['rows'] as &$row) {
-                if ($row['_valid'] && ! empty($row['_class_id']) && ! in_array($row['_class_id'], $allowedClassIds)) {
-                    $row['_valid'] = false;
-                }
-            }
-            unset($row);
-
-            $importResult = $this->csvImportService->importRows($result['rows'], $request->input('default_password'));
-        } catch (\Throwable $e) {
-            @unlink($fullPath);
-
-            return redirect()->route('teacher.students.import')
-                ->with('error', __('Import failed: :message', ['message' => $e->getMessage()]));
-        }
-
-        // Clean up temp file
-        @unlink($fullPath);
-
-        $imported = $importResult['imported'];
-        $skipped = $importResult['skipped'];
-
-        if ($imported === 0 && count($skipped) > 0) {
-            return redirect()->route('teacher.students.import')
-                ->with('error', __('No students were imported. All :count rows were skipped.', ['count' => count($skipped)]))
-                ->with('skipped_students', $skipped);
-        }
-
-        if (count($skipped) > 0) {
-            return redirect()->route('teacher.students.index')
-                ->with('success', __(':imported students imported successfully. :skipped skipped.', [
-                    'imported' => $imported,
-                    'skipped' => count($skipped),
-                ]))
-                ->with('skipped_students', $skipped);
-        }
+        ImportStudentsCsvJob::dispatch(
+            schoolId: $school->id,
+            storagePath: $request->input('temp_path'),
+            defaultPassword: $request->input('default_password'),
+            importKey: $importKey,
+            allowedClassIds: $allowedClassIds,
+        );
 
         return redirect()->route('teacher.students.index')
-            ->with('success', __(':count students imported successfully.', ['count' => $imported]));
+            ->with('success', __('Your student import is processing in the background. New students will appear on this page shortly — refresh in a moment.'));
     }
 
     /**

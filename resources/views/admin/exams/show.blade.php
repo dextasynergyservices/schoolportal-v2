@@ -13,6 +13,7 @@
                 @endif
                 <flux:button href="{{ route($routePrefix . '.analytics', $exam) }}" variant="subtle" icon="chart-bar-square" wire:navigate>{{ __('Analytics') }}</flux:button>
                 <flux:button href="{{ route($routePrefix . '.results', $exam) }}" variant="subtle" icon="clipboard-document-list" wire:navigate>{{ __('Results') }}</flux:button>
+                <flux:button href="{{ route($routePrefix . '.preview', $exam) }}" variant="subtle" icon="eye" wire:navigate>{{ __('Preview as Student') }}</flux:button>
                 <flux:button href="{{ route($routePrefix . '.edit', $exam) }}" variant="subtle" icon="pencil-square" wire:navigate>{{ __('Edit') }}</flux:button>
                 @if ($exam->status === 'approved' && ! $exam->is_published)
                     <form method="POST" action="{{ route($routePrefix . '.publish', $exam) }}" class="inline">

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GradeExamAttempt;
 use App\Models\Exam;
 use App\Models\ExamAnswer;
 use App\Models\ExamAttempt;
@@ -166,6 +167,7 @@ class ExamController extends Controller
                 'attempt_number' => $attemptNumber,
                 'started_at' => now(),
                 'status' => 'in_progress',
+                'ip_address' => request()->ip(),
             ]);
 
             // Pre-create answer slots for all questions
@@ -197,6 +199,12 @@ class ExamController extends Controller
 
         if (! $attempt->isInProgress()) {
             return redirect()->route($this->routePrefix().'.results', $attempt);
+        }
+
+        // IP session lock — prevent resuming from a different IP (e.g. shared device hand-off)
+        if ($attempt->ip_address && $attempt->ip_address !== request()->ip()) {
+            return redirect()->route($this->routePrefix().'.index')
+                ->with('error', __('This exam session is locked to another device. Please contact your teacher.'));
         }
 
         // Check timeout
@@ -355,9 +363,9 @@ class ExamController extends Controller
                 'time_spent_seconds' => $elapsed,
                 'status' => 'submitted',
             ]);
-
-            $this->gradingService->gradeAttempt($attempt);
         });
+
+        GradeExamAttempt::dispatch($attempt);
 
         return redirect()->route($this->routePrefix().'.results', $attempt);
     }
@@ -413,9 +421,9 @@ class ExamController extends Controller
                 'time_spent_seconds' => $elapsed,
                 'status' => 'timed_out',
             ]);
-
-            $this->gradingService->gradeAttempt($attempt);
         });
+
+        GradeExamAttempt::dispatch($attempt);
     }
 
     private function resolveCategory(): ?string

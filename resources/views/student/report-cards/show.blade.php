@@ -1,4 +1,45 @@
 <x-layouts::app :title="__('Report Card — :name', ['name' => $report->student->name ?? 'Student'])">
+
+@push('styles')
+<style>
+@media print {
+    /* Hide navigation chrome and action buttons */
+    flux-sidebar, [data-flux-sidebar], nav[class*="sidebar"],
+    flux-header, header, [data-flux-header],
+    .flux-toast-group, [data-flux-toast-group],
+    a[href*="download"], [data-flux-button],
+    flux-button, [wire\:navigate][href*="back"],
+    [href*="report-cards"]:not([href*="show"]) {
+        display: none !important;
+    }
+
+    /* Remove page chrome — full width content */
+    body { background: white !important; margin: 0 !important; }
+    flux-main, [data-flux-main], main {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    /* Report card container fills the page */
+    .space-y-6 > div:first-child { display: none !important; } /* Hide the back/download bar */
+    .shadow-sm, .shadow, .shadow-lg { box-shadow: none !important; }
+    .rounded-xl, .rounded-2xl { border-radius: 0 !important; }
+
+    /* Preserve colors and backgrounds */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* Ensure table doesn't break across pages awkwardly */
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    thead { display: table-header-group; }
+
+    @page { margin: 1.5cm; size: A4 portrait; }
+}
+</style>
+@endpush
+
     <div class="space-y-6">
         <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -46,7 +87,7 @@
             {{-- School Header --}}
             <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5 text-white text-center">
                 @if ($school->logo_url)
-                    <img src="{{ $school->logo_url }}" alt="{{ $school->name }}" class="mx-auto mb-2 h-16 w-16 rounded-full object-cover border-2 border-white/30">
+                    <img src="{{ $school->logoSmallUrl() }}" alt="{{ $school->name }}" class="mx-auto mb-2 h-16 w-16 rounded-full object-cover border-2 border-white/30">
                 @endif
                 <h2 class="text-xl font-bold uppercase">{{ $school->name }}</h2>
                 <p class="text-sm text-white/80">{{ $school->address ?? '' }}</p>

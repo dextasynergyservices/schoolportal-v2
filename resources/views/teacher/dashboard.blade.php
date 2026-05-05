@@ -69,7 +69,8 @@
         {{-- ── Primary Stats ──────────────────────────────────────── --}}
         <section aria-label="{{ __('Teaching statistics') }}">
             <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                <div class="stat-card stat-card-blue dash-animate dash-animate-delay-1">
+                <div class="stat-card stat-card-blue dash-animate dash-animate-delay-1" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 700)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-blue-500/15">
                             <flux:icon.academic-cap class="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -84,7 +85,8 @@
                     </p>
                 </div>
 
-                <div class="stat-card stat-card-emerald dash-animate dash-animate-delay-2">
+                <div class="stat-card stat-card-emerald dash-animate dash-animate-delay-2" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 850)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-emerald-500/15">
                             <flux:icon.document-text class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -96,7 +98,8 @@
                     </div>
                 </div>
 
-                <div class="stat-card stat-card-purple dash-animate dash-animate-delay-3">
+                <div class="stat-card stat-card-purple dash-animate dash-animate-delay-3" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 1000)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-purple-500/15">
                             <flux:icon.clipboard-document-list class="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -108,7 +111,8 @@
                     </div>
                 </div>
 
-                <div class="stat-card stat-card-amber dash-animate dash-animate-delay-4">
+                <div class="stat-card stat-card-amber dash-animate dash-animate-delay-4" data-stat-loading
+                     x-data x-init="setTimeout(() => $el.removeAttribute('data-stat-loading'), 1150)">
                     <div class="flex items-center gap-3">
                         <div class="stat-icon bg-amber-500/15">
                             <flux:icon.clock class="w-5 h-5 text-amber-600 dark:text-amber-400" />

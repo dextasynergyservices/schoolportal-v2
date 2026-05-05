@@ -16,7 +16,7 @@
                         <div class="flex items-start gap-4 mb-6">
                             <div class="flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 shrink-0">
                                 @if ($student->avatar_url)
-                                    <img src="{{ $student->avatar_url }}" alt="{{ $student->name }}" class="w-16 h-16 rounded-full object-cover">
+                                    <img src="{{ $student->avatarProfileUrl() }}" alt="{{ $student->name }}" class="w-16 h-16 rounded-full object-cover">
                                 @else
                                     <span class="text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ Str::of($student->name)->explode(' ')->map(fn($n) => Str::substr($n, 0, 1))->take(2)->implode('') }}</span>
                                 @endif
@@ -118,6 +118,23 @@
                             <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Quizzes Taken') }}</span>
                             <span class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $quizzesTaken }}</span>
                         </div>
+                    </div>
+                </div>
+
+                {{-- Achievements --}}
+                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                    <div class="border-b border-zinc-200 dark:border-zinc-700 px-5 py-3">
+                        <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Achievements') }}</h3>
+                    </div>
+                    <div class="p-4">
+                        <a href="{{ route('student.achievements') }}"
+                           class="flex items-center justify-between group px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
+                            <div class="flex items-center gap-2.5">
+                                <span class="text-xl leading-none">🏆</span>
+                                <span class="text-sm font-medium text-amber-700 dark:text-amber-400">{{ __('View My Badges') }}</span>
+                            </div>
+                            <svg class="size-4 text-amber-500 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+                        </a>
                     </div>
                 </div>
 

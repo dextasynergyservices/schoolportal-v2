@@ -37,13 +37,19 @@
 
         @if ($available->count())
             <div>
-                <h2 class="text-base font-semibold text-zinc-700 dark:text-zinc-300 mb-3">{{ __('Available') }}</h2>
+                <h2 class="text-base font-semibold text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>{{ __('Ongoing') }}
+                    </span>
+                    <span class="text-sm text-zinc-500 font-normal">{{ __('Currently open — you can take these now') }}</span>
+                </h2>
                 <div class="grid gap-4 sm:grid-cols-2">
                     @foreach ($available as $exam)
                         @php
                             $attemptsDone = $exam->completedAttemptsFor($studentId);
                             $bestAttempt = $exam->bestAttemptForStudent($studentId);
                             $inProgress = $exam->attemptsFor($studentId)->where('status', 'in_progress')->first();
+                            $hasTaken = $attemptsDone > 0;
                             $examRoutePrefix = 'student.exams';
                             $typeColors = ['assessment' => 'sky', 'assignment' => 'amber', 'exam' => 'indigo'];
                             $examTypeLabel = match ($exam->category) {
@@ -52,15 +58,22 @@
                                 default => __('Exam'),
                             };
                         @endphp
-                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
+                        <div class="rounded-lg border {{ $hasTaken ? 'border-emerald-200 dark:border-emerald-800/50' : 'border-zinc-200 dark:border-zinc-700' }} bg-white dark:bg-zinc-800 p-4">
                             <div class="flex items-start justify-between gap-2">
-                                <div class="min-w-0">
+                                <div class="min-w-0 flex-1">
                                     <h3 class="font-semibold text-zinc-900 dark:text-white truncate">{{ $exam->title }}</h3>
                                     @if ($exam->subject)
                                         <p class="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{{ $exam->subject->name }}</p>
                                     @endif
                                 </div>
-                                <flux:badge :color="$typeColors[$exam->category] ?? 'zinc'" size="sm">{{ $examTypeLabel }}</flux:badge>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    @if ($hasTaken)
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                            ✓ {{ __('Taken') }}
+                                        </span>
+                                    @endif
+                                    <flux:badge :color="$typeColors[$exam->category] ?? 'zinc'" size="sm">{{ $examTypeLabel }}</flux:badge>
+                                </div>
                             </div>
 
                             <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">

@@ -94,7 +94,7 @@
                 <div class="relative z-10 animate-fade-in">
                     @if ($school?->logo_url)
                         <a href="{{ route('home') }}" class="inline-flex items-center gap-3 text-white no-underline group">
-                            <img src="{{ $school->logo_url }}" alt="{{ $school->name }}" class="h-10 w-10 rounded-xl object-contain bg-white/10 backdrop-blur-sm p-1 transition-transform group-hover:scale-105" />
+                            <img src="{{ $school->logoSmallUrl() }}" alt="{{ $school->name }}" class="h-10 w-10 rounded-xl object-contain bg-white/10 backdrop-blur-sm p-1 transition-transform group-hover:scale-105" />
                             <span class="text-lg font-bold tracking-tight">{{ $school->name }}</span>
                         </a>
                     @elseif ($school)

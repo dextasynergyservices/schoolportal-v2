@@ -35,7 +35,7 @@
                     <flux:table.row>
                         <flux:table.cell>
                             <div class="flex items-center gap-2">
-                                <flux:avatar size="xs" :src="$teacher->avatar_url" :name="$teacher->name" />
+                                <flux:avatar size="xs" :src="$teacher->avatarTableUrl()" :name="$teacher->name" />
                                 <span class="font-medium">{{ $teacher->name }}</span>
                             </div>
                         </flux:table.cell>

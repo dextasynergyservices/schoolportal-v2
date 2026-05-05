@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Models\School;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class ResolveTenant
@@ -84,10 +85,23 @@ class ResolveTenant
         // Strip www. prefix — schools register bare domains (e.g., portal.double6.store)
         $host = preg_replace('/^www\./', '', $host);
 
-        $school = School::withoutGlobalScopes()
-            ->where('custom_domain', $host)
-            ->where('is_active', true)
-            ->first();
+        // Cache the school ID for 60 seconds per domain to avoid a full-table scan on
+        // every unauthenticated request (login page, asset fallbacks, API probes, etc.).
+        // We store only the ID — the school row is always re-fetched so is_active stays
+        // fresh. A deactivated school (cached ID) will fail the second query and fall
+        // through to the platform-domain check, returning a 404 after at most 60 s.
+        $schoolId = Cache::remember(
+            'tenant.domain.'.md5($host),
+            60,
+            fn (): ?int => School::withoutGlobalScopes()
+                ->where('custom_domain', $host)
+                ->where('is_active', true)
+                ->value('id')
+        );
+
+        $school = $schoolId
+            ? School::withoutGlobalScopes()->where('id', $schoolId)->where('is_active', true)->first()
+            : null;
 
         if ($school) {
             $this->bindSchool($school);

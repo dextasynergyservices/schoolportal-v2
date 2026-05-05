@@ -12,6 +12,8 @@ use App\Services\FileUploadService;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class NoticeController extends Controller
@@ -52,9 +54,24 @@ class NoticeController extends Controller
         unset($validated['file']);
 
         $fileData = [];
+        $uploadedPublicId = null;
+
         if ($request->hasFile('file')) {
             $schoolId = app('current.school')->id;
-            $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $schoolId);
+
+            try {
+                $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $schoolId);
+            } catch (\Throwable $e) {
+                Log::error('Notice file Cloudinary upload failed', [
+                    'school_id' => $schoolId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->withInput()
+                    ->with('error', __('File upload failed. Please try again.'));
+            }
+
+            $uploadedPublicId = $uploaded['public_id'];
             $fileData = [
                 'file_url' => $uploaded['url'],
                 'file_public_id' => $uploaded['public_id'],
@@ -62,13 +79,32 @@ class NoticeController extends Controller
             ];
         }
 
-        $notice = Notice::create([
-            ...$validated,
-            ...$fileData,
-            'created_by' => auth()->id(),
-            'published_at' => ($validated['is_published'] ?? false) ? now() : null,
-            'status' => 'approved',
-        ]);
+        try {
+            $notice = DB::transaction(function () use ($validated, $fileData) {
+                return Notice::create([
+                    ...$validated,
+                    ...$fileData,
+                    'created_by' => auth()->id(),
+                    'published_at' => ($validated['is_published'] ?? false) ? now() : null,
+                    'status' => 'approved',
+                ]);
+            });
+        } catch (\Throwable $e) {
+            if ($uploadedPublicId) {
+                try {
+                    $uploadService->delete($uploadedPublicId);
+                } catch (\Throwable) {
+                    // Best-effort cleanup
+                }
+            }
+
+            Log::error('Notice DB save failed after Cloudinary upload', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->withInput()
+                ->with('error', __('Failed to save notice. The uploaded file has been removed. Please try again.'));
+        }
 
         if ($notice->is_published) {
             app(NotificationService::class)->notifyNoticePublished($notice);
@@ -112,22 +148,35 @@ class NoticeController extends Controller
             $validated['published_at'] = now();
         }
 
-        // Handle file upload
+        $oldFilePublicId = null;
+        $newFilePublicId = null;
+
+        // Handle file upload: upload new file first, defer old-file deletion until after DB succeeds
         if ($request->hasFile('file')) {
-            // Delete old file from Cloudinary
-            if ($notice->file_public_id) {
-                $uploadService->delete($notice->file_public_id);
-            }
             $schoolId = app('current.school')->id;
-            $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $schoolId);
+
+            try {
+                $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $schoolId);
+            } catch (\Throwable $e) {
+                Log::error('Notice file Cloudinary upload failed during update', [
+                    'notice_id' => $notice->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->withInput()
+                    ->with('error', __('File upload failed. Please try again.'));
+            }
+
+            $newFilePublicId = $uploaded['public_id'];
+            $oldFilePublicId = $notice->file_public_id;
             $validated['file_url'] = $uploaded['url'];
             $validated['file_public_id'] = $uploaded['public_id'];
             $validated['file_name'] = $request->file('file')->getClientOriginalName();
         }
 
-        // Handle file removal
+        // Handle file removal: defer Cloudinary deletion until after DB succeeds
         if ($request->boolean('remove_file') && $notice->file_public_id) {
-            $uploadService->delete($notice->file_public_id);
+            $oldFilePublicId = $notice->file_public_id;
             $validated['file_url'] = null;
             $validated['file_public_id'] = null;
             $validated['file_name'] = null;
@@ -135,7 +184,38 @@ class NoticeController extends Controller
 
         $wasPublished = $notice->is_published;
 
-        $notice->update($validated);
+        try {
+            $notice->update($validated);
+        } catch (\Throwable $e) {
+            // DB failed — clean up any newly uploaded file to avoid orphan
+            if ($newFilePublicId) {
+                try {
+                    $uploadService->delete($newFilePublicId);
+                } catch (\Throwable) {
+                    // Best-effort cleanup
+                }
+            }
+
+            Log::error('Notice DB update failed', [
+                'notice_id' => $notice->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->withInput()
+                ->with('error', __('Failed to update notice. Please try again.'));
+        }
+
+        // DB succeeded — now safe to remove the old Cloudinary file
+        if ($oldFilePublicId) {
+            try {
+                $uploadService->delete($oldFilePublicId);
+            } catch (\Throwable $e) {
+                Log::warning('Could not delete old notice file from Cloudinary', [
+                    'public_id' => $oldFilePublicId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         // Notify if notice just became published
         if (! $wasPublished && $notice->is_published) {
@@ -151,10 +231,25 @@ class NoticeController extends Controller
         abort_unless($notice->created_by === auth()->id(), 403);
 
         if ($notice->file_public_id) {
-            $uploadService->delete($notice->file_public_id);
+            try {
+                $uploadService->delete($notice->file_public_id);
+            } catch (\Throwable $e) {
+                Log::warning('Could not delete notice file from Cloudinary', [
+                    'public_id' => $notice->file_public_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
+
         if ($notice->image_public_id) {
-            $uploadService->delete($notice->image_public_id);
+            try {
+                $uploadService->delete($notice->image_public_id);
+            } catch (\Throwable $e) {
+                Log::warning('Could not delete notice image from Cloudinary', [
+                    'public_id' => $notice->image_public_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $notice->delete();

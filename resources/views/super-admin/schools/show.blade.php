@@ -393,7 +393,7 @@
                                 <div x-show="!preview">
                                     @if ($school->logo_url)
                                         <img
-                                            src="{{ $school->logo_url }}"
+                                            src="{{ $school->logoMediumUrl() }}"
                                             alt="{{ $school->name }} logo"
                                             class="size-24 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
                                         />
@@ -798,6 +798,73 @@
             </form>
         </div>
 
+        {{-- Feature Locks (§2.4) --}}
+        <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+            <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+                <flux:heading size="lg">{{ __('Feature Locks') }}</flux:heading>
+                <flux:subheading>{{ __('Lock features ON or OFF for this school — overrides the school admin\'s own settings. Leave unlocked to let the school admin decide.') }}</flux:subheading>
+            </div>
+            <form method="POST" action="{{ route('super-admin.schools.lock-features', $school) }}">
+                @csrf
+                <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @foreach (\App\Models\PlatformSetting::FEATURE_FLAGS as $flagKey => $flagLabel)
+                        @php $lock = $school->featureLock($flagKey); @endphp
+                        <div
+                            class="grid grid-cols-1 items-center gap-3 p-4 sm:grid-cols-3"
+                            x-data="{ mode: '{{ $lock === null ? 'unlocked' : ($lock ? 'on' : 'off') }}' }"
+                        >
+                            {{-- Description --}}
+                            <div class="sm:col-span-1">
+                                <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $flagLabel }}</div>
+                                <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                                    @if ($lock === null)
+                                        <span class="text-zinc-400">{{ __('School admin controls this') }}</span>
+                                    @elseif ($lock)
+                                        <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ __('Locked ON by super admin') }}</span>
+                                    @else
+                                        <span class="font-medium text-red-500 dark:text-red-400">{{ __('Locked OFF by super admin') }}</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Lock controls --}}
+                            <div class="flex items-center gap-2 sm:col-span-2">
+                                <input type="hidden" name="locks[{{ $flagKey }}]" x-bind:value="mode === 'on' ? '1' : (mode === 'off' ? '0' : '')">
+                                <div class="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 text-xs dark:border-zinc-700 dark:bg-zinc-800">
+                                    <button
+                                        type="button"
+                                        @click="mode = 'off'"
+                                        :class="mode === 'off' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-semibold' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'"
+                                        class="rounded-md px-3 py-1.5 transition-colors"
+                                    >{{ __('Lock OFF') }}</button>
+                                    <button
+                                        type="button"
+                                        @click="mode = 'unlocked'"
+                                        :class="mode === 'unlocked' ? 'bg-white text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100 font-semibold shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'"
+                                        class="rounded-md px-3 py-1.5 transition-colors"
+                                    >{{ __('Unlocked') }}</button>
+                                    <button
+                                        type="button"
+                                        @click="mode = 'on'"
+                                        :class="mode === 'on' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-semibold' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'"
+                                        class="rounded-md px-3 py-1.5 transition-colors"
+                                    >{{ __('Lock ON') }}</button>
+                                </div>
+                                <div class="text-xs text-zinc-400" x-show="mode !== 'unlocked'" x-cloak>
+                                    <flux:icon.lock-closed class="inline-block h-3.5 w-3.5 text-zinc-400" />
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                    <flux:button type="submit" variant="primary" size="sm" icon="lock-closed">
+                        {{ __('Save Locks') }}
+                    </flux:button>
+                </div>
+            </form>
+        </div>
+
         {{-- School Levels & Classes --}}
         <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
             <div class="border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
@@ -1125,7 +1192,7 @@
                             {{-- Top: school logo + name --}}
                             <div class="relative z-10 flex items-center gap-2.5">
                                 @if ($school->logo_url)
-                                    <img src="{{ $school->logo_url }}" alt="" class="h-8 w-8 rounded-lg object-contain bg-white/10 p-0.5" />
+                                    <img src="{{ $school->logoSmallUrl() }}" alt="" class="h-8 w-8 rounded-lg object-contain bg-white/10 p-0.5" />
                                 @else
                                     <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-white">
                                         {{ mb_strtoupper(mb_substr($school->name, 0, 1)) }}
@@ -1175,7 +1242,7 @@
                                 {{-- School logo + heading --}}
                                 <div class="flex flex-col items-center gap-2 text-center">
                                     @if ($school->logo_url)
-                                        <img src="{{ $school->logo_url }}" alt="" class="h-12 w-12 rounded-xl object-contain shadow-md" />
+                                        <img src="{{ $school->logoSmallUrl() }}" alt="" class="h-12 w-12 rounded-xl object-contain shadow-md" />
                                     @endif
                                     <h3 class="text-base font-bold text-zinc-900">
                                         {{ __('Welcome to') }}

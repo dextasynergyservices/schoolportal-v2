@@ -59,9 +59,22 @@
                         </p>
                     </div>
                     @if ($profile?->admission_number)
-                        <span class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
-                            {{ $profile->admission_number }}
-                        </span>
+                        <button
+                            type="button"
+                            x-data="{ copied: false }"
+                            @click="navigator.clipboard.writeText('{{ e($profile->admission_number) }}').then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
+                            title="{{ __('Click to copy admission number') }}"
+                            class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors cursor-pointer select-none"
+                        >
+                            <span x-show="!copied">{{ $profile->admission_number }}</span>
+                            <span x-show="copied" x-cloak class="text-emerald-600 dark:text-emerald-400">{{ __('Copied!') }}</span>
+                            <svg x-show="!copied" class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <svg x-show="copied" x-cloak class="w-3 h-3 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                        </button>
                     @endif
                 </div>
             </div>
@@ -171,153 +184,204 @@
         {{-- ── Achievements & Streaks ─────────────────────────────── --}}
         <livewire:student.achievements />
 
-        {{-- ── Quiz Performance Summary ───────────────────────────── --}}
-        @if ($quizzesTaken > 0)
+        {{-- ── My Performance (Quiz + CBT combined) ──────────────── --}}
+        @if ($quizzesTaken > 0 || $examsTaken > 0)
             <div class="dash-panel dash-animate dash-animate-delay-2" style="padding: 0;">
                 <div class="dash-panel-header">
-                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('My Quiz Performance') }}</h2>
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('My Performance') }}</h2>
                 </div>
-                <div class="grid grid-cols-3 divide-x divide-zinc-100 dark:divide-zinc-700/50 p-1">
-                    <div class="p-3 text-center">
-                        <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $quizzesTaken }}</p>
-                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Taken') }}</p>
-                    </div>
-                    <div class="p-3 text-center">
-                        <p class="text-2xl font-bold {{ $quizAvgScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($quizAvgScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
-                            {{ number_format((float) $quizAvgScore, 0) }}%
-                        </p>
-                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Average') }}</p>
-                    </div>
-                    <div class="p-3 text-center">
-                        <p class="text-2xl font-bold {{ $quizPassRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($quizPassRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
-                            {{ $quizPassRate }}%
-                        </p>
-                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Pass Rate') }}</p>
-                    </div>
+                <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
+                    @if ($quizzesTaken > 0)
+                        <div class="flex items-center px-4 py-3 gap-4">
+                            <div class="flex items-center gap-1.5 shrink-0 w-20">
+                                <flux:icon.academic-cap class="w-4 h-4 text-amber-500" />
+                                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Quizzes') }}</span>
+                            </div>
+                            <div class="flex flex-1 items-center gap-4">
+                                <div class="text-center">
+                                    <p class="text-base font-bold text-zinc-900 dark:text-white">{{ $quizzesTaken }}</p>
+                                    <p class="text-[10px] text-zinc-400">{{ __('taken') }}</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-base font-bold {{ $quizAvgScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($quizAvgScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">{{ number_format((float) $quizAvgScore, 0) }}%</p>
+                                    <p class="text-[10px] text-zinc-400">{{ __('avg') }}</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-base font-bold {{ $quizPassRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($quizPassRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">{{ $quizPassRate }}%</p>
+                                    <p class="text-[10px] text-zinc-400">{{ __('pass rate') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                    @if ($examsTaken > 0)
+                        <div class="flex items-center px-4 py-3 gap-4">
+                            <div class="flex items-center gap-1.5 shrink-0 w-20">
+                                <flux:icon.computer-desktop class="w-4 h-4 text-indigo-500" />
+                                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('CBT') }}</span>
+                            </div>
+                            <div class="flex flex-1 items-center gap-4">
+                                <div class="text-center">
+                                    <p class="text-base font-bold text-zinc-900 dark:text-white">{{ $examsTaken }}</p>
+                                    <p class="text-[10px] text-zinc-400">{{ __('taken') }}</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-base font-bold {{ ($examAvgScore ?? 0) >= 70 ? 'text-emerald-600 dark:text-emerald-400' : (($examAvgScore ?? 0) >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">{{ number_format((float) ($examAvgScore ?? 0), 0) }}%</p>
+                                    <p class="text-[10px] text-zinc-400">{{ __('avg') }}</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-base font-bold {{ $examPassRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($examPassRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">{{ $examPassRate }}%</p>
+                                    <p class="text-[10px] text-zinc-400">{{ __('pass rate') }}</p>
+                                </div>
+                                <a href="{{ route('student.exams.index') }}" wire:navigate class="ml-auto text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline shrink-0">{{ __('View') }}</a>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         @endif
 
-        {{-- ── CBT Exam Performance Summary ───────────────────────── --}}
-        @if ($examsTaken > 0)
-            <div class="dash-panel dash-animate dash-animate-delay-2" style="padding: 0;">
-                <div class="dash-panel-header">
-                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-                        <flux:icon.computer-desktop class="w-4 h-4 text-indigo-500" />
-                        {{ __('My CBT Performance') }}
-                    </h2>
-                    <a href="{{ route('student.exams.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
-                </div>
-                <div class="grid grid-cols-3 divide-x divide-zinc-100 dark:divide-zinc-700/50 p-1">
-                    <div class="p-3 text-center">
-                        <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $examsTaken }}</p>
-                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Taken') }}</p>
-                    </div>
-                    <div class="p-3 text-center">
-                        <p class="text-2xl font-bold {{ ($examAvgScore ?? 0) >= 70 ? 'text-emerald-600 dark:text-emerald-400' : (($examAvgScore ?? 0) >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
-                            {{ number_format((float) ($examAvgScore ?? 0), 0) }}%
-                        </p>
-                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Average') }}</p>
-                    </div>
-                    <div class="p-3 text-center">
-                        <p class="text-2xl font-bold {{ $examPassRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : ($examPassRate >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
-                            {{ $examPassRate }}%
-                        </p>
-                        <p class="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1">{{ __('Pass Rate') }}</p>
-                    </div>
-                </div>
-            </div>
+        {{-- ── Academic Progress Timeline ─────────────────────────── --}}
+        @if (! empty($timelineData))
+            @include('student.partials.progress-timeline', ['timelineData' => $timelineData, 'student' => $student])
         @endif
 
-        {{-- ── Upcoming CBT Exams ─────────────────────────────────── --}}
-        @if ($upcomingExams->isNotEmpty())
+        {{-- ── What's Next (CBT ongoing/upcoming + assignment deadlines) --}}
+        @php
+            $ongoingItems    = $cbtItems->where('_status', 'ongoing');
+            $upcomingItems   = $cbtItems->where('_status', 'upcoming');
+            $hasWhatsNext    = $ongoingItems->isNotEmpty() || $upcomingItems->isNotEmpty() || $upcomingDeadlines->isNotEmpty();
+        @endphp
+        @if ($hasWhatsNext)
             <div class="dash-panel dash-animate dash-animate-delay-3" style="padding: 0;">
                 <div class="dash-panel-header">
                     <h2 class="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                         <flux:icon.clock class="w-4 h-4 text-indigo-500" />
-                        {{ __('Upcoming CBT Exams') }}
+                        {{ __("What's Next") }}
                     </h2>
-                    <a href="{{ route('student.exams.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
+                    <a href="{{ route('student.exams.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('All CBT') }}</a>
                 </div>
                 <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
-                    @foreach ($upcomingExams as $upExam)
+
+                    {{-- Ongoing CBT items --}}
+                    @foreach ($ongoingItems as $cbt)
                         @php
-                            $daysLeft = (int) now()->diffInDays($upExam->available_until, false);
-                            $urgent = $daysLeft <= 2;
-                            $catRoute = 'student.exams.show';
+                            $daysLeft = $cbt->available_until ? (int) now()->diffInDays($cbt->available_until, false) : null;
+                            $urgent   = $daysLeft !== null && $daysLeft <= 1;
+                            $catIcon  = match ($cbt->category) { 'exam' => 'computer-desktop', 'assessment' => 'clipboard-document-check', default => 'clipboard-document-list' };
+                            $catLabel = match ($cbt->category) { 'exam' => __('Exam'), 'assessment' => __('Assessment'), default => __('Assignment') };
                         @endphp
-                        <a href="{{ route($catRoute, $upExam) }}" wire:navigate class="activity-item hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
-                            <div class="activity-dot {{ $urgent ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30' }}">
-                                <flux:icon.computer-desktop class="w-4 h-4 {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-indigo-600 dark:text-indigo-400' }}" />
+                        <a href="{{ route('student.exams.show', $cbt) }}" wire:navigate
+                           class="activity-item hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
+                            <div class="activity-dot {{ $cbt->_taken ? 'bg-emerald-100 dark:bg-emerald-900/30' : ($urgent ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30') }}">
+                                <flux:icon :name="$catIcon" class="w-4 h-4 {{ $cbt->_taken ? 'text-emerald-600 dark:text-emerald-400' : ($urgent ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400') }}" />
                             </div>
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $upExam->title }}</p>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $upExam->subject?->name }}</span>
-                                    <span class="text-xs text-zinc-400">&middot;</span>
-                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $upExam->total_questions }} {{ __('questions') }}</span>
-                                    @if ($upExam->time_limit_minutes)
-                                        <span class="text-xs text-zinc-400">&middot;</span>
-                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $upExam->time_limit_minutes }} {{ __('min') }}</span>
-                                    @endif
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
-                                        {{ ucfirst($upExam->category) }}
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $cbt->title }}</p>
+                                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                        {{ __('Ongoing') }}
                                     </span>
+                                    @if ($cbt->_taken)
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0">
+                                            <flux:icon.check class="w-3 h-3" /> {{ __('Taken') }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                    <span class="text-xs text-zinc-400 capitalize">{{ $catLabel }}</span>
+                                    @if ($cbt->subject)
+                                        <span class="text-xs text-zinc-400">&middot;</span>
+                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $cbt->subject->name }}</span>
+                                    @endif
+                                    @if ($cbt->total_questions)
+                                        <span class="text-xs text-zinc-400">&middot; {{ $cbt->total_questions }} {{ __('q') }}</span>
+                                    @endif
                                 </div>
                             </div>
                             <div class="text-right shrink-0">
-                                <p class="text-sm font-semibold {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300' }}">
-                                    {{ $upExam->available_until->format('M j') }}
-                                </p>
-                                <p class="text-xs {{ $urgent ? 'text-red-500 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400' }}">
-                                    @if ($daysLeft == 0) {{ __('Today') }}
-                                    @elseif ($daysLeft == 1) {{ __('Tomorrow') }}
-                                    @else {{ __(':days days', ['days' => $daysLeft]) }}
-                                    @endif
-                                </p>
+                                @if ($cbt->available_until)
+                                    <p class="text-sm font-semibold {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300' }}">
+                                        {{ $cbt->available_until->format('M j') }}
+                                    </p>
+                                    <p class="text-xs {{ $urgent ? 'text-red-500' : 'text-zinc-400' }}">
+                                        @if ($daysLeft === 0) {{ __('Today') }}
+                                        @elseif ($daysLeft === 1) {{ __('Tomorrow') }}
+                                        @else {{ __(':d days left', ['d' => $daysLeft]) }}
+                                        @endif
+                                    </p>
+                                @endif
                             </div>
                         </a>
                     @endforeach
-                </div>
-            </div>
-        @endif
 
-        {{-- ── Upcoming Deadlines ─────────────────────────────────── --}}
-        @if ($upcomingDeadlines->isNotEmpty())
-            <div class="dash-panel dash-animate dash-animate-delay-3" style="padding: 0;">
-                <div class="dash-panel-header">
-                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Upcoming Deadlines') }}</h2>
-                </div>
-                <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
+                    {{-- Upcoming CBT items (not yet open) --}}
+                    @foreach ($upcomingItems as $cbt)
+                        @php
+                            $opensIn   = (int) now()->diffInDays($cbt->available_from, false);
+                            $catLabel  = match ($cbt->category) { 'exam' => __('Exam'), 'assessment' => __('Assessment'), default => __('Assignment') };
+                            $catIcon   = match ($cbt->category) { 'exam' => 'computer-desktop', 'assessment' => 'clipboard-document-check', default => 'clipboard-document-list' };
+                        @endphp
+                        <div class="activity-item opacity-75">
+                            <div class="activity-dot bg-amber-100 dark:bg-amber-900/30">
+                                <flux:icon :name="$catIcon" class="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $cbt->title }}</p>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 shrink-0">{{ __('Upcoming') }}</span>
+                                </div>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                    {{ $catLabel }}
+                                    @if ($cbt->subject) &middot; {{ $cbt->subject->name }} @endif
+                                </p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{{ $cbt->available_from->format('M j') }}</p>
+                                <p class="text-xs text-zinc-400">
+                                    {{ $cbt->available_from->format('g:i A') }}
+                                </p>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    {{-- Assignment deadlines --}}
                     @foreach ($upcomingDeadlines as $deadline)
                         @php
                             $daysLeft = (int) now()->diffInDays($deadline->due_date, false);
-                            $urgent = $daysLeft <= 2;
+                            $urgent   = $daysLeft <= 2;
                         @endphp
                         <div class="activity-item">
-                            <div class="activity-dot {{ $urgent ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30' }}">
-                                <flux:icon.calendar class="w-4 h-4 {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400' }}" />
+                            <div class="activity-dot {{ $urgent ? 'bg-red-100 dark:bg-red-900/30' : 'bg-purple-100 dark:bg-purple-900/30' }}">
+                                <flux:icon.calendar-days class="w-4 h-4 {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400' }}" />
                             </div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">
                                     {{ $deadline->title ?? __('Week :week Assignment', ['week' => $deadline->week_number]) }}
                                 </p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Assignment due') }}</p>
                             </div>
                             <div class="text-right shrink-0">
                                 <p class="text-sm font-semibold {{ $urgent ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300' }}">
                                     {{ $deadline->due_date->format('M j') }}
                                 </p>
-                                <p class="text-xs {{ $urgent ? 'text-red-500 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400' }}">
+                                <p class="text-xs {{ $urgent ? 'text-red-500' : 'text-zinc-400' }}">
                                     @if ($daysLeft == 0) {{ __('Today') }}
                                     @elseif ($daysLeft == 1) {{ __('Tomorrow') }}
-                                    @else {{ __(':days days', ['days' => $daysLeft]) }}
+                                    @else {{ __(':d days', ['d' => $daysLeft]) }}
                                     @endif
                                 </p>
                             </div>
                         </div>
                     @endforeach
+
                 </div>
             </div>
+        @endif
+
+        {{-- ── CBT/Study Calendar ─────────────────────────────────── --}}
+        @if ($profile?->class_id)
+            @include('student.partials.study-calendar', ['calendarEvents' => $calendarEvents])
         @endif
 
         {{-- ── My Learning (unified quizzes + games) ─────────────── --}}
@@ -544,7 +608,7 @@
                     @foreach ($recentNotices as $notice)
                         <a href="{{ route('student.notices.show', $notice) }}" wire:navigate class="flex items-start gap-3 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
                             @if ($notice->image_url)
-                                <img src="{{ $notice->image_url }}" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />
+                                <img src="{{ $notice->imageThumbnailUrl() }}" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />
                             @else
                                 <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 shrink-0">
                                     <flux:icon.megaphone class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />

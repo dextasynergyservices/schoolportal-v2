@@ -17,6 +17,7 @@ use App\Notifications\SubmissionReviewed;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class ApprovalController extends Controller
@@ -111,39 +112,47 @@ class ApprovalController extends Controller
         // Update the related entity status
         $this->updateEntityStatus($action, 'approved');
 
-        // Notify the teacher if they have an email
+        // Notify the teacher and downstream parties — wrapped so any notification
+        // failure cannot mask the successfully committed approval.
         $teacher = $action->teacher;
-        if ($teacher?->email) {
-            $teacher->notify(new SubmissionReviewed($action->entity_type, 'approved'));
-        }
-
-        // DB notification to teacher
-        $notificationService = app(NotificationService::class);
-        if ($teacher) {
-            $entityTitle = $notificationService->resolveEntityTitle($action->entity_type, $action->entity_id);
-            $notificationService->notifySubmissionApproved($teacher, $action->entity_type, $entityTitle);
-        }
-
-        // If entity was auto-published on approval, notify students/parents
-        if (in_array($action->entity_type, ['quiz', 'game', 'notice', 'exam'], true)) {
-            match ($action->entity_type) {
-                'quiz' => $notificationService->notifyQuizPublished(Quiz::find($action->entity_id)),
-                'game' => $notificationService->notifyGamePublished(Game::find($action->entity_id)),
-                'notice' => $notificationService->notifyNoticePublished(Notice::find($action->entity_id)),
-                'exam' => $notificationService->notifyExamPublished(Exam::find($action->entity_id)),
-            };
-        }
-        if ($action->entity_type === 'result') {
-            $result = Result::find($action->entity_id);
-            if ($result) {
-                $notificationService->notifyResultUploaded($result);
+        try {
+            if ($teacher?->email) {
+                $teacher->notify(new SubmissionReviewed($action->entity_type, 'approved'));
             }
-        }
-        if ($action->entity_type === 'assignment') {
-            $assignment = Assignment::find($action->entity_id);
-            if ($assignment) {
-                $notificationService->notifyAssignmentUploaded($assignment);
+
+            $notificationService = app(NotificationService::class);
+            if ($teacher) {
+                $entityTitle = $notificationService->resolveEntityTitle($action->entity_type, $action->entity_id);
+                $notificationService->notifySubmissionApproved($teacher, $action->entity_type, $entityTitle);
             }
+
+            if (in_array($action->entity_type, ['quiz', 'game', 'notice', 'exam'], true)) {
+                match ($action->entity_type) {
+                    'quiz' => $notificationService->notifyQuizPublished(Quiz::find($action->entity_id)),
+                    'game' => $notificationService->notifyGamePublished(Game::find($action->entity_id)),
+                    'notice' => $notificationService->notifyNoticePublished(Notice::find($action->entity_id)),
+                    'exam' => $notificationService->notifyExamPublished(Exam::find($action->entity_id)),
+                };
+            }
+            if ($action->entity_type === 'result') {
+                $result = Result::find($action->entity_id);
+                if ($result) {
+                    $notificationService->notifyResultUploaded($result);
+                }
+            }
+            if ($action->entity_type === 'assignment') {
+                $assignment = Assignment::find($action->entity_id);
+                if ($assignment) {
+                    $notificationService->notifyAssignmentUploaded($assignment);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Approval notification failed — approval was committed successfully', [
+                'action_id' => $action->id,
+                'entity_type' => $action->entity_type,
+                'entity_id' => $action->entity_id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return redirect()->route('admin.approvals.index')
@@ -180,36 +189,45 @@ class ApprovalController extends Controller
             $this->updateEntityStatus($action, 'approved');
 
             $teacher = $action->teacher;
-            if ($teacher?->email) {
-                $teacher->notify(new SubmissionReviewed($action->entity_type, 'approved'));
-            }
-
-            if ($teacher) {
-                $entityTitle = $notificationService->resolveEntityTitle($action->entity_type, $action->entity_id);
-                $notificationService->notifySubmissionApproved($teacher, $action->entity_type, $entityTitle);
-            }
-
-            if (in_array($action->entity_type, ['quiz', 'game', 'notice', 'exam'], true)) {
-                match ($action->entity_type) {
-                    'quiz' => $notificationService->notifyQuizPublished(Quiz::find($action->entity_id)),
-                    'game' => $notificationService->notifyGamePublished(Game::find($action->entity_id)),
-                    'notice' => $notificationService->notifyNoticePublished(Notice::find($action->entity_id)),
-                    'exam' => $notificationService->notifyExamPublished(Exam::find($action->entity_id)),
-                };
-            }
-
-            if ($action->entity_type === 'result') {
-                $result = Result::find($action->entity_id);
-                if ($result) {
-                    $notificationService->notifyResultUploaded($result);
+            try {
+                if ($teacher?->email) {
+                    $teacher->notify(new SubmissionReviewed($action->entity_type, 'approved'));
                 }
-            }
 
-            if ($action->entity_type === 'assignment') {
-                $assignment = Assignment::find($action->entity_id);
-                if ($assignment) {
-                    $notificationService->notifyAssignmentUploaded($assignment);
+                if ($teacher) {
+                    $entityTitle = $notificationService->resolveEntityTitle($action->entity_type, $action->entity_id);
+                    $notificationService->notifySubmissionApproved($teacher, $action->entity_type, $entityTitle);
                 }
+
+                if (in_array($action->entity_type, ['quiz', 'game', 'notice', 'exam'], true)) {
+                    match ($action->entity_type) {
+                        'quiz' => $notificationService->notifyQuizPublished(Quiz::find($action->entity_id)),
+                        'game' => $notificationService->notifyGamePublished(Game::find($action->entity_id)),
+                        'notice' => $notificationService->notifyNoticePublished(Notice::find($action->entity_id)),
+                        'exam' => $notificationService->notifyExamPublished(Exam::find($action->entity_id)),
+                    };
+                }
+
+                if ($action->entity_type === 'result') {
+                    $result = Result::find($action->entity_id);
+                    if ($result) {
+                        $notificationService->notifyResultUploaded($result);
+                    }
+                }
+
+                if ($action->entity_type === 'assignment') {
+                    $assignment = Assignment::find($action->entity_id);
+                    if ($assignment) {
+                        $notificationService->notifyAssignmentUploaded($assignment);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Bulk approval notification failed for one action — approval was committed', [
+                    'action_id' => $action->id,
+                    'entity_type' => $action->entity_type,
+                    'entity_id' => $action->entity_id,
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             $count++;

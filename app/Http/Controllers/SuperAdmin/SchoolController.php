@@ -8,10 +8,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSchoolRequest;
 use App\Http\Requests\UpdateSchoolRequest;
 use App\Models\AcademicSession;
+use App\Models\AiCreditUsageLog;
 use App\Models\Assignment;
 use App\Models\AuditLog;
 use App\Models\Exam;
 use App\Models\Game;
+use App\Models\PlatformSetting;
 use App\Models\Quiz;
 use App\Models\Result;
 use App\Models\School;
@@ -26,7 +28,10 @@ use App\Services\NotificationService;
 use App\Services\SchoolSetupService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -54,6 +59,14 @@ class SchoolController extends Controller
             $query->where('is_active', $status === 'active');
         }
 
+        if ($location = $request->string('location')->toString()) {
+            $query->where(function ($q) use ($location) {
+                $q->where('city', 'like', "%{$location}%")
+                    ->orWhere('state', 'like', "%{$location}%")
+                    ->orWhere('country', 'like', "%{$location}%");
+            });
+        }
+
         // Sorting
         $sort = $request->string('sort')->toString();
         $dir = in_array($request->string('dir')->toString(), ['asc', 'desc'])
@@ -66,12 +79,80 @@ class SchoolController extends Controller
             'credits' => $query->orderByRaw("(ai_free_credits + ai_purchased_credits) {$dir}"),
             'name' => $query->orderBy('name', $dir),
             'created' => $query->orderBy('created_at', $dir),
+            'health' => $query->orderBy(
+                User::withoutGlobalScopes()
+                    ->select(DB::raw('MAX(last_login_at)'))
+                    ->whereColumn('users.school_id', 'schools.id'),
+                $dir,
+            ),
             default => $query->orderByDesc('created_at'),
         };
 
         $schools = $query->paginate(10)->withQueryString();
 
-        return view('super-admin.schools.index', compact('schools'));
+        // ── Batch health data (§2.3) — 3 queries for all paginated schools, no N+1 ──
+        $schoolIds = $schools->pluck('id')->all();
+        $healthData = [];
+
+        if ($schoolIds !== []) {
+            // 1. Last login per school (MAX across all users)
+            $lastLogins = User::withoutGlobalScopes()
+                ->select('school_id', DB::raw('MAX(last_login_at) as last_login'))
+                ->whereIn('school_id', $schoolIds)
+                ->groupBy('school_id')
+                ->pluck('last_login', 'school_id');
+
+            // 2. Content created in last 30 days (results + quizzes)
+            $since = now()->subDays(30);
+
+            $resultCounts = Result::withoutGlobalScopes()
+                ->select('school_id', DB::raw('COUNT(*) as cnt'))
+                ->whereIn('school_id', $schoolIds)
+                ->where('created_at', '>=', $since)
+                ->groupBy('school_id')
+                ->pluck('cnt', 'school_id');
+
+            $quizCounts = Quiz::withoutGlobalScopes()
+                ->select('school_id', DB::raw('COUNT(*) as cnt'))
+                ->whereIn('school_id', $schoolIds)
+                ->where('created_at', '>=', $since)
+                ->groupBy('school_id')
+                ->pluck('cnt', 'school_id');
+
+            // 3. AI credits used this calendar month
+            $aiUsage = AiCreditUsageLog::withoutGlobalScopes()
+                ->select('school_id', DB::raw('SUM(credits_used) as total'))
+                ->whereIn('school_id', $schoolIds)
+                ->where('created_at', '>=', now()->startOfMonth())
+                ->groupBy('school_id')
+                ->pluck('total', 'school_id');
+
+            foreach ($schoolIds as $id) {
+                $lastLogin = $lastLogins[$id] ? Carbon::parse($lastLogins[$id]) : null;
+                $recentContent = (int) ($resultCounts[$id] ?? 0) + (int) ($quizCounts[$id] ?? 0);
+                $aiThisMonth = (int) ($aiUsage[$id] ?? 0);
+
+                $status = match (true) {
+                    $lastLogin === null => 'never',
+                    $lastLogin->gt(now()->subDays(7)) => 'healthy',
+                    $lastLogin->gt(now()->subDays(30)) => 'moderate',
+                    $lastLogin->gt(now()->subDays(60)) => 'at_risk',
+                    default => 'idle',
+                };
+
+                $healthData[$id] = [
+                    'last_login' => $lastLogin,
+                    'recent_content' => $recentContent,
+                    'ai_this_month' => $aiThisMonth,
+                    'status' => $status,
+                ];
+            }
+        }
+
+        return view('super-admin.schools.index', [
+            'schools' => $schools,
+            'healthData' => $healthData,
+        ]);
     }
 
     public function create(): View
@@ -79,6 +160,7 @@ class SchoolController extends Controller
         return view('super-admin.schools.create', [
             'levelPresets' => SchoolSetupService::LEVEL_PRESETS,
             'levelNames' => SchoolSetupService::LEVEL_NAMES,
+            'nigerianStates' => config('schoolportal.nigerian_states'),
         ]);
     }
 
@@ -104,11 +186,40 @@ class SchoolController extends Controller
             $admin->notify(new WelcomeNewUser('school_admin', $admin->username, $school->name, $data['admin_password']));
         }
 
-        app(NotificationService::class)->notifySchoolCreated($school);
+        try {
+            app(NotificationService::class)->notifySchoolCreated($school);
+        } catch (\Throwable $e) {
+            Log::warning('School-created notification failed — school was created successfully', [
+                'school_id' => $school->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
-        return redirect()
+        // Optional logo as part of initial setup. Upload failure is non-fatal —
+        // the school is fully operational without a logo and the admin can upload
+        // it later via school settings.
+        $logoWarning = null;
+        if ($request->hasFile('logo')) {
+            try {
+                $logoResult = app(FileUploadService::class)->uploadSchoolLogo($request->file('logo'), $school->id);
+                $school->update([
+                    'logo_url' => $logoResult['url'],
+                    'logo_public_id' => $logoResult['public_id'],
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Logo upload failed during school setup — school was created successfully', [
+                    'school_id' => $school->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $logoWarning = __('School created, but the logo could not be uploaded. You can add it later via school settings.');
+            }
+        }
+
+        $redirect = redirect()
             ->route('super-admin.schools.show', $school)
             ->with('success', __('School ":name" created successfully.', ['name' => $school->name]));
+
+        return $logoWarning ? $redirect->with('warning', $logoWarning) : $redirect;
     }
 
     public function show(School $school): View
@@ -232,6 +343,47 @@ class SchoolController extends Controller
         return back()->with('success', __('Portal settings saved for :name.', ['name' => $school->name]));
     }
 
+    /**
+     * Save super-admin feature locks for a school.
+     * Each flag can be locked ON (1), locked OFF (0), or unlocked (empty string / absent).
+     */
+    public function lockFeatures(Request $request, School $school): RedirectResponse
+    {
+        $flagKeys = array_keys(PlatformSetting::FEATURE_FLAGS);
+
+        $rules = [];
+        foreach ($flagKeys as $key) {
+            $rules["locks.{$key}"] = ['nullable', 'in:0,1,'];
+        }
+
+        $validated = $request->validate($rules);
+        $locks = $validated['locks'] ?? [];
+
+        $settings = $school->settings ?? [];
+        $lockedFeatures = [];
+
+        foreach ($flagKeys as $key) {
+            $val = $locks[$key] ?? null;
+            if ($val === '1') {
+                $lockedFeatures[$key] = true;
+            } elseif ($val === '0') {
+                $lockedFeatures[$key] = false;
+            }
+            // Empty / absent = unlocked, so we just don't include the key
+        }
+
+        // Store as null if no locks are set, otherwise store the map
+        $settings['locked_features'] = $lockedFeatures !== [] ? $lockedFeatures : null;
+
+        $school->update(['settings' => $settings]);
+
+        $this->auditLog($request, $school, 'school.feature_locks_updated', [], [
+            'locked_features' => $lockedFeatures,
+        ]);
+
+        return back()->with('success', __('Feature locks saved for :name.', ['name' => $school->name]));
+    }
+
     public function bulkToggleSetting(Request $request): RedirectResponse
     {
         $request->validate([
@@ -352,7 +504,11 @@ class SchoolController extends Controller
             ->orderBy('id')
             ->first();
 
-        return view('super-admin.schools.edit', compact('school', 'primaryAdmin'));
+        return view('super-admin.schools.edit', [
+            'school' => $school,
+            'primaryAdmin' => $primaryAdmin,
+            'nigerianStates' => config('schoolportal.nigerian_states'),
+        ]);
     }
 
     public function update(UpdateSchoolRequest $school_request, School $school): RedirectResponse

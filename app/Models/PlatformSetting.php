@@ -23,6 +23,15 @@ class PlatformSetting extends Model
         'allowed_file_types' => 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg,gif,webp',
         'max_upload_size_mb' => 10,
         'credit_price_per_5' => 1000,
+        // Feature flag platform-wide defaults (school admin can override; super admin can lock)
+        'feature_default_enable_parent_portal' => true,
+        'feature_default_enable_quiz_generator' => true,
+        'feature_default_enable_game_generator' => true,
+        'feature_default_enable_teacher_approval' => true,
+        'feature_default_enable_cbt_results_for_parents' => false,
+        'feature_default_enable_cbt_exam' => true,
+        'feature_default_enable_assessment' => true,
+        'feature_default_enable_cbt_assignment' => true,
     ];
 
     /** @var array<string, string> */
@@ -34,6 +43,26 @@ class PlatformSetting extends Model
         'allowed_file_types' => 'string',
         'max_upload_size_mb' => 'integer',
         'credit_price_per_5' => 'integer',
+        'feature_default_enable_parent_portal' => 'boolean',
+        'feature_default_enable_quiz_generator' => 'boolean',
+        'feature_default_enable_game_generator' => 'boolean',
+        'feature_default_enable_teacher_approval' => 'boolean',
+        'feature_default_enable_cbt_results_for_parents' => 'boolean',
+        'feature_default_enable_cbt_exam' => 'boolean',
+        'feature_default_enable_assessment' => 'boolean',
+        'feature_default_enable_cbt_assignment' => 'boolean',
+    ];
+
+    /** Feature flag keys (convenience list for iteration) */
+    public const FEATURE_FLAGS = [
+        'enable_parent_portal' => 'Parent Portal',
+        'enable_quiz_generator' => 'AI Quiz Generator',
+        'enable_game_generator' => 'AI Game Generator',
+        'enable_teacher_approval' => 'Teacher Approval Flow',
+        'enable_cbt_results_for_parents' => 'CBT Results for Parents',
+        'enable_cbt_exam' => 'CBT Exams',
+        'enable_assessment' => 'Assessments',
+        'enable_cbt_assignment' => 'CBT Assignments',
     ];
 
     // ── Cache helpers ───────────────────────────────────────────────

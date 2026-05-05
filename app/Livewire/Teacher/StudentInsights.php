@@ -222,10 +222,9 @@ class StudentInsights extends Component
                 $flagged[] = [
                     'id' => $student->id,
                     'name' => $student->name,
-                    'avatar_url' => $student->avatar_url,
+                    'avatar_url' => $student->avatarTableUrl(),
                     'initials' => $student->initials(),
                     'class_id' => $student->studentProfile?->class_id,
-                    'class' => $student->studentProfile?->class?->name ?? '—',
                     'concerns' => $concerns,
                     'severity' => $severity,
                     'quiz_avg' => $quiz ? (int) round((float) $quiz->avg_score) : null,

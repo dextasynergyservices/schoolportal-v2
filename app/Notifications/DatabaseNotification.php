@@ -5,11 +5,18 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-abstract class DatabaseNotification extends Notification
+abstract class DatabaseNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    /** Allow one retry before marking the notification as failed. */
+    public int $tries = 2;
+
+    /** Seconds before the job is considered timed out. */
+    public int $timeout = 30;
 
     /** @return array<string> */
     public function via(object $notifiable): array

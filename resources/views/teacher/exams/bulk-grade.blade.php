@@ -91,7 +91,7 @@
                         <div class="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg">
                             @if ($answer && $answer->theory_answer)
                                 <p class="text-sm whitespace-pre-wrap">{{ $answer->theory_answer }}</p>
-                                @if ($question->min_words || $question->max_words)
+                                @if ($currentQuestion->min_words || $currentQuestion->max_words)
                                     @php $wordCount = str_word_count($answer->theory_answer); @endphp
                                     <span class="text-xs text-zinc-400 mt-1 block">{{ __(':count words', ['count' => $wordCount]) }}</span>
                                 @endif

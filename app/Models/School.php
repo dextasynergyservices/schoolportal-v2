@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Traits\HasCloudinaryImages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class School extends Model
 {
-    use HasFactory;
+    use HasCloudinaryImages, HasFactory;
 
     protected $fillable = [
         'name',
@@ -65,6 +66,45 @@ class School extends Model
     public function setting(string $key, mixed $default = null): mixed
     {
         return data_get($this->settings, $key, $default);
+    }
+
+    /**
+     * Resolve whether a portal feature is enabled for this school.
+     *
+     * Resolution order:
+     *  1. Super-admin lock in settings.locked_features.{feature} — wins if set (not null)
+     *  2. School-admin preference in settings.portal.{feature}
+     *  3. Platform-wide default from PlatformSetting
+     *
+     * @param  string  $feature  e.g. 'enable_quiz_generator'
+     */
+    public function featureEnabled(string $feature): bool
+    {
+        // 1. Super-admin lock (true/false/null stored as integer in JSON)
+        $locked = $this->setting("locked_features.{$feature}");
+        if ($locked !== null) {
+            return (bool) $locked;
+        }
+
+        // 2. School-admin preference
+        $pref = $this->setting("portal.{$feature}");
+        if ($pref !== null) {
+            return (bool) $pref;
+        }
+
+        // 3. Platform-wide default
+        return (bool) PlatformSetting::get("feature_default_{$feature}", true);
+    }
+
+    /**
+     * Check whether a portal feature is locked by the super admin.
+     * Returns null (not locked), true (locked ON), or false (locked OFF).
+     */
+    public function featureLock(string $feature): ?bool
+    {
+        $lock = $this->setting("locked_features.{$feature}");
+
+        return $lock === null ? null : (bool) $lock;
     }
 
     /**
@@ -165,5 +205,19 @@ class School extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(Assignment::class);
+    }
+
+    // ── Cloudinary Image Accessors ──
+
+    /** For nav, sidebar, and small login logos (displayed ≤64px). Uses c_limit (no upscale, preserves aspect ratio). */
+    public function logoSmallUrl(): string
+    {
+        return self::cloudinaryTransform($this->logo_url, 'w_128,h_128,c_limit,f_auto,q_auto');
+    }
+
+    /** For settings page logo display and report card headers (displayed ~80–128px). */
+    public function logoMediumUrl(): string
+    {
+        return self::cloudinaryTransform($this->logo_url, 'w_400,h_400,c_limit,f_auto,q_auto');
     }
 }

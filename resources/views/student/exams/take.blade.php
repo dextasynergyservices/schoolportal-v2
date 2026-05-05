@@ -72,6 +72,41 @@
                     </button>
                 @endforeach
             </div>
+
+            {{-- ⏱️ Timer warning banner (shown at ≤5 min remaining, inside sticky header) --}}
+            @if ($remainingSeconds !== null)
+                <div x-show="showTimerWarning" x-cloak
+                     class="mt-2 -mx-3 sm:-mx-4 -mb-3 sm:-mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-b-lg transition-colors"
+                     :class="timeRemaining <= 60
+                         ? 'bg-red-600 text-white'
+                         : 'bg-amber-500 text-white'">
+                    <div class="flex items-center gap-2 text-sm font-medium">
+                        <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                             :class="timeRemaining <= 60 ? 'animate-pulse' : ''"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+                        <span x-text="timeRemaining <= 60
+                            ? '{{ __('Less than 1 minute remaining — submit soon!') }}'
+                            : '{{ __(':m minutes remaining — review your answers!') }}'.replace(':m', Math.ceil(timeRemaining / 60))"></span>
+                    </div>
+                    <button type="button" @click="showTimerWarning = false"
+                        class="shrink-0 rounded p-1 hover:bg-white/20 transition-colors"
+                        aria-label="{{ __('Dismiss timer warning') }}">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            @endif
+        </div>
+
+        {{-- 📶 Offline queued-submit banner (shown when student submitted while offline) --}}
+        <div x-show="offlineSubmitQueued" x-cloak
+             class="mt-3 flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
+             role="alert" aria-live="assertive">
+            <svg class="size-5 shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.584 10.587a2 2 0 0 0 2.828 2.83m5.145 5.145A9.955 9.955 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.106.654-4.062 1.77-5.672m3.144-2.65A9.956 9.956 0 0 1 12 2c5.523 0 10 4.477 10 10 0 2.107-.655 4.063-1.77 5.673"/>
+            </svg>
+            <div>
+                <p class="font-semibold">{{ __("You're offline — submission queued") }}</p>
+                <p class="mt-0.5 text-xs opacity-80">{{ __('Your answers are saved on this device. The exam will submit automatically as soon as your connection is restored.') }}</p>
+            </div>
         </div>
 
         {{-- Questions --}}
@@ -309,36 +344,122 @@
                             </p>
                         </div>
 
-                        <form method="POST" action="{{ route($routePrefix . '.submit', $attempt) }}" id="submitForm"
-                            @submit="injectAnswers()" class="flex justify-end gap-2">
+                        {{-- Hidden form — submit triggered programmatically to avoid beforeunload race --}}
+                        <form method="POST" action="{{ route($routePrefix . '.submit', $attempt) }}" id="submitForm">
                             @csrf
+                        </form>
+
+                        <div class="flex justify-end gap-2">
                             <flux:modal.close>
                                 <flux:button type="button" variant="ghost">{{ __('Keep Reviewing') }}</flux:button>
                             </flux:modal.close>
-                            <flux:button type="submit" variant="primary" icon="paper-airplane">
+                            <flux:button type="button" variant="primary" icon="paper-airplane"
+                                @click="submitExamFinal()">
                                 {{ __('Submit Now') }}
                             </flux:button>
-                        </form>
+                        </div>
                     </div>
                 </flux:modal>
             </div>
         </div>
 
-        {{-- Tab switch warning overlay --}}
+
+        {{-- ⏱️ 1-minute review modal (auto-triggered once at 60s) --}}
+        <template x-if="showOneMinuteModal">
+            <div class="fixed inset-0 z-50 bg-zinc-900/70 flex items-center justify-center p-4">
+                <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+                    <div class="flex items-start gap-3">
+                        <span class="text-3xl leading-none select-none" aria-hidden="true">⏱️</span>
+                        <div>
+                            <h2 class="text-base font-bold text-red-600 dark:text-red-400">{{ __('1 minute left!') }}</h2>
+                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                {{ __('Time is almost up. Make sure you have answered all questions.') }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40 px-4 py-2.5">
+                        <span class="text-sm text-amber-800 dark:text-amber-300">{{ __('Unanswered questions') }}</span>
+                        <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="totalQuestions - answeredCount"></span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button"
+                            @click="
+                                showOneMinuteModal = false;
+                                const firstUnansweredIdx = questions.findIndex(qId => !answeredQuestions[qId]);
+                                if (firstUnansweredIdx !== -1) currentIndex = firstUnansweredIdx;
+                            "
+                            x-show="answeredCount < totalQuestions"
+                            class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
+                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                            {{ __('Jump to first unanswered') }}
+                        </button>
+                        <button type="button" @click="showOneMinuteModal = false"
+                            class="flex-1 inline-flex items-center justify-center rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-600 transition-colors">
+                            {{ __('Dismiss') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        {{-- 🔁 Tab-switch warning modal (professional design) --}}
         <template x-if="showTabWarning">
-            <div class="fixed inset-0 z-50 bg-red-900/90 flex items-center justify-center p-4">
-                <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl">
-                    <flux:icon name="exclamation-triangle" class="mx-auto size-12 text-red-500" />
-                    <h2 class="text-lg font-bold text-zinc-900 dark:text-white">{{ __('Tab Switch Detected!') }}</h2>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                        {{ __('You switched away from this :label. Please stay on this page.', ['label' => Str::lower($label)]) }}
-                    </p>
-                    <p class="text-sm font-medium" :class="tabSwitches >= {{ $exam->max_tab_switches ?? 999 }} - 1 ? 'text-red-600' : 'text-amber-600'">
-                        <span x-text="'{{ __('Switches:') }} ' + tabSwitches + ' / {{ $exam->max_tab_switches ?? '∞' }}'"></span>
-                    </p>
-                    <flux:button variant="primary" @click="showTabWarning = false" class="w-full">
-                        {{ __('Return to :label', ['label' => $label]) }}
-                    </flux:button>
+            <div class="fixed inset-0 z-50 bg-zinc-900/75 flex items-center justify-center p-4">
+                <div class="bg-white dark:bg-zinc-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                    {{-- Coloured top bar --}}
+                    <div class="h-1.5"
+                         :class="{{ $exam->max_tab_switches ?? 'null' }} !== null && tabSwitches >= {{ $exam->max_tab_switches ?? 999 }} - 1
+                             ? 'bg-red-500'
+                             : 'bg-amber-400'"></div>
+                    <div class="p-6 space-y-4">
+                        <div class="flex items-start gap-4">
+                            <div class="shrink-0 flex items-center justify-center w-10 h-10 rounded-full"
+                                 :class="{{ $exam->max_tab_switches ?? 'null' }} !== null && tabSwitches >= {{ $exam->max_tab_switches ?? 999 }} - 1
+                                     ? 'bg-red-100 dark:bg-red-900/30'
+                                     : 'bg-amber-100 dark:bg-amber-900/30'">
+                                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                     :class="{{ $exam->max_tab_switches ?? 'null' }} !== null && tabSwitches >= {{ $exam->max_tab_switches ?? 999 }} - 1
+                                         ? 'text-red-600 dark:text-red-400'
+                                         : 'text-amber-600 dark:text-amber-400'"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-zinc-900 dark:text-white">{{ __('You left the exam tab') }}</h2>
+                                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                    {{ __('Switching away from this :label is monitored. Please stay focused.', ['label' => Str::lower($label)]) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        @if ($exam->max_tab_switches)
+                            <div class="rounded-lg border px-4 py-3"
+                                 :class="tabSwitches >= {{ $exam->max_tab_switches }} - 1
+                                     ? 'bg-red-50 dark:bg-red-900/20 border-red-200/60 dark:border-red-700/40'
+                                     : 'bg-zinc-50 dark:bg-zinc-700/40 border-zinc-200 dark:border-zinc-600'">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-zinc-600 dark:text-zinc-400">{{ __('Tab switch count') }}</span>
+                                    <span class="font-bold" :class="tabSwitches >= {{ $exam->max_tab_switches }} - 1 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-white'">
+                                        <span x-text="tabSwitches"></span> / {{ $exam->max_tab_switches }}
+                                    </span>
+                                </div>
+                                <template x-if="tabSwitches >= {{ $exam->max_tab_switches }} - 1">
+                                    <p class="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
+                                        ⚠️ {{ __('Next violation will auto-submit your exam!') }}
+                                    </p>
+                                </template>
+                                <template x-if="tabSwitches < {{ $exam->max_tab_switches }} - 1">
+                                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                        <span x-text="{{ $exam->max_tab_switches }} - tabSwitches"></span> {{ __('switch(es) remaining before auto-submit') }}
+                                    </p>
+                                </template>
+                            </div>
+                        @endif
+
+                        <button type="button" @click="showTabWarning = false"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors">
+                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"/></svg>
+                            {{ __('Return to :label', ['label' => $label]) }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </template>
@@ -364,6 +485,18 @@
                 }
             }
 
+            // Restore any locally-saved draft (takes precedence over server state —
+            // covers the case where the student was offline and lost connectivity
+            // mid-exam, then refreshed or the browser recovered).
+            const draftKey = 'exam_draft_' + attemptId;
+            try {
+                const saved = localStorage.getItem(draftKey);
+                if (saved) {
+                    const draft = JSON.parse(saved);
+                    Object.assign(answeredQuestions, draft);
+                }
+            } catch (e) {}
+
             return {
                 currentIndex: 0,
                 totalQuestions,
@@ -374,6 +507,11 @@
                 tabSwitches: {{ $attempt->tab_switches ?? 0 }},
                 showTabWarning: false,
                 showFullscreenPrompt: preventTabSwitch,
+                showTimerWarning: false,
+                showOneMinuteModal: false,
+                oneMinuteModalShown: false,
+                questions: {{ $questions->pluck('id') }},
+                offlineSubmitQueued: false,
 
                 get answeredCount() {
                     return Object.values(this.answeredQuestions).filter(a => a !== null && a !== '').length;
@@ -387,6 +525,15 @@
                     if (this.timeRemaining !== null) {
                         this.startTimer();
                     }
+
+                    // --- Offline: auto-submit when connectivity returns ---
+                    this._onlineHandler = () => {
+                        if (this.offlineSubmitQueued) {
+                            this.offlineSubmitQueued = false;
+                            this._doFinalSubmit();
+                        }
+                    };
+                    window.addEventListener('online', this._onlineHandler);
 
                     // --- Anti-cheat: Copy/Cut/Paste prevention ---
                     if (preventCopyPaste) {
@@ -477,8 +624,19 @@
                 startTimer() {
                     this.timerInterval = setInterval(() => {
                         this.timeRemaining--;
+                        // 5-minute warning banner
+                        if (this.timeRemaining <= 300 && !this.showTimerWarning) {
+                            this.showTimerWarning = true;
+                        }
+                        // 1-minute modal (show once)
+                        if (this.timeRemaining <= 60 && !this.oneMinuteModalShown) {
+                            this.oneMinuteModalShown = true;
+                            this.showOneMinuteModal = true;
+                        }
                         if (this.timeRemaining <= 0) {
                             clearInterval(this.timerInterval);
+                            this.showTimerWarning = false;
+                            this.showOneMinuteModal = false;
                             this.forceSubmit();
                         }
                     }, 1000);
@@ -516,10 +674,13 @@
 
                 selectAnswer(questionId, answer) {
                     this.answeredQuestions[questionId] = answer;
+                    // Persist draft locally — survives a page reload if network drops
+                    try { localStorage.setItem(draftKey, JSON.stringify(this.answeredQuestions)); } catch (e) {}
                     this.saveAnswerToServer(questionId, answer);
                 },
 
                 saveAnswerToServer(questionId, answer) {
+                    if (!navigator.onLine) return; // localStorage draft covers this
                     const url = '{{ route($routePrefix . ".save-answer", $attempt) }}';
                     fetch(url, {
                         method: 'POST',
@@ -535,9 +696,25 @@
                     }).catch(() => {});
                 },
 
-                injectAnswers() {
-                    // Remove beforeunload so form submission goes through
+                submitExamFinal() {
+                    if (!navigator.onLine) {
+                        // Queue the submission — _onlineHandler will fire it when back online.
+                        // Draft is already saved in localStorage from every selectAnswer().
+                        this.offlineSubmitQueued = true;
+                        return;
+                    }
+                    this._doFinalSubmit();
+                },
+
+                _doFinalSubmit() {
+                    // Remove the anti-cheat beforeunload guard FIRST (synchronously),
+                    // then inject answers and call form.submit() directly.
+                    // Using form.submit() (not a submit button click) means the browser
+                    // never fires the 'submit' event, so no Livewire/Flux interception
+                    // can race ahead and trigger the beforeunload dialog.
                     window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+                    // Clear the local draft — submission is now in flight
+                    try { localStorage.removeItem(draftKey); } catch (e) {}
                     const form = document.getElementById('submitForm');
                     form.querySelectorAll('.injected-answer').forEach(el => el.remove());
                     for (const [questionId, answer] of Object.entries(this.answeredQuestions)) {
@@ -550,13 +727,11 @@
                             form.appendChild(input);
                         }
                     }
+                    form.submit();
                 },
 
                 forceSubmit() {
-                    // Remove beforeunload so submission goes through
-                    window.removeEventListener('beforeunload', this._beforeUnloadHandler);
-                    this.injectAnswers();
-                    document.getElementById('submitForm').submit();
+                    this.submitExamFinal();
                 },
 
                 formatTime(seconds) {
@@ -590,6 +765,7 @@
                 destroy() {
                     if (this.timerInterval) clearInterval(this.timerInterval);
                     if (this._bc) this._bc.close();
+                    if (this._onlineHandler) window.removeEventListener('online', this._onlineHandler);
                 },
             };
         }

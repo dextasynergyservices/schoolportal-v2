@@ -13,6 +13,7 @@ use App\Traits\NotifiesAdminsOnSubmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class NoticeController extends Controller
@@ -74,9 +75,24 @@ class NoticeController extends Controller
         unset($validated['file']);
 
         $fileData = [];
+        $uploadedPublicId = null;
+
         if ($request->hasFile('file')) {
             $schoolId = $teacher->school_id;
-            $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $schoolId);
+
+            try {
+                $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $schoolId);
+            } catch (\Throwable $e) {
+                Log::error('Teacher notice file Cloudinary upload failed', [
+                    'teacher_id' => $teacher->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->withInput()
+                    ->with('error', __('File upload failed. Please try again.'));
+            }
+
+            $uploadedPublicId = $uploaded['public_id'];
             $fileData = [
                 'file_url' => $uploaded['url'],
                 'file_public_id' => $uploaded['public_id'],
@@ -84,26 +100,44 @@ class NoticeController extends Controller
             ];
         }
 
-        DB::transaction(function () use ($validated, $fileData, $teacher) {
-            $notice = Notice::create([
-                ...$validated,
-                ...$fileData,
-                'created_by' => $teacher->id,
-                'is_published' => false,
-                'status' => 'pending',
-            ]);
+        try {
+            DB::transaction(function () use ($validated, $fileData, $teacher) {
+                $notice = Notice::create([
+                    ...$validated,
+                    ...$fileData,
+                    'created_by' => $teacher->id,
+                    'is_published' => false,
+                    'status' => 'pending',
+                ]);
 
-            $action = TeacherAction::create([
-                'school_id' => $teacher->school_id,
+                $action = TeacherAction::create([
+                    'school_id' => $teacher->school_id,
+                    'teacher_id' => $teacher->id,
+                    'action_type' => 'post_notice',
+                    'entity_type' => 'notice',
+                    'entity_id' => $notice->id,
+                    'status' => 'pending',
+                ]);
+
+                $this->notifyAdminsOfPendingSubmission($action, $teacher);
+            });
+        } catch (\Throwable $e) {
+            if ($uploadedPublicId) {
+                try {
+                    $uploadService->delete($uploadedPublicId);
+                } catch (\Throwable) {
+                    // Best-effort cleanup
+                }
+            }
+
+            Log::error('Teacher notice DB save failed after Cloudinary upload', [
                 'teacher_id' => $teacher->id,
-                'action_type' => 'post_notice',
-                'entity_type' => 'notice',
-                'entity_id' => $notice->id,
-                'status' => 'pending',
+                'error' => $e->getMessage(),
             ]);
 
-            $this->notifyAdminsOfPendingSubmission($action, $teacher);
-        });
+            return redirect()->back()->withInput()
+                ->with('error', __('Failed to submit notice. The uploaded file has been removed. Please try again.'));
+        }
 
         return redirect()->route('teacher.notices.index')
             ->with('success', __('Notice submitted for approval.'));
@@ -153,49 +187,95 @@ class NoticeController extends Controller
 
         unset($validated['file'], $validated['remove_file']);
 
-        // Handle file upload
+        $oldFilePublicId = null;
+        $newFilePublicId = null;
+
+        // Handle file upload: upload new file first, defer deletion of old until after DB succeeds
         if ($request->hasFile('file')) {
-            if ($notice->file_public_id) {
-                $uploadService->delete($notice->file_public_id);
+            try {
+                $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $teacher->school_id);
+            } catch (\Throwable $e) {
+                Log::error('Teacher notice file Cloudinary upload failed during update', [
+                    'teacher_id' => $teacher->id,
+                    'notice_id' => $notice->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->withInput()
+                    ->with('error', __('File upload failed. Please try again.'));
             }
-            $uploaded = $uploadService->uploadNoticeFile($request->file('file'), $teacher->school_id);
+
+            $newFilePublicId = $uploaded['public_id'];
+            $oldFilePublicId = $notice->file_public_id;
             $validated['file_url'] = $uploaded['url'];
             $validated['file_public_id'] = $uploaded['public_id'];
             $validated['file_name'] = $request->file('file')->getClientOriginalName();
         }
 
-        // Handle file removal
+        // Handle file removal: defer Cloudinary deletion until after DB succeeds
         if ($request->boolean('remove_file') && $notice->file_public_id) {
-            $uploadService->delete($notice->file_public_id);
+            $oldFilePublicId = $notice->file_public_id;
             $validated['file_url'] = null;
             $validated['file_public_id'] = null;
             $validated['file_name'] = null;
         }
 
-        DB::transaction(function () use ($validated, $notice, $teacher) {
-            $notice->update([
-                ...$validated,
-                'status' => 'pending',
-                'is_published' => false,
-            ]);
-
-            // Reset the existing TeacherAction to pending
-            $action = TeacherAction::where('entity_type', 'notice')
-                ->where('entity_id', $notice->id)
-                ->where('teacher_id', $teacher->id)
-                ->first();
-
-            if ($action) {
-                $action->update([
+        try {
+            DB::transaction(function () use ($validated, $notice, $teacher) {
+                $notice->update([
+                    ...$validated,
                     'status' => 'pending',
-                    'reviewed_by' => null,
-                    'reviewed_at' => null,
-                    'rejection_reason' => null,
+                    'is_published' => false,
                 ]);
 
-                $this->notifyAdminsOfPendingSubmission($action, $teacher);
+                // Reset the existing TeacherAction to pending
+                $action = TeacherAction::where('entity_type', 'notice')
+                    ->where('entity_id', $notice->id)
+                    ->where('teacher_id', $teacher->id)
+                    ->first();
+
+                if ($action) {
+                    $action->update([
+                        'status' => 'pending',
+                        'reviewed_by' => null,
+                        'reviewed_at' => null,
+                        'rejection_reason' => null,
+                    ]);
+
+                    $this->notifyAdminsOfPendingSubmission($action, $teacher);
+                }
+            });
+        } catch (\Throwable $e) {
+            // DB failed — clean up any newly uploaded file to avoid orphan
+            if ($newFilePublicId) {
+                try {
+                    $uploadService->delete($newFilePublicId);
+                } catch (\Throwable) {
+                    // Best-effort cleanup
+                }
             }
-        });
+
+            Log::error('Teacher notice DB update failed', [
+                'teacher_id' => $teacher->id,
+                'notice_id' => $notice->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->withInput()
+                ->with('error', __('Failed to update notice. Please try again.'));
+        }
+
+        // DB succeeded — now safe to remove the old Cloudinary file
+        if ($oldFilePublicId) {
+            try {
+                $uploadService->delete($oldFilePublicId);
+            } catch (\Throwable $e) {
+                Log::warning('Could not delete old notice file from Cloudinary', [
+                    'public_id' => $oldFilePublicId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return redirect()->route('teacher.notices.index')
             ->with('success', __('Notice updated and resubmitted for approval.'));
@@ -241,7 +321,14 @@ class NoticeController extends Controller
         abort_unless($notice->created_by === $teacher->id, 403);
 
         if ($notice->file_public_id) {
-            $uploadService->delete($notice->file_public_id);
+            try {
+                $uploadService->delete($notice->file_public_id);
+            } catch (\Throwable $e) {
+                Log::warning('Could not delete notice file from Cloudinary', [
+                    'public_id' => $notice->file_public_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // Also clean up the teacher action record

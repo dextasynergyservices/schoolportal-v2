@@ -13,7 +13,7 @@
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden max-w-2xl">
             <div class="p-6">
                 <div class="flex items-center gap-4">
-                    <flux:avatar size="xl" :src="$child->avatar_url" :name="$child->name" :initials="$child->initials()" />
+                    <flux:avatar size="xl" :src="$child->avatarProfileUrl()" :name="$child->name" :initials="$child->initials()" />
                     <div class="min-w-0 flex-1">
                         <flux:heading size="xl">{{ $child->name }}</flux:heading>
                         <flux:text class="mt-1 text-zinc-500 dark:text-zinc-400">{{ $child->username }}</flux:text>

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ImportStudentsCsvJob;
 use App\Rules\SafeCsvFile;
 use App\Services\CsvImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -61,6 +63,9 @@ class StudentImportController extends Controller
 
     /**
      * Import the validated students.
+     *
+     * Dispatches an async job so large imports do not block the HTTP request.
+     * The job processes the stored temp file in the queue worker.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -76,42 +81,18 @@ class StudentImportController extends Controller
                 ->with('error', __('Import file expired. Please upload again.'));
         }
 
-        try {
-            $school = app('current.school');
-            $result = $this->csvImportService->parseCsv($fullPath, $school->id);
-            $importResult = $this->csvImportService->importRows($result['rows'], $request->input('default_password'));
-        } catch (\Throwable $e) {
-            @unlink($fullPath);
+        $school = app('current.school');
+        $importKey = Str::uuid()->toString();
 
-            return redirect()->route('admin.students.import')
-                ->with('error', __('Import failed: :message', ['message' => $e->getMessage()]));
-        }
-
-        // Clean up temp file
-        @unlink($fullPath);
-
-        $imported = $importResult['imported'];
-        $skipped = $importResult['skipped'];
-
-        if ($imported === 0 && count($skipped) > 0) {
-            // Nothing imported — all skipped
-            return redirect()->route('admin.students.import')
-                ->with('error', __('No students were imported. All :count rows were skipped.', ['count' => count($skipped)]))
-                ->with('skipped_students', $skipped);
-        }
-
-        if (count($skipped) > 0) {
-            // Some imported, some skipped
-            return redirect()->route('admin.students.index')
-                ->with('success', __(':imported students imported successfully. :skipped skipped.', [
-                    'imported' => $imported,
-                    'skipped' => count($skipped),
-                ]))
-                ->with('skipped_students', $skipped);
-        }
+        ImportStudentsCsvJob::dispatch(
+            schoolId: $school->id,
+            storagePath: $request->input('temp_path'),
+            defaultPassword: $request->input('default_password'),
+            importKey: $importKey,
+        );
 
         return redirect()->route('admin.students.index')
-            ->with('success', __(':count students imported successfully.', ['count' => $imported]));
+            ->with('success', __('Your student import is processing in the background. New students will appear on this page shortly — refresh in a moment.'));
     }
 
     /**

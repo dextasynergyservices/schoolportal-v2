@@ -2,11 +2,19 @@
     <div class="space-y-6">
         <x-admin-header :title="__('Create Quiz')" />
 
-        @if (session('error'))
-            <flux:callout variant="danger" icon="x-circle">{{ session('error') }}</flux:callout>
-        @endif
+        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 sm:p-6" x-data="{ tab: '{{ request()->query('tab', 'prompt') }}' }">
+            @if (session('error'))
+                <flux:callout variant="danger" icon="x-circle" class="mb-6">
+                    <flux:callout.heading>{{ __('AI Generation Failed') }}</flux:callout.heading>
+                    <flux:callout.text>{{ session('error') }}</flux:callout.text>
+                    <div class="mt-3">
+                        <flux:button size="sm" variant="ghost" icon="pencil-square" @click="tab = 'manual'">
+                            {{ __('Create Manually Instead') }}
+                        </flux:button>
+                    </div>
+                </flux:callout>
+            @endif
 
-        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 sm:p-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">{{ __('Choose how to create your quiz') }}</h2>
                 <div class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -15,7 +23,7 @@
                 </div>
             </div>
 
-            <div x-data="{ tab: 'prompt' }" class="space-y-6">
+            <div class="space-y-6">
                 {{-- Tab buttons --}}
                 <div class="flex flex-wrap gap-2 border-b border-zinc-200 dark:border-zinc-700 pb-3">
                     <button type="button" @click="tab = 'prompt'"

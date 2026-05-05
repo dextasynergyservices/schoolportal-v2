@@ -240,6 +240,76 @@
                 </form>
             </div>
 
+            {{-- ── Feature Flag Defaults ─────────────────────────────── --}}
+            <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                <div class="px-6 py-4 border-b border-zinc-100 dark:border-zinc-700 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                        <flux:icon.cpu-chip class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Feature Flag Defaults') }}</h2>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Platform-wide defaults for new and unoveridden schools. Schools can override unless locked.') }}</p>
+                    </div>
+                </div>
+                <form method="POST" action="{{ route('super-admin.settings.update') }}" class="p-6 space-y-4">
+                    @csrf
+                    @method('PUT')
+                    {{-- Pass through all other settings unchanged --}}
+                    <input type="hidden" name="platform_name" value="{{ old('platform_name', $settings['platform_name']) }}">
+                    <input type="hidden" name="default_free_ai_credits" value="{{ old('default_free_ai_credits', $settings['default_free_ai_credits']) }}">
+                    <input type="hidden" name="allowed_file_types" value="{{ old('allowed_file_types', $settings['allowed_file_types']) }}">
+                    <input type="hidden" name="max_upload_size_mb" value="{{ old('max_upload_size_mb', $settings['max_upload_size_mb']) }}">
+                    <input type="hidden" name="credit_price_per_5" value="{{ old('credit_price_per_5', $settings['credit_price_per_5']) }}">
+                    <input type="hidden" name="maintenance_mode" value="{{ $settings['maintenance_mode'] ? '1' : '0' }}">
+                    <input type="hidden" name="maintenance_message" value="{{ old('maintenance_message', $settings['maintenance_message']) }}">
+
+                    <div class="divide-y divide-zinc-100 dark:divide-zinc-700 -mx-6 px-6">
+                        @foreach (\App\Models\PlatformSetting::FEATURE_FLAGS as $flagKey => $flagLabel)
+                            @php
+                                $settingKey = "feature_default_{$flagKey}";
+                                $isOn = (bool) old($settingKey, $settings[$settingKey] ?? true);
+                            @endphp
+                            <div class="py-3 flex items-center justify-between gap-4">
+                                <div>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-white">{{ __($flagLabel) }}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Default state for :flag', ['flag' => $flagKey]) }}</p>
+                                </div>
+                                <div x-data="{ on: {{ $isOn ? 'true' : 'false' }} }">
+                                    {{-- Hidden 0 so unchecked checkbox = false --}}
+                                    <input type="hidden" name="{{ $settingKey }}" value="0">
+                                    <input
+                                        id="{{ $settingKey }}"
+                                        type="checkbox"
+                                        name="{{ $settingKey }}"
+                                        value="1"
+                                        x-model="on"
+                                        class="sr-only"
+                                        @checked($isOn)
+                                    >
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        :aria-checked="on.toString()"
+                                        @click="on = !on; $el.previousElementSibling.previousElementSibling.checked = on"
+                                        :class="on
+                                            ? 'bg-indigo-600'
+                                            : 'bg-zinc-200 dark:bg-zinc-700'"
+                                        class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    >
+                                        <span
+                                            :class="on ? 'translate-x-5' : 'translate-x-0'"
+                                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
+                                        ></span>
+                                    </button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <flux:button variant="primary" type="submit">{{ __('Save') }}</flux:button>
+                </form>
+            </div>
+
         </div>
     </div>
 </x-layouts::app>

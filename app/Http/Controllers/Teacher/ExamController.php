@@ -950,6 +950,27 @@ class ExamController extends Controller
             ->with('success', __('All theory questions graded successfully.'));
     }
 
+    // ── Preview ──
+
+    public function preview(Exam $exam): View
+    {
+        $teacher = auth()->user();
+        $this->authorizeTeacherAccess($exam, $teacher);
+
+        $exam->load(['questions', 'class:id,name', 'subject:id,name']);
+
+        $questions = $exam->shuffle_questions
+            ? $exam->questions->shuffle(crc32((string) $exam->id))
+            : $exam->questions->sortBy('sort_order');
+
+        $category = $this->resolveCategory();
+
+        return view('shared.exams.preview', array_merge(
+            compact('exam', 'questions', 'category'),
+            ['label' => $this->categoryLabel($category), 'routePrefix' => $this->routePrefix()],
+        ));
+    }
+
     // ── Live Monitor & Analytics ──
 
     public function monitor(Exam $exam): View

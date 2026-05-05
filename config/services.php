@@ -65,4 +65,10 @@ return [
         'keep_local' => env('BACKUP_KEEP_LOCAL', 7),
     ],
 
+    'platform' => [
+        // Email address that receives alerts for critical system events (queue failures, etc.).
+        // Falls back to BACKUP_ALERT_EMAIL if PLATFORM_ALERT_EMAIL is not set.
+        'alert_email' => env('PLATFORM_ALERT_EMAIL', env('BACKUP_ALERT_EMAIL')),
+    ],
+
 ];

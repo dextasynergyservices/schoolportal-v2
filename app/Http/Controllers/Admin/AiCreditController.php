@@ -13,6 +13,7 @@ use App\Services\AiCreditService;
 use App\Services\PaystackService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -163,9 +164,22 @@ class AiCreditController extends Controller
                 ->with('error', __('Payment amount mismatch. Please contact support.'));
         }
 
-        // Complete purchase
-        $purchase->update(['status' => 'completed']);
-        $this->creditService->completePurchase($purchase);
+        // Complete purchase atomically (completePurchase handles the status update
+        // and credit increment inside a single DB transaction).
+        try {
+            $this->creditService->completePurchase($purchase);
+        } catch (\Throwable $e) {
+            // Roll back to pending so admin can retry or support can investigate.
+            $purchase->update(['status' => 'pending']);
+
+            Log::error('purchaseCallback: completePurchase failed', [
+                'reference' => $reference,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('admin.credits.index')
+                ->with('error', __('Payment was received but credits could not be applied. Please contact support with reference: :ref.', ['ref' => $reference]));
+        }
 
         return redirect()->route('admin.credits.index')
             ->with('success', __(':credits credits purchased for ₦:amount.', [

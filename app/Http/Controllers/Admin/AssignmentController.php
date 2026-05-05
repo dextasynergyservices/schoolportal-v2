@@ -13,6 +13,7 @@ use App\Services\FileUploadService;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class AssignmentController extends Controller
@@ -86,7 +87,14 @@ class AssignmentController extends Controller
             'status' => 'approved',
         ]);
 
-        app(NotificationService::class)->notifyAssignmentUploaded($assignment);
+        try {
+            app(NotificationService::class)->notifyAssignmentUploaded($assignment);
+        } catch (\Throwable $e) {
+            Log::warning('Assignment notification failed — assignment was saved successfully', [
+                'assignment_id' => $assignment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()->route('admin.assignments.index')
             ->with('success', __('Assignment created.'));

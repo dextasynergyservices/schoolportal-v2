@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Models\School;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -24,27 +26,38 @@ class PlatformEmail extends Mailable
         private readonly string $emailSubject,
         private readonly string $emailBody,
         private readonly array $attachmentFiles = [],
+        private readonly ?School $school = null,
     ) {}
 
     public function envelope(): Envelope
     {
+        $fromName = $this->school
+            ? $this->school->name.' via DX-SchoolPortal'
+            : config('app.name');
+
         return new Envelope(
             subject: $this->emailSubject,
+            replyTo: $this->school?->email ? [new Address($this->school->email, $this->school->name)] : [],
         );
     }
 
     public function content(): Content
     {
+        $school = $this->school;
+
         return new Content(
-            markdown: 'emails.platform-email',
+            view: 'emails.platform-email',
             with: [
                 'body' => $this->emailBody,
+                'schoolName' => $school?->name ?? config('app.name'),
+                'schoolLogoUrl' => $school?->settings['branding']['logo_url'] ?? null,
+                'primaryColor' => $school?->settings['branding']['primary_color'] ?? '#4F46E5',
             ],
         );
     }
 
     /**
-     * @return array<int, Attachment>
+     * @return array<int, Attachment> Cloudinary files downloaded and attached.
      */
     public function attachments(): array
     {

@@ -304,7 +304,7 @@ class StudentInsights extends Component
                     'id' => $student->id,
                     'name' => $student->name,
                     'username' => $student->username,
-                    'avatar_url' => $student->avatar_url,
+                    'avatar_url' => $student->avatarTableUrl(),
                     'initials' => $student->initials(),
                     'class_id' => $student->studentProfile?->class_id,
                     'class' => $student->studentProfile?->class?->name ?? '—',

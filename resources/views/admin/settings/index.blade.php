@@ -75,7 +75,7 @@
                             <div x-show="!preview">
                                 @if ($school->logo_url)
                                     <img
-                                        src="{{ $school->logo_url }}"
+                                        src="{{ $school->logoSmallUrl() }}"
                                         alt="{{ $school->name }} logo"
                                         class="size-20 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900"
                                     />
@@ -202,12 +202,50 @@
                     @endphp
 
                     <div class="space-y-3">
-                        <flux:switch name="enable_parent_portal" :label="__('Enable Parent Portal')" :checked="old('enable_parent_portal', $portalSettings['enable_parent_portal'] ?? true)" value="1" />
-                        <flux:switch name="enable_quiz_generator" :label="__('Enable AI Quiz Generator')" :checked="old('enable_quiz_generator', $portalSettings['enable_quiz_generator'] ?? true)" value="1" />
-                        <flux:switch name="enable_game_generator" :label="__('Enable AI Game Generator')" :checked="old('enable_game_generator', $portalSettings['enable_game_generator'] ?? true)" value="1" />
-                        <flux:switch name="enable_teacher_approval" :label="__('Require Teacher Approval')" :checked="old('enable_teacher_approval', $portalSettings['enable_teacher_approval'] ?? true)" value="1" />
-                    </div>
+                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">{{ __('General Features') }}</p>
+                        @foreach ([
+                            'enable_parent_portal'             => __('Enable Parent Portal'),
+                            'enable_quiz_generator'            => __('Enable AI Quiz Generator'),
+                            'enable_game_generator'            => __('Enable AI Game Generator'),
+                            'enable_teacher_approval'          => __('Require Teacher Approval'),
+                            'enable_cbt_results_for_parents'   => __('CBT Results for Parents'),
+                        ] as $flagKey => $flagLabel)
+                            @php $lock = $school->featureLock($flagKey); @endphp
+                            @if ($lock !== null)
+                                <input type="hidden" name="{{ $flagKey }}" value="{{ $lock ? '1' : '0' }}">
+                                <div class="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-700/40 px-3 py-2">
+                                    <span class="text-sm text-zinc-700 dark:text-zinc-300">{{ $flagLabel }}</span>
+                                    <div class="flex items-center gap-1.5 text-xs font-medium {{ $lock ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400' }}">
+                                        <flux:icon.lock-closed class="h-3.5 w-3.5" />
+                                        {{ $lock ? __('Enabled by platform') : __('Disabled by platform') }}
+                                    </div>
+                                </div>
+                            @else
+                                <flux:switch name="{{ $flagKey }}" :label="$flagLabel" :checked="old($flagKey, $portalSettings[$flagKey] ?? true)" value="1" />
+                            @endif
+                        @endforeach
 
+                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wide pt-2">{{ __('CBT & Assessments') }}</p>
+                        @foreach ([
+                            'enable_cbt_exam'        => __('Enable CBT Exams'),
+                            'enable_assessment'      => __('Enable Assessments'),
+                            'enable_cbt_assignment'  => __('Enable CBT Assignments'),
+                        ] as $flagKey => $flagLabel)
+                            @php $lock = $school->featureLock($flagKey); @endphp
+                            @if ($lock !== null)
+                                <input type="hidden" name="{{ $flagKey }}" value="{{ $lock ? '1' : '0' }}">
+                                <div class="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-700/40 px-3 py-2">
+                                    <span class="text-sm text-zinc-700 dark:text-zinc-300">{{ $flagLabel }}</span>
+                                    <div class="flex items-center gap-1.5 text-xs font-medium {{ $lock ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400' }}">
+                                        <flux:icon.lock-closed class="h-3.5 w-3.5" />
+                                        {{ $lock ? __('Enabled by platform') : __('Disabled by platform') }}
+                                    </div>
+                                </div>
+                            @else
+                                <flux:switch name="{{ $flagKey }}" :label="$flagLabel" :checked="old($flagKey, $portalSettings[$flagKey] ?? true)" value="1" />
+                            @endif
+                        @endforeach
+                    </div>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <flux:input name="session_timeout_minutes" :label="__('Session Timeout (minutes)')" :value="old('session_timeout_minutes', $portalSettings['session_timeout_minutes'] ?? 30)" type="number" min="5" max="120" required />
                         <flux:input name="max_file_upload_mb" :label="__('Max File Upload (MB)')" :value="old('max_file_upload_mb', $portalSettings['max_file_upload_mb'] ?? 10)" type="number" min="1" max="50" required />
