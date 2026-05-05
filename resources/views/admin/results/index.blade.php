@@ -70,6 +70,7 @@
                         <flux:table.cell>
                             <div class="flex items-center gap-1">
                                 <flux:button variant="subtle" size="xs" icon="eye" href="{{ route('admin.results.show', $result) }}" wire:navigate aria-label="{{ __('View result') }}" />
+                                <flux:button variant="subtle" size="xs" icon="arrow-path" href="{{ route('admin.results.edit', $result) }}" wire:navigate aria-label="{{ __('Replace result') }}" />
                                 <x-confirm-delete
                                     :action="route('admin.results.destroy', $result)"
                                     :title="__('Delete Result')"

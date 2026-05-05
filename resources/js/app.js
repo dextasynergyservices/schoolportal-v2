@@ -236,3 +236,15 @@ document.addEventListener('submit', (e) => {
         });
     }, 15000);
 });
+
+// ── PWA Service Worker ──────────────────────────────────────────────────────
+// Register only for students (manifest link is also student-only in head.blade.php).
+// The SW is scoped to /portal/student so it never intercepts admin/teacher requests.
+if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]')) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/portal/student/' }).catch((err) => {
+            // Silently swallow registration errors (e.g. localhost dev, cross-origin)
+            console.debug('[PWA] SW registration skipped:', err.message);
+        });
+    });
+}

@@ -174,7 +174,7 @@ class ResultController extends Controller
 
         if ($request->hasFile('result_file')) {
             if ($result->file_public_id) {
-                app(FileUploadService::class)->delete($result->file_public_id);
+                app(FileUploadService::class)->deleteRaw($result->file_public_id);
             }
             $school = app('current.school');
             $upload = app(FileUploadService::class)->uploadResult($request->file('result_file'), $school->id);

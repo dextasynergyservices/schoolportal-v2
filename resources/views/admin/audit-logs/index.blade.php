@@ -39,7 +39,11 @@
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="text-zinc-500">{{ $log->ip_address ?? '—' }}</flux:table.cell>
-                        <flux:table.cell class="text-zinc-500">{{ $log->created_at->format('M j, Y g:i A') }}</flux:table.cell>
+                        <flux:table.cell class="text-zinc-500">
+                            <time datetime="{{ $log->created_at->toIso8601String() }}" title="{{ $log->created_at->format('M j, Y g:i A') }}">
+                                {{ $log->created_at->diffForHumans() }}
+                            </time>
+                        </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>

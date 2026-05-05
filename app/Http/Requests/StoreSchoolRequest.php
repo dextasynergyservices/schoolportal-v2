@@ -76,6 +76,9 @@ class StoreSchoolRequest extends FormRequest
             'session_name' => ['required', 'string', 'max:50'],
             'session_start_date' => ['required', 'date'],
             'session_end_date' => ['required', 'date', 'after:session_start_date'],
+
+            // Step 6 — Optional logo (may be uploaded during the wizard or later via uploadLogo)
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ];
     }
 

@@ -28,3 +28,6 @@ Schedule::command('digest:parents-weekly')->weeklyOn(1, '07:00')->onOneServer();
 
 // Send 24-hour deadline reminders for quizzes and exams every day at 8:00 AM
 Schedule::command('reminders:send-deadlines')->dailyAt('08:00')->onOneServer();
+
+// Archive completed academic sessions older than 1 year, every January 1st at 03:00 AM
+Schedule::command('sessions:archive')->yearlyOn(1, 1, '03:00')->onOneServer();

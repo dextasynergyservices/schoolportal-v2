@@ -213,8 +213,10 @@
                                         @if ($hasDetail) @click="open = !open" @endif>
 
                                         <td class="px-4 py-3.5">
-                                            <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">{{ $log->created_at->format('d M Y') }}</p>
-                                            <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 tabular-nums">{{ $log->created_at->format('H:i:s') }}</p>
+                                            <time datetime="{{ $log->created_at->toIso8601String() }}" title="{{ $log->created_at->format('d M Y H:i:s') }}" class="block">
+                                                <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">{{ $log->created_at->diffForHumans() }}</p>
+                                                <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{{ $log->created_at->format('d M Y') }}</p>
+                                            </time>
                                         </td>
 
                                         <td class="px-4 py-3.5">

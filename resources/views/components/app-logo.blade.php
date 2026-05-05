@@ -11,7 +11,7 @@
     @if ($school?->logo_url)
         <flux:sidebar.brand :name="$name" {{ $attributes }}>
             <x-slot name="logo">
-                <img src="{{ $school->logo_url }}" alt="{{ $name }}" class="object-contain rounded-md size-8">
+                <img src="{{ $school->logoSmallUrl() }}" alt="{{ $name }}" class="object-contain rounded-md size-8">
             </x-slot>
         </flux:sidebar.brand>
     @else
@@ -25,7 +25,7 @@
     @if ($school?->logo_url)
         <flux:brand :name="$name" {{ $attributes }}>
             <x-slot name="logo">
-                <img src="{{ $school->logo_url }}" alt="{{ $name }}" class="object-contain rounded-md size-8">
+                <img src="{{ $school->logoSmallUrl() }}" alt="{{ $name }}" class="object-contain rounded-md size-8">
             </x-slot>
         </flux:brand>
     @else

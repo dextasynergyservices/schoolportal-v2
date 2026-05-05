@@ -62,6 +62,14 @@
                 <option value="active" @selected(request('status') === 'active')>{{ __('Active') }}</option>
                 <option value="inactive" @selected(request('status') === 'inactive')>{{ __('Inactive') }}</option>
             </flux:select>
+            <flux:input
+                name="location"
+                :value="request('location')"
+                placeholder="{{ __('City, state or country...') }}"
+                class="min-w-48"
+                icon="map-pin"
+                aria-label="{{ __('Filter by city, state or country') }}"
+            />
             <flux:select name="sort" class="min-w-48" aria-label="{{ __('Sort by') }}">
                 <option value="" @selected(!request('sort'))>{{ __('Newest First') }}</option>
                 <option value="students" @selected(request('sort') === 'students')>{{ __('Most Students') }}</option>
@@ -69,9 +77,10 @@
                 <option value="credits" @selected(request('sort') === 'credits')>{{ __('Most AI Credits') }}</option>
                 <option value="name" @selected(request('sort') === 'name')>{{ __('Name A→Z') }}</option>
                 <option value="created" @selected(request('sort') === 'created')>{{ __('Oldest First') }}</option>
+                <option value="health" @selected(request('sort') === 'health')>{{ __('Most Active') }}</option>
             </flux:select>
             <flux:button type="submit" variant="filled" size="sm">{{ __('Filter') }}</flux:button>
-            @if (request()->hasAny(['search', 'status', 'sort']))
+            @if (request()->hasAny(['search', 'status', 'sort', 'location']))
                 <flux:button variant="subtle" size="sm" href="{{ route('super-admin.schools.index') }}" wire:navigate>
                     {{ __('Clear') }}
                 </flux:button>
@@ -408,6 +417,7 @@
                 <flux:table.column class="hidden md:table-cell">{{ __('Students') }}</flux:table.column>
                 <flux:table.column class="hidden md:table-cell">{{ __('Teachers') }}</flux:table.column>
                 <flux:table.column class="hidden lg:table-cell">{{ __('Credits') }}</flux:table.column>
+                <flux:table.column>{{ __('Health') }}</flux:table.column>
                 <flux:table.column>{{ __('Status') }}</flux:table.column>
                 <flux:table.column class="w-40" />
             </flux:table.columns>
@@ -442,6 +452,46 @@
                                 'f' => $school->ai_free_credits,
                                 'p' => $school->ai_purchased_credits,
                             ]) }}
+                        </flux:table.cell>
+                        {{-- Health column (§2.3) --}}
+                        <flux:table.cell>
+                            @php $h = $healthData[$school->id] ?? null; @endphp
+                            @if ($h)
+                                @php
+                                    [$dot, $dotTitle] = match ($h['status']) {
+                                        'healthy'  => ['bg-emerald-500', __('Active within 7 days')],
+                                        'moderate' => ['bg-yellow-400',  __('Active within 30 days')],
+                                        'at_risk'  => ['bg-orange-400',  __('Active within 60 days')],
+                                        'idle'     => ['bg-red-500',     __('Inactive 60+ days')],
+                                        default    => ['bg-zinc-400',    __('Never logged in')],
+                                    };
+                                @endphp
+                                <div class="flex items-center gap-2">
+                                    <span class="relative flex h-2.5 w-2.5">
+                                        @if ($h['status'] === 'healthy')
+                                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full {{ $dot }} opacity-60"></span>
+                                        @endif
+                                        <span class="relative inline-flex h-2.5 w-2.5 rounded-full {{ $dot }}" title="{{ $dotTitle }}"></span>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                                            @if ($h['last_login'])
+                                                {{ $h['last_login']->diffForHumans() }}
+                                            @else
+                                                {{ __('Never') }}
+                                            @endif
+                                        </div>
+                                        <div class="text-xs text-zinc-400">
+                                            {{ __(':n content · :ai AI', [
+                                                'n' => $h['recent_content'],
+                                                'ai' => $h['ai_this_month'],
+                                            ]) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            @else
+                                <span class="text-xs text-zinc-400">—</span>
+                            @endif
                         </flux:table.cell>
                         <flux:table.cell>
                             @if ($school->is_active)
@@ -511,7 +561,7 @@
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="7" class="py-8 text-center text-zinc-500">
+                        <flux:table.cell colspan="8" class="py-8 text-center text-zinc-500">
                             {{ __('No schools found.') }}
                         </flux:table.cell>
                     </flux:table.row>

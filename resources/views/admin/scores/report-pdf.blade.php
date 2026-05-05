@@ -110,7 +110,7 @@
         {{-- School Header --}}
         <div class="school-header">
             @if ($school->logo_url)
-                <img src="{{ $school->logo_url }}" class="school-logo" alt="">
+                <img src="{{ $school->logoMediumUrl() }}" class="school-logo" alt="">
             @endif
             <h1>{{ $school->name ?? 'School Name' }}</h1>
             <p>{{ $school->address ?? '' }}</p>

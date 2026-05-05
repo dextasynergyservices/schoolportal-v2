@@ -1,13 +1,11 @@
+{{-- Admin Gradebook — all logic handled by the Livewire component below --}}
 <x-layouts::app :title="__('Score Entry')">
     <div class="space-y-6">
         <x-score-workflow-steps current="scores" />
 
-        <x-admin-header
-            :title="__('Score Entry')"
-            :description="__('View, edit, and manage student scores by class and term.')"
-        />
+        @livewire('admin.gradebook', ['role' => 'admin'])
 
-        @if (session('success'))
+        @if (false) {{-- Old session flashes + filters + grid — replaced by the Livewire component above --}}
             <flux:callout variant="success" icon="check-circle">
                 <div class="flex flex-wrap items-center justify-between gap-3 w-full">
                     <span>{{ session('success') }}</span>
@@ -19,6 +17,7 @@
                 </div>
             </flux:callout>
         @endif
+        <div style="display:none" aria-hidden="true">{{-- deprecated: old score form hidden, replaced by Livewire above --}}
         @if (session('error'))
             <flux:callout variant="danger" icon="x-circle">{{ session('error') }}</flux:callout>
         @endif
@@ -425,8 +424,8 @@
                 <p class="text-sm text-zinc-500">{{ __('Select a class and term to view scores.') }}</p>
             </div>
         @endif
+        </div>{{-- /deprecated hidden wrapper --}}
     </div>
-
     @push('scripts')
     <script>
         function scoreGrid() {

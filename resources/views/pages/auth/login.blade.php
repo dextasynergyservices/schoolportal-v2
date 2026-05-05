@@ -23,7 +23,7 @@
         @if ($school)
             <div class="flex flex-col items-center gap-2 text-center">
                 @if ($school->logo_url)
-                    <img src="{{ $school->logo_url }}" alt="{{ $school->name }} logo" class="object-contain w-16 h-16 rounded-xl shadow-md">
+                    <img src="{{ $school->logoSmallUrl() }}" alt="{{ $school->name }} logo" class="object-contain w-16 h-16 rounded-xl shadow-md">
                 @endif
                 <h2 class="text-xl font-bold text-zinc-900 dark:text-white">
                     {{ __('Welcome to') }}

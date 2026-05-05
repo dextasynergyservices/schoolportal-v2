@@ -92,10 +92,39 @@
                             <flux:label>{{ __('City') }}</flux:label>
                             <flux:input name="city" :value="old('city')" />
                         </flux:field>
-                        <flux:field>
+
+                        {{-- State: dropdown for Nigerian states, free-text fallback for others --}}
+                        @php
+                            $savedState = old('state', '');
+                            $stateIsListed = in_array($savedState, $nigerianStates, true);
+                            $statePreset = $stateIsListed ? $savedState : ($savedState !== '' ? '__other__' : '');
+                            $stateCustom  = $stateIsListed ? '' : $savedState;
+                        @endphp
+                        <flux:field
+                            x-data="{
+                                preset: @js($statePreset),
+                                custom: @js($stateCustom),
+                                get final() { return this.preset === '__other__' ? this.custom : this.preset; },
+                            }"
+                        >
                             <flux:label>{{ __('State') }}</flux:label>
-                            <flux:input name="state" :value="old('state')" />
+                            {{-- Hidden input carries the final value to the server --}}
+                            <input type="hidden" name="state" :value="final" />
+                            <flux:select x-model="preset" :placeholder="__('Select state…')">
+                                @foreach ($nigerianStates as $s)
+                                    <option value="{{ $s }}">{{ $s }}</option>
+                                @endforeach
+                                <option value="__other__">{{ __('Other / Not Listed') }}</option>
+                            </flux:select>
+                            <div x-show="preset === '__other__'" x-cloak class="mt-2">
+                                <flux:input
+                                    x-model="custom"
+                                    :placeholder="__('Enter state or region')"
+                                    aria-label="{{ __('Custom state name') }}"
+                                />
+                            </div>
                         </flux:field>
+
                         <flux:field>
                             <flux:label>{{ __('Country') }}</flux:label>
                             <flux:input name="country" :value="old('country', 'Nigeria')" />

@@ -110,17 +110,59 @@ class DashboardController extends Controller
                 ->count();
         }
 
-        // ── Upcoming CBT exams (nearest deadlines) ──────────────
-        $upcomingExams = collect();
+        // ── CBT items: ongoing (open now) + upcoming (not yet open) ──
+        $cbtItems = collect();
         if ($classId) {
-            $upcomingExams = Exam::available()
+            $cols = ['id', 'title', 'category', 'subject_id', 'total_questions', 'time_limit_minutes', 'available_from', 'available_until', 'max_attempts', 'school_id', 'class_id', 'is_published'];
+
+            // Ongoing: published, window is open right now
+            $ongoing = Exam::published()
+                ->forClass($classId)
+                ->where(function ($q) {
+                    $q->whereNull('available_from')->orWhere('available_from', '<=', now());
+                })
+                ->where(function ($q) {
+                    $q->whereNull('available_until')->orWhere('available_until', '>=', now());
+                })
+                ->with('subject:id,name')
+                ->orderBy('available_until')
+                ->take(4)
+                ->get($cols);
+
+            // Upcoming: published, window hasn't opened yet
+            $upcoming = Exam::upcoming()
                 ->forClass($classId)
                 ->with('subject:id,name')
-                ->whereNotNull('available_until')
-                ->orderBy('available_until')
-                ->take(5)
-                ->get(['id', 'title', 'category', 'subject_id', 'total_questions', 'time_limit_minutes', 'available_until', 'max_attempts', 'school_id', 'class_id', 'is_published', 'available_from']);
+                ->orderBy('available_from')
+                ->take(3)
+                ->get($cols);
+
+            // Bulk-load this student's completed attempt counts for these exams
+            $allIds = $ongoing->pluck('id')->merge($upcoming->pluck('id'))->unique();
+            $takenCounts = ExamAttempt::where('student_id', $student->id)
+                ->whereIn('exam_id', $allIds)
+                ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
+                ->selectRaw('exam_id, COUNT(*) as cnt')
+                ->groupBy('exam_id')
+                ->pluck('cnt', 'exam_id');
+
+            foreach ($ongoing as $exam) {
+                $done = (int) ($takenCounts[$exam->id] ?? 0);
+                $exam->_status = 'ongoing';
+                $exam->_attempts_done = $done;
+                $exam->_taken = $done >= $exam->max_attempts;
+            }
+            foreach ($upcoming as $exam) {
+                $exam->_status = 'upcoming';
+                $exam->_attempts_done = 0;
+                $exam->_taken = false;
+            }
+
+            $cbtItems = $ongoing->merge($upcoming);
         }
+
+        // Keep $upcomingExams as alias for backwards-compat with calendar helper
+        $upcomingExams = $cbtItems;
 
         // ── My Learning: unified quiz + game items ────────────────
         $learningItems = collect();
@@ -276,6 +318,12 @@ class DashboardController extends Controller
             ->take(3)
             ->get();
 
+        // ── Progress Timeline ─────────────────────────────────────
+        $timelineData = $this->buildTimelineData($student->id, $school->id, $currentSession, $currentTerm);
+
+        // ── Study Calendar events (next 60 days) ─────────────────────
+        $calendarEvents = $this->buildCalendarEvents($student->id, $classId, $currentSession, $currentTerm);
+
         return view('student.dashboard', compact(
             'student', 'school', 'profile', 'class',
             'currentSession', 'currentTerm',
@@ -285,10 +333,145 @@ class DashboardController extends Controller
             'quizzesTaken', 'quizAvgScore', 'quizPassRate',
             'examsTaken', 'examAvgScore', 'examPassRate',
             'upcomingExams',
+            'cbtItems',
             'learningItems', 'totalPublishedQuizzes', 'quizzesCompletedCount',
             'totalPublishedGames', 'gamesCompletedCount',
             'upcomingDeadlines',
             'recentResults', 'recentAssignments', 'recentNotices',
+            'timelineData', 'calendarEvents',
         ));
+    }
+
+    /**
+     * Build the academic progress timeline data from published term reports.
+     * Returns sessions ordered oldest → newest, each with terms and average score.
+     */
+    private function buildTimelineData(int $studentId, int $schoolId, mixed $currentSession, mixed $currentTerm): array
+    {
+        $reports = StudentTermReport::where('student_id', $studentId)
+            ->where('school_id', $schoolId)
+            ->where('status', 'published')
+            ->whereNotNull('average_weighted_score')
+            ->with(['session:id,name', 'term:id,term_number,name'])
+            ->orderBy('session_id')
+            ->orderBy('term_id')
+            ->get(['id', 'student_id', 'school_id', 'session_id', 'term_id', 'average_weighted_score']);
+
+        if ($reports->isEmpty()) {
+            return [];
+        }
+
+        $grouped = [];
+        foreach ($reports as $report) {
+            $sessionName = $report->session?->name ?? '?';
+            $termNumber = $report->term?->term_number ?? 1;
+            $isCurrentTerm = $currentSession && $currentTerm
+                && $report->session_id === $currentSession->id
+                && $report->term_id === $currentTerm->id;
+
+            if (! isset($grouped[$sessionName])) {
+                $grouped[$sessionName] = ['session' => $sessionName, 'terms' => []];
+            }
+            $grouped[$sessionName]['terms'][] = [
+                'label' => 'T'.$termNumber,
+                'label_full' => $report->term?->name ?? ('Term '.$termNumber),
+                'score' => (int) round((float) $report->average_weighted_score),
+                'current' => $isCurrentTerm,
+            ];
+        }
+
+        return array_values($grouped);
+    }
+
+    /**
+     * Build calendar event array for upcoming exams, quizzes, and assignment deadlines.
+     * Only events within the next 60 days from today.
+     */
+    private function buildCalendarEvents(int $studentId, ?int $classId, mixed $currentSession, mixed $currentTerm): array
+    {
+        $events = [];
+        $horizon = now()->addDays(60);
+        $today = now()->startOfDay();
+
+        if ($classId) {
+            // CBT exams / assessments / cbt-assignments with available_until
+            $exams = Exam::published()
+                ->forClass($classId)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('available_from')->orWhere('available_from', '<=', $today->copy()->endOfDay());
+                })
+                ->whereNotNull('available_until')
+                ->where('available_until', '>=', $today)
+                ->where('available_until', '<=', $horizon)
+                ->get(['id', 'title', 'category', 'available_until', 'max_attempts', 'school_id', 'class_id', 'is_published', 'available_from']);
+
+            // Check which exams the student has already taken
+            $calExamIds = $exams->pluck('id');
+            $calTakenCounts = ExamAttempt::where('student_id', $studentId)
+                ->whereIn('exam_id', $calExamIds)
+                ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
+                ->selectRaw('exam_id, COUNT(*) as cnt')
+                ->groupBy('exam_id')
+                ->pluck('cnt', 'exam_id');
+
+            foreach ($exams as $exam) {
+                $done = (int) ($calTakenCounts[$exam->id] ?? 0);
+                $taken = $done >= $exam->max_attempts;
+                $events[] = [
+                    'date' => $exam->available_until->format('Y-m-d'),
+                    'type' => in_array($exam->category, ['exam', 'assessment'], true) ? $exam->category : 'assignment',
+                    'title' => $exam->title,
+                    'route' => route('student.exams.show', $exam),
+                    'urgent' => $exam->available_until->isToday(),
+                    'taken' => $taken,
+                ];
+            }
+
+            // Quizzes with expires_at
+            $quizzes = Quiz::published()
+                ->where('class_id', $classId)
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '>=', $today)
+                ->where('expires_at', '<=', $horizon)
+                ->get(['id', 'title', 'expires_at', 'school_id', 'class_id', 'is_published']);
+
+            foreach ($quizzes as $quiz) {
+                $events[] = [
+                    'date' => $quiz->expires_at->format('Y-m-d'),
+                    'type' => 'quiz',
+                    'title' => $quiz->title,
+                    'route' => route('student.quizzes.index'),
+                    'urgent' => $quiz->expires_at->isToday(),
+                    'taken' => false,
+                ];
+            }
+
+            // Assignment due dates
+            if ($currentSession && $currentTerm) {
+                $assignments = Assignment::where('class_id', $classId)
+                    ->where('session_id', $currentSession->id)
+                    ->where('term_id', $currentTerm->id)
+                    ->where('status', 'approved')
+                    ->whereNotNull('due_date')
+                    ->where('due_date', '>=', $today)
+                    ->where('due_date', '<=', $horizon)
+                    ->get(['id', 'title', 'week_number', 'due_date']);
+
+                foreach ($assignments as $assignment) {
+                    $events[] = [
+                        'date' => $assignment->due_date->format('Y-m-d'),
+                        'type' => 'assignment',
+                        'title' => $assignment->title ?? __('Week :week Assignment', ['week' => $assignment->week_number]),
+                        'route' => route('student.assignments.index'),
+                        'urgent' => $assignment->due_date->isToday(),
+                        'taken' => false,
+                    ];
+                }
+            }
+        }
+
+        usort($events, static fn ($a, $b) => strcmp($a['date'], $b['date']));
+
+        return $events;
     }
 }

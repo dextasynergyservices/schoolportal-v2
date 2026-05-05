@@ -50,7 +50,7 @@
             {{-- School Header --}}
             <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5 text-white text-center">
                 @if ($school->logo_url)
-                    <img src="{{ $school->logo_url }}" alt="" class="mx-auto mb-2 h-16 w-16 rounded-full object-cover border-2 border-white/30">
+                    <img src="{{ $school->logoSmallUrl() }}" alt="" class="mx-auto mb-2 h-16 w-16 rounded-full object-cover border-2 border-white/30">
                 @endif
                 <h2 class="text-xl font-bold uppercase">{{ $school->name }}</h2>
                 <p class="text-sm text-white/80">{{ $school->address ?? '' }}</p>

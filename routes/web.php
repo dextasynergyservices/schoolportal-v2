@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\NoticeController;
 use App\Http\Controllers\Admin\ParentController;
 use App\Http\Controllers\Admin\PerformanceController as AdminPerformanceController;
 use App\Http\Controllers\Admin\PromotionController;
+use App\Http\Controllers\Admin\QuestionBankController;
 use App\Http\Controllers\Admin\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\ResultController;
 use App\Http\Controllers\Admin\ScoreController as AdminScoreController;
@@ -44,6 +45,8 @@ use App\Http\Controllers\Parent\DashboardController as ParentDashboardController
 use App\Http\Controllers\Parent\NoticeController as ParentNoticeController;
 use App\Http\Controllers\Parent\OverviewController as ParentOverviewController;
 use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Controllers\PwaManifestController;
+use App\Http\Controllers\Student\AchievementController;
 use App\Http\Controllers\Student\AssignmentController as StudentAssignmentController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\ExamController as StudentExamController;
@@ -101,6 +104,9 @@ Route::post('webhooks/paystack', PaystackWebhookController::class)->name('webhoo
 // All portal routes live under /portal
 Route::prefix('portal')->group(function () {
 
+    // PWA manifest — public, per-school branding (no auth required for browser install)
+    Route::get('manifest.json', PwaManifestController::class)->name('pwa.manifest');
+
     // Force password change (accessible when must_change_password = true)
     Route::middleware('auth')->group(function () {
         Route::get('password/change', [ChangePasswordController::class, 'show'])->name('password.change');
@@ -108,6 +114,12 @@ Route::prefix('portal')->group(function () {
 
         // Stop impersonating — accessible while logged in as school_admin (not super_admin)
         Route::post('impersonate/stop', [ImpersonateController::class, 'stop'])->name('impersonate.stop');
+
+        // Session keep-alive ping — resets session last_activity timestamp
+        Route::post('session/ping', function () {
+            // SessionTimeout middleware already updated last_activity, nothing extra needed
+            return response()->json(['ok' => true]);
+        })->name('session.ping')->middleware('throttle:60,1');
     });
 
     Route::middleware(['auth', 'verified'])->group(function () {
@@ -153,6 +165,9 @@ Route::prefix('portal')->group(function () {
             Route::post('students/{student}/deactivate', [StudentController::class, 'deactivate'])->name('admin.students.deactivate');
             Route::post('students/{student}/activate', [StudentController::class, 'activate'])->name('admin.students.activate');
             Route::post('students/{student}/transfer-class', [StudentController::class, 'transferClass'])->name('admin.students.transfer-class');
+            Route::get('students/{student}/full-profile-export', [StudentController::class, 'exportFullProfileCsv'])->name('admin.students.full-profile-export');
+            Route::get('students/{student}/academic-records-export', [StudentController::class, 'exportAcademicRecordsCsv'])->name('admin.students.academic-records-export');
+            Route::post('students/{student}/anonymize', [StudentController::class, 'anonymize'])->name('admin.students.anonymize')->middleware('throttle:sensitive-action');
             Route::get('students-import', [StudentImportController::class, 'create'])->name('admin.students.import');
             Route::post('students-import/preview', [StudentImportController::class, 'preview'])->name('admin.students.import.preview')->middleware('throttle:file-upload');
             Route::post('students-import', [StudentImportController::class, 'store'])->name('admin.students.import.store')->middleware('throttle:sensitive-action');
@@ -220,7 +235,7 @@ Route::prefix('portal')->group(function () {
             Route::put('terms/{term}', [SessionController::class, 'updateTerm'])->name('admin.terms.update');
 
             // Results
-            Route::resource('results', ResultController::class)->names('admin.results')->except('edit', 'update');
+            Route::resource('results', ResultController::class)->names('admin.results');
             Route::get('results-bulk', [BulkResultController::class, 'create'])->name('admin.results.bulk');
             Route::post('results-bulk/preview', [BulkResultController::class, 'preview'])->name('admin.results.bulk.preview')->middleware('throttle:file-upload');
             Route::post('results-bulk', [BulkResultController::class, 'store'])->name('admin.results.bulk.store')->middleware('throttle:file-upload');
@@ -279,6 +294,7 @@ Route::prefix('portal')->group(function () {
             Route::post('exams/store-subject', [AdminExamController::class, 'storeSubject'])->name('admin.exams.store-subject');
             Route::post('exams', [AdminExamController::class, 'store'])->name('admin.exams.store');
             Route::get('exams/{exam}', [AdminExamController::class, 'show'])->name('admin.exams.show');
+            Route::get('exams/{exam}/preview', [AdminExamController::class, 'preview'])->name('admin.exams.preview');
             Route::get('exams/{exam}/edit', [AdminExamController::class, 'edit'])->name('admin.exams.edit');
             Route::put('exams/{exam}', [AdminExamController::class, 'update'])->name('admin.exams.update');
             Route::post('exams/{exam}/publish', [AdminExamController::class, 'publish'])->name('admin.exams.publish');
@@ -321,6 +337,14 @@ Route::prefix('portal')->group(function () {
             Route::post('settings/upload-logo', [SettingsController::class, 'uploadLogo'])->name('admin.settings.upload-logo');
             Route::delete('settings/remove-logo', [SettingsController::class, 'removeLogo'])->name('admin.settings.remove-logo');
             Route::put('settings/portal', [SettingsController::class, 'updatePortal'])->name('admin.settings.portal');
+
+            // Question Bank
+            Route::get('question-bank', [QuestionBankController::class, 'index'])->name('admin.question-bank.index');
+            Route::post('question-bank', [QuestionBankController::class, 'store'])->name('admin.question-bank.store');
+            Route::put('question-bank/{questionBank}', [QuestionBankController::class, 'update'])->name('admin.question-bank.update');
+            Route::delete('question-bank/{questionBank}', [QuestionBankController::class, 'destroy'])->name('admin.question-bank.destroy');
+            Route::get('question-bank/search', [QuestionBankController::class, 'search'])->name('admin.question-bank.search');
+            Route::post('question-bank/save-from-exam', [QuestionBankController::class, 'saveFromExam'])->name('admin.question-bank.save-from-exam');
 
             // Help Guide
             Route::get('help', HelpController::class)->name('admin.help');
@@ -399,6 +423,14 @@ Route::prefix('portal')->group(function () {
             Route::get('games/{game}/stats', [TeacherGameController::class, 'stats'])->name('teacher.games.stats');
             Route::delete('games/{game}', [TeacherGameController::class, 'destroy'])->name('teacher.games.destroy');
 
+            // Question Bank
+            Route::get('question-bank', [QuestionBankController::class, 'index'])->name('teacher.question-bank.index');
+            Route::post('question-bank', [QuestionBankController::class, 'store'])->name('teacher.question-bank.store');
+            Route::put('question-bank/{questionBank}', [QuestionBankController::class, 'update'])->name('teacher.question-bank.update');
+            Route::delete('question-bank/{questionBank}', [QuestionBankController::class, 'destroy'])->name('teacher.question-bank.destroy');
+            Route::get('question-bank/search', [QuestionBankController::class, 'search'])->name('teacher.question-bank.search');
+            Route::post('question-bank/save-from-exam', [QuestionBankController::class, 'saveFromExam'])->name('teacher.question-bank.save-from-exam');
+
             // CBT — Legacy redirect aliases (assessments → exams?category=assessment)
             Route::get('assessments', fn () => redirect()->route('teacher.exams.index', ['category' => 'assessment']))->name('teacher.assessments.index');
             Route::get('assessments/create', fn () => redirect()->route('teacher.exams.create', ['category' => 'assessment']))->name('teacher.assessments.create');
@@ -420,6 +452,7 @@ Route::prefix('portal')->group(function () {
             Route::post('exams/store-subject', [TeacherExamController::class, 'storeSubject'])->name('teacher.exams.store-subject');
             Route::post('exams', [TeacherExamController::class, 'store'])->name('teacher.exams.store');
             Route::get('exams/{exam}', [TeacherExamController::class, 'show'])->name('teacher.exams.show');
+            Route::get('exams/{exam}/preview', [TeacherExamController::class, 'preview'])->name('teacher.exams.preview');
             Route::get('exams/{exam}/edit', [TeacherExamController::class, 'edit'])->name('teacher.exams.edit');
             Route::put('exams/{exam}', [TeacherExamController::class, 'update'])->name('teacher.exams.update');
             Route::delete('exams/{exam}', [TeacherExamController::class, 'destroy'])->name('teacher.exams.destroy');
@@ -464,6 +497,7 @@ Route::prefix('portal')->group(function () {
         Route::prefix('student')->middleware('role:student')->group(function () {
             Route::get('dashboard', StudentDashboardController::class)->name('student.dashboard');
             Route::get('profile', StudentProfileController::class)->name('student.profile');
+            Route::get('achievements', AchievementController::class)->name('student.achievements');
 
             // Results
             Route::get('results', [StudentResultController::class, 'index'])->name('student.results.index');
@@ -584,6 +618,7 @@ Route::prefix('portal')->group(function () {
             Route::delete('schools/{school}/remove-logo', [SuperAdminSchoolController::class, 'removeLogo'])->name('super-admin.schools.remove-logo');
             Route::post('schools/{school}/impersonate', [ImpersonateController::class, 'start'])->name('super-admin.schools.impersonate')->middleware('throttle:sensitive-action');
             Route::post('schools/{school}/settings', [SuperAdminSchoolController::class, 'updateSettings'])->name('super-admin.schools.update-settings');
+            Route::post('schools/{school}/lock-features', [SuperAdminSchoolController::class, 'lockFeatures'])->name('super-admin.schools.lock-features');
 
             // AI Credits
             Route::get('credits', [SuperAdminCreditController::class, 'index'])->name('super-admin.credits.index');

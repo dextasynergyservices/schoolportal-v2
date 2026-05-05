@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlatformSetting;
 use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -69,13 +70,28 @@ class SettingsController extends Controller
             'enable_quiz_generator' => ['boolean'],
             'enable_game_generator' => ['boolean'],
             'enable_teacher_approval' => ['boolean'],
+            'enable_cbt_results_for_parents' => ['boolean'],
+            'enable_cbt_exam' => ['boolean'],
+            'enable_assessment' => ['boolean'],
+            'enable_cbt_assignment' => ['boolean'],
             'session_timeout_minutes' => ['required', 'integer', 'min:5', 'max:120'],
             'max_file_upload_mb' => ['required', 'integer', 'min:1', 'max:50'],
         ]);
 
         $settings = $school->settings ?? [];
-        $settings['portal'] = array_merge($settings['portal'] ?? [], $validated);
+        $portal = $settings['portal'] ?? [];
 
+        // Merge validated values, but skip any flag that is locked by super admin
+        $flagKeys = array_keys(PlatformSetting::FEATURE_FLAGS);
+        foreach ($validated as $key => $value) {
+            if (in_array($key, $flagKeys, true) && $school->featureLock($key) !== null) {
+                // Locked — ignore what the school admin submitted
+                continue;
+            }
+            $portal[$key] = $value;
+        }
+
+        $settings['portal'] = $portal;
         $school->update(['settings' => $settings]);
 
         return redirect()->route('admin.settings.index')
@@ -100,12 +116,6 @@ class SettingsController extends Controller
             $school->logo_url = $result['url'];
             $school->logo_public_id = $result['public_id'];
             $school->save();
-
-            \Log::info('Logo uploaded successfully', [
-                'school_id' => $school->id,
-                'logo_url' => $school->logo_url,
-                'logo_public_id' => $school->logo_public_id,
-            ]);
 
             return redirect()->route('admin.settings.index')
                 ->with('success', __('School logo updated.'));

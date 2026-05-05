@@ -96,7 +96,7 @@
                                         : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700/50'"
                                     class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0 cursor-pointer"
                                 >
-                                    <flux:avatar size="sm" :src="$child->avatar_url" :name="$child->name" :initials="$child->initials()" />
+                                    <flux:avatar size="sm" :src="$child->avatarThumbUrl()" :name="$child->name" :initials="$child->initials()" />
                                     <div class="text-left">
                                         <p class="text-sm font-semibold leading-tight">{{ $child->name }}</p>
                                         <p class="text-[11px] leading-tight" :class="sel === {{ $loop->index }} ? 'text-white/70' : 'opacity-50'">
@@ -122,7 +122,7 @@
                         {{-- Profile Header --}}
                         <div class="dash-panel dash-animate dash-animate-delay-3">
                             <div class="flex items-center gap-4">
-                                <flux:avatar size="xl" :src="$child->avatar_url" :name="$child->name" :initials="$child->initials()" />
+                                <flux:avatar size="xl" :src="$child->avatarProfileUrl()" :name="$child->name" :initials="$child->initials()" />
                                 <div class="min-w-0 flex-1">
                                     <h3 class="text-lg font-bold text-zinc-900 dark:text-white truncate">{{ $child->name }}</h3>
                                     <p class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -305,7 +305,7 @@
                     @foreach ($recentNotices as $notice)
                         <a href="{{ route('parent.notices.show', $notice) }}" wire:navigate class="flex items-start gap-3 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
                             @if ($notice->image_url)
-                                <img src="{{ $notice->image_url }}" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />
+                                <img src="{{ $notice->imageThumbnailUrl() }}" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />
                             @else
                                 <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 shrink-0">
                                     <flux:icon.megaphone class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
@@ -327,7 +327,7 @@
             <div class="flex items-center gap-3 mb-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-700">
                     @if ($school->logo_url)
-                        <img src="{{ $school->logo_url }}" alt="{{ $school->name }}" class="w-8 h-8 rounded object-contain" />
+                        <img src="{{ $school->logoSmallUrl() }}" alt="{{ $school->name }}" class="w-8 h-8 rounded object-contain" />
                     @else
                         <flux:icon.building-office-2 class="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
                     @endif

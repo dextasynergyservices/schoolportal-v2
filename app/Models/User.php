@@ -8,6 +8,7 @@ use App\Notifications\ResetPassword;
 use App\Notifications\VerifyEmail;
 use App\Traits\Auditable;
 use App\Traits\BelongsToTenant;
+use App\Traits\HasCloudinaryImages;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,7 +23,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use Auditable, BelongsToTenant, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use Auditable, BelongsToTenant, HasCloudinaryImages, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'school_id',
@@ -36,6 +37,7 @@ class User extends Authenticatable
         'phone',
         'gender',
         'is_active',
+        'is_anonymized',
         'deactivation_reason',
         'deactivated_at',
         'must_change_password',
@@ -60,6 +62,7 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'is_anonymized' => 'boolean',
             'deactivated_at' => 'datetime',
             'must_change_password' => 'boolean',
             'school_id' => 'integer',
@@ -230,5 +233,25 @@ class User extends Authenticatable
             ['id' => 'approvals_activity', 'visible' => true],
             ['id' => 'analytics_link', 'visible' => true],
         ];
+    }
+
+    // ── Cloudinary Image Accessors ──
+
+    /** For nav menus and small header avatars (displayed ~40px, 80×80 for 2× retina). */
+    public function avatarThumbUrl(): string
+    {
+        return self::cloudinaryTransform($this->avatar_url, 'w_80,h_80,c_fill,g_face,f_auto,q_auto');
+    }
+
+    /** For list tables and small overview cards (displayed ~32–88px). */
+    public function avatarTableUrl(): string
+    {
+        return self::cloudinaryTransform($this->avatar_url, 'w_200,h_200,c_fill,g_face,f_auto,q_auto');
+    }
+
+    /** For profile/show pages (displayed ≥64px). */
+    public function avatarProfileUrl(): string
+    {
+        return self::cloudinaryTransform($this->avatar_url, 'w_400,h_400,c_fill,g_face,f_auto,q_auto');
     }
 }

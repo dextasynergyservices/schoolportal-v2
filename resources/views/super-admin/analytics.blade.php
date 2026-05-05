@@ -145,14 +145,16 @@
                     to:   '{{ $mode === 'custom' ? $end->format('Y-m-d')   : now()->format('Y-m-d') }}',
                     apply() {
                         if (!this.from || !this.to) return;
-                        window.location = '{{ route('super-admin.analytics') }}?range=custom&from=' + this.from + '&to=' + this.to;
+                        var url = '{{ route('super-admin.analytics') }}?range=custom&from=' + this.from + '&to=' + this.to;
+                    @if ($geoLocation !== '') url += '&geo_location={{ urlencode($geoLocation) }}'; @endif
+                    window.location = url;
                     }
                 }">
 
                     {{-- Preset tabs --}}
                     <div class="range-tabs">
                         @foreach(['3m' => '3M', '6m' => '6M', '12m' => '12M'] as $val => $label)
-                            <a href="{{ route('super-admin.analytics', ['range' => $val]) }}"
+                            <a href="{{ route('super-admin.analytics', array_filter(['range' => $val, 'geo_location' => $geoLocation ?: null])) }}"
                                wire:navigate
                                class="range-tab {{ $range === $val && $mode !== 'custom' ? 'active' : '' }}">
                                 {{ $label }}
@@ -203,7 +205,7 @@
                     </div>
 
                     {{-- Export CSV --}}
-                    <a href="{{ route('super-admin.analytics.export', array_filter(['range' => $range, 'from' => $mode === 'custom' ? $start->format('Y-m-d') : null, 'to' => $mode === 'custom' ? $end->format('Y-m-d') : null])) }}"
+                    <a href="{{ route('super-admin.analytics.export', array_filter(['range' => $range, 'from' => $mode === 'custom' ? $start->format('Y-m-d') : null, 'to' => $mode === 'custom' ? $end->format('Y-m-d') : null, 'geo_location' => $geoLocation ?: null])) }}"
                        class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/15 hover:text-white text-sm font-semibold transition-all">
                         <flux:icon.arrow-down-tray class="w-4 h-4" />
                         {{ __('Export CSV') }}
@@ -212,7 +214,43 @@
                 </div>
             </div>
         </div>
+        {{-- ── Geo Filter ─────────────────────────────────────────────── --}}
+        <form method="GET" action="{{ route('super-admin.analytics') }}" class="flex flex-wrap items-center gap-3 dash-animate">
+            <input type="hidden" name="range" value="{{ $range }}" />
+            @if ($mode === 'custom')
+                <input type="hidden" name="from" value="{{ $start->format('Y-m-d') }}" />
+                <input type="hidden" name="to" value="{{ $end->format('Y-m-d') }}" />
+            @endif
 
+            <div class="flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 shrink-0">
+                <flux:icon.funnel class="w-4 h-4" />
+                {{ __('Filter schools:') }}
+            </div>
+
+            <flux:input
+                name="geo_location"
+                :value="$geoLocation"
+                placeholder="{{ __('City, state or country...') }}"
+                class="min-w-48"
+                icon="map-pin"
+                aria-label="{{ __('Filter by city, state or country') }}"
+            />
+
+            <flux:button type="submit" size="sm" variant="filled">{{ __('Apply') }}</flux:button>
+
+            @if ($geoLocation !== '')
+                <flux:button
+                    size="sm"
+                    variant="subtle"
+                    href="{{ route('super-admin.analytics', array_filter(['range' => $range, 'from' => $mode === 'custom' ? $start->format('Y-m-d') : null, 'to' => $mode === 'custom' ? $end->format('Y-m-d') : null])) }}"
+                    wire:navigate
+                >{{ __('Clear filter') }}</flux:button>
+                <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                    <flux:icon.building-office-2 class="w-4 h-4" />
+                    {{ __(':n school(s) matched', ['n' => $filteredSchoolCount]) }}
+                </span>
+            @endif
+        </form>
         {{-- ── KPI Cards ───────────────────────────────────────────────── --}}
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
 
@@ -343,6 +381,128 @@
 
         </div>
 
+        {{-- ── Geographic Breakdown ───────────────────────────────────── --}}
+        <div class="grid gap-4 lg:grid-cols-2 dash-animate dash-animate-delay-4">
+
+            {{-- By State --}}
+            <div class="chart-panel">
+                <div class="chart-panel-header flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                            <flux:icon.map-pin class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <span class="text-sm font-semibold text-zinc-800 dark:text-white">{{ __('Schools by State') }}</span>
+                    </div>
+                    <span class="text-xs text-zinc-400">{{ __('All time') }}</span>
+                </div>
+                <div class="p-4 space-y-2">
+                    @forelse ($geoData['by_state'] as $row)
+                        @php $max = $geoData['by_state'][0]['count'] ?? 1; @endphp
+                        <div class="flex items-center gap-3">
+                            <span class="w-28 shrink-0 text-xs text-zinc-600 dark:text-zinc-300 truncate" title="{{ $row['state'] }}">{{ $row['state'] }}</span>
+                            <div class="flex-1 bg-zinc-100 dark:bg-zinc-700 rounded-full h-2 overflow-hidden">
+                                <div class="h-2 rounded-full bg-emerald-500 transition-all duration-500"
+                                     style="width: {{ round(($row['count'] / $max) * 100) }}%"></div>
+                            </div>
+                            <span class="w-6 shrink-0 text-right text-xs font-semibold text-zinc-700 dark:text-zinc-200">{{ $row['count'] }}</span>
+                        </div>
+                    @empty
+                        <p class="text-sm text-zinc-400 py-4 text-center">{{ __('No geographic data yet') }}</p>
+                    @endforelse
+                </div>
+            </div>
+
+            {{-- Top Cities --}}
+            <div class="chart-panel">
+                <div class="chart-panel-header flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
+                            <flux:icon.building-office-2 class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                        </div>
+                        <span class="text-sm font-semibold text-zinc-800 dark:text-white">{{ __('Top Cities') }}</span>
+                    </div>
+                    <span class="text-xs text-zinc-400">{{ __('All time · top 20') }}</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="border-b border-zinc-100 dark:border-zinc-700">
+                                <th class="px-4 py-2 text-left font-medium text-zinc-500">#</th>
+                                <th class="px-4 py-2 text-left font-medium text-zinc-500">{{ __('City') }}</th>
+                                <th class="px-4 py-2 text-left font-medium text-zinc-500">{{ __('State') }}</th>
+                                <th class="px-4 py-2 text-right font-medium text-zinc-500">{{ __('Schools') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-50 dark:divide-zinc-700/50">
+                            @forelse ($geoData['by_city'] as $i => $row)
+                                <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
+                                    <td class="px-4 py-2 text-zinc-400">{{ $i + 1 }}</td>
+                                    <td class="px-4 py-2 font-medium text-zinc-700 dark:text-zinc-200">{{ $row['city'] }}</td>
+                                    <td class="px-4 py-2 text-zinc-500">{{ $row['state'] }}</td>
+                                    <td class="px-4 py-2 text-right font-semibold text-zinc-700 dark:text-zinc-200">{{ $row['count'] }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="px-4 py-6 text-center text-zinc-400">{{ __('No city data yet') }}</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        {{-- ── Cohort Analysis ─────────────────────────────────────────── --}}
+        @if (count($cohortData) > 0)
+        <div class="chart-panel dash-animate dash-animate-delay-5">
+            <div class="chart-panel-header flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                        <flux:icon.arrow-trending-up class="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <div>
+                        <span class="text-sm font-semibold text-zinc-800 dark:text-white">{{ __('Cohort Retention') }}</span>
+                        <p class="text-xs text-zinc-400">{{ __('% of schools that signed up in month X still active in month X+3') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 overflow-x-auto">
+                <table class="w-full text-xs min-w-[480px]">
+                    <thead>
+                        <tr class="border-b border-zinc-100 dark:border-zinc-700">
+                            <th class="px-3 py-2 text-left font-medium text-zinc-500">{{ __('Cohort') }}</th>
+                            <th class="px-3 py-2 text-right font-medium text-zinc-500">{{ __('Joined') }}</th>
+                            <th class="px-3 py-2 text-right font-medium text-zinc-500">{{ __('Active @ +3m') }}</th>
+                            <th class="px-3 py-2 text-left font-medium text-zinc-500 w-40">{{ __('Retention') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-50 dark:divide-zinc-700/50">
+                        @foreach ($cohortData as $row)
+                            @php
+                                $pct = $row['retention'];
+                                $barColor = $pct >= 75 ? 'bg-emerald-500' : ($pct >= 50 ? 'bg-yellow-400' : 'bg-red-400');
+                                $textColor = $pct >= 75 ? 'text-emerald-600 dark:text-emerald-400' : ($pct >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500 dark:text-red-400');
+                            @endphp
+                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors">
+                                <td class="px-3 py-2 font-medium text-zinc-700 dark:text-zinc-200">{{ $row['cohort'] }}</td>
+                                <td class="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">{{ $row['joined'] }}</td>
+                                <td class="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">{{ $row['active_3m'] }}</td>
+                                <td class="px-3 py-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 bg-zinc-100 dark:bg-zinc-700 rounded-full h-2 overflow-hidden">
+                                            <div class="h-2 rounded-full {{ $barColor }} transition-all duration-500"
+                                                 style="width: {{ min($pct, 100) }}%"></div>
+                                        </div>
+                                        <span class="w-12 text-right font-semibold {{ $textColor }}">{{ $pct }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @endif
+
         {{-- ── Back ────────────────────────────────────────────────────── --}}
         <div class="flex justify-start">
             <a href="{{ route('super-admin.dashboard') }}" wire:navigate
@@ -354,8 +514,7 @@
 
     </div>
 
-    {{-- Chart.js from CDN (UMD build — no module/Vite complexity) --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    {{-- Inline script FIRST so window._initAnalyticsCharts is defined before the CDN onload fires --}}
     <script>
     (function () {
         var labels       = @json($monthLabels->values());
@@ -447,26 +606,29 @@
                   function(v){ return '  ' + v + ' credit' + (v !== 1 ? 's' : ''); });
         }
 
-        // Run on full page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
+        function runCharts() {
+            ['chart-schools','chart-students','chart-revenue','chart-credits'].forEach(function (id) {
+                var ex = Chart.getChart(id); if (ex) ex.destroy();
+            });
             init();
         }
 
-        // Re-run after wire:navigate SPA navigation (Livewire 4)
-        document.addEventListener('livewire:navigated', function () {
-            // Only re-init if the chart canvases are present on this page
-            if (document.getElementById('chart-schools')) {
-                // Destroy any existing Chart.js instances first to avoid "canvas already in use" errors
-                ['chart-schools','chart-students','chart-revenue','chart-credits'].forEach(function(id) {
-                    var existing = Chart.getChart(id);
-                    if (existing) existing.destroy();
-                });
-                init();
-            }
-        });
+        // Called by the Chart.js onload attribute below (handles full load + first SPA navigation)
+        window._initAnalyticsCharts = runCharts;
+
+        // For subsequent SPA navigations where Chart.js is already cached (onload won't fire again).
+        // Guard flag prevents duplicate listeners if the user visits this page multiple times.
+        if (!window._analyticsNavListenerRegistered) {
+            window._analyticsNavListenerRegistered = true;
+            document.addEventListener('livewire:navigated', function () {
+                if (document.getElementById('chart-schools') && typeof Chart !== 'undefined') {
+                    runCharts();
+                }
+            });
+        }
     })();
     </script>
+    {{-- Chart.js from CDN — onload calls _initAnalyticsCharts once the library is ready --}}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" onload="window._initAnalyticsCharts && window._initAnalyticsCharts()"></script>
 
 </x-layouts::app>

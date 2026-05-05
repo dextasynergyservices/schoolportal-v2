@@ -74,8 +74,10 @@
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="7" class="text-center py-8">
-                            {{ __('No assignments found.') }}
+                        <flux:table.cell colspan="7" class="py-14 text-center">
+                            <flux:icon.clipboard-document-list class="mx-auto w-10 h-10 text-zinc-300 dark:text-zinc-600" />
+                            <p class="mt-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('No assignments found.') }}</p>
+                            <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-500">{{ __('Assignments will appear here once uploaded for a class.') }}</p>
                         </flux:table.cell>
                     </flux:table.row>
                 @endforelse

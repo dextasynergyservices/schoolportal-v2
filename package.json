@@ -36,7 +36,9 @@
         "@commitlint/cli": "^20.5.0",
         "@commitlint/config-conventional": "^20.5.0",
         "husky": "^9.1.7",
-        "lint-staged": "^16.4.0"
+        "lint-staged": "^16.4.0",
+        "vite-plugin-pwa": "^1.2.0",
+        "workbox-window": "^7.4.1"
     },
     "lint-staged": {
         "*.php": [

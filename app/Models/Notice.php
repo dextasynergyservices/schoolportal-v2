@@ -7,13 +7,14 @@ namespace App\Models;
 use App\Services\FileUploadService;
 use App\Traits\Auditable;
 use App\Traits\BelongsToTenant;
+use App\Traits\HasCloudinaryImages;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Notice extends Model
 {
-    use Auditable, BelongsToTenant, HasFactory;
+    use Auditable, BelongsToTenant, HasCloudinaryImages, HasFactory;
 
     protected $fillable = [
         'school_id',
@@ -80,5 +81,19 @@ class Notice extends Model
         } catch (\Throwable) {
             return $value;
         }
+    }
+
+    // ── Cloudinary Image Accessors ──
+
+    /** For small inline thumbnails in dashboard notice cards (displayed ~48px). */
+    public function imageThumbnailUrl(): string
+    {
+        return self::cloudinaryTransform($this->image_url, 'w_128,h_128,c_fill,f_auto,q_auto');
+    }
+
+    /** For notice index grid cards displayed in aspect-video containers (~400px wide). */
+    public function imageCardUrl(): string
+    {
+        return self::cloudinaryTransform($this->image_url, 'w_800,h_450,c_fill,f_auto,q_auto');
     }
 }

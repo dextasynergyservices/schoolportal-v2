@@ -72,7 +72,7 @@
                     <flux:table.row>
                         <flux:table.cell>
                             <div class="flex items-center gap-2">
-                                <flux:avatar size="xs" :src="$student->avatar_url" :name="$student->name" />
+                                <flux:avatar size="xs" :src="$student->avatarTableUrl()" :name="$student->name" />
                                 <span class="font-medium">{{ $student->name }}</span>
                             </div>
                         </flux:table.cell>

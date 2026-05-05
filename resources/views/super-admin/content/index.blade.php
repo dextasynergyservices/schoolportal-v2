@@ -116,7 +116,7 @@
                                     <a href="{{ route('super-admin.schools.show', $school) }}" wire:navigate class="block min-w-0 hover:underline">
                                         <div class="flex items-center gap-2">
                                             @if ($school->logo_url)
-                                                <img src="{{ $school->logo_url }}" alt="" class="size-7 shrink-0 rounded object-contain" aria-hidden="true" />
+                                                <img src="{{ $school->logoSmallUrl() }}" alt="" class="size-7 shrink-0 rounded object-contain" aria-hidden="true" />
                                             @else
                                                 <div class="flex size-7 shrink-0 items-center justify-center rounded bg-zinc-100 dark:bg-zinc-700">
                                                     <flux:icon.building-office-2 class="size-4 text-zinc-400" />

@@ -17,6 +17,13 @@
 <link rel="icon" href="{{ $school?->setting('branding.favicon_url') ?? '/favicon.ico' }}" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
+{{-- PWA manifest (dynamic — per-school name/color, student portal only) --}}
+@auth
+    @if (auth()->user()?->role === 'student')
+        <link rel="manifest" href="{{ route('pwa.manifest') }}">
+    @endif
+@endauth
+
 <link rel="preconnect" href="https://fonts.bunny.net">
 <link rel="dns-prefetch" href="https://res.cloudinary.com">
 <link href="https://fonts.bunny.net/css?family=montserrat:300,400,500,600,700,800,900" rel="stylesheet" />
@@ -34,3 +41,5 @@
     }
 </style>
 @endif
+
+@stack('styles')

@@ -14,6 +14,8 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class AnalyticsController extends Controller
@@ -29,18 +31,53 @@ class AnalyticsController extends Controller
         $months = $monthKeys->count();
         $monthLabels = $monthKeys->map(fn (string $m) => Carbon::parse($m.'-01')->format("M 'y"));
 
-        $schoolsData = $this->seriesData($monthKeys, $start, $end, 'schools');
-        $studentsData = $this->seriesData($monthKeys, $start, $end, 'students');
-        $revenueData = $this->seriesData($monthKeys, $start, $end, 'revenue');
-        $creditsData = $this->seriesData($monthKeys, $start, $end, 'credits');
+        // ── Geo filter ────────────────────────────────────────────────
+        $geoLocation = $request->string('geo_location')->toString();
+
+        $filteredSchoolIds = null;
+        $filteredSchoolCount = null;
+
+        if ($geoLocation !== '') {
+            $filteredSchoolIds = School::tenants()
+                ->where(function ($q) use ($geoLocation) {
+                    $q->where('city', 'like', "%{$geoLocation}%")
+                        ->orWhere('state', 'like', "%{$geoLocation}%")
+                        ->orWhere('country', 'like', "%{$geoLocation}%");
+                })
+                ->pluck('id')
+                ->all();
+            $filteredSchoolCount = count($filteredSchoolIds);
+        }
+
+        $schoolsData = $this->seriesData($monthKeys, $start, $end, 'schools', $filteredSchoolIds);
+        $studentsData = $this->seriesData($monthKeys, $start, $end, 'students', $filteredSchoolIds);
+        $revenueData = $this->seriesData($monthKeys, $start, $end, 'revenue', $filteredSchoolIds);
+        $creditsData = $this->seriesData($monthKeys, $start, $end, 'credits', $filteredSchoolIds);
 
         $periodSchools = (int) array_sum($schoolsData);
         $periodStudents = (int) array_sum($studentsData);
         $periodRevenue = (float) array_sum($revenueData);
         $periodCredits = (int) array_sum($creditsData);
 
-        $totalSchools = School::tenants()->count();
-        $totalStudents = User::withoutGlobalScopes()->where('role', 'student')->count();
+        $totalSchools = $filteredSchoolCount ?? School::tenants()->count();
+        $totalStudents = User::withoutGlobalScopes()
+            ->where('role', 'student')
+            ->when($filteredSchoolIds !== null, fn ($q) => $q->whereIn('school_id', $filteredSchoolIds))
+            ->count();
+
+        // ── Geographic breakdown (always all-time, not scoped by geo filter) ─
+        $geoData = Cache::remember('platform:analytics:geo', now()->addMinutes(30), function () {
+            return $this->geoBreakdown();
+        });
+
+        // ── Cohort analysis (skip cache when geo filter is active) ────
+        $cohortData = ($filteredSchoolIds !== null)
+            ? $this->cohortAnalysis($monthKeys, $start, $end, $filteredSchoolIds)
+            : Cache::remember("platform:analytics:cohort:{$range}", now()->addMinutes(60), function () use ($start, $end, $monthKeys) {
+                return $this->cohortAnalysis($monthKeys, $start, $end);
+            });
+
+        $nigerianStates = config('schoolportal.nigerian_states');
 
         return view('super-admin.analytics', compact(
             'range',
@@ -57,8 +94,12 @@ class AnalyticsController extends Controller
             'periodCredits',
             'totalSchools',
             'totalStudents',
+            'geoData',
+            'cohortData',
             'start',
             'end',
+            'geoLocation',
+            'filteredSchoolCount',
         ));
     }
 
@@ -188,11 +229,12 @@ class AnalyticsController extends Controller
      * @param  Collection<int, string>  $monthKeys
      * @return array<int, int|float>
      */
-    private function seriesData(Collection $monthKeys, CarbonInterface $start, CarbonInterface $end, string $series): array
+    private function seriesData(Collection $monthKeys, CarbonInterface $start, CarbonInterface $end, string $series, ?array $schoolIds = null): array
     {
         $raw = match ($series) {
             'schools' => School::tenants()
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt")
+                ->when($schoolIds !== null, fn ($q) => $q->whereIn('id', $schoolIds))
                 ->whereBetween('created_at', [$start, $end])
                 ->groupBy('month')
                 ->get()
@@ -201,6 +243,7 @@ class AnalyticsController extends Controller
             'students' => User::withoutGlobalScopes()
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt")
                 ->where('role', 'student')
+                ->when($schoolIds !== null, fn ($q) => $q->whereIn('school_id', $schoolIds))
                 ->whereBetween('created_at', [$start, $end])
                 ->groupBy('month')
                 ->get()
@@ -209,6 +252,7 @@ class AnalyticsController extends Controller
             'revenue' => AiCreditPurchase::withoutGlobalScopes()
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount_naira) as total")
                 ->where('status', 'completed')
+                ->when($schoolIds !== null, fn ($q) => $q->whereIn('school_id', $schoolIds))
                 ->whereBetween('created_at', [$start, $end])
                 ->groupBy('month')
                 ->get()
@@ -216,6 +260,7 @@ class AnalyticsController extends Controller
 
             'credits' => AiCreditUsageLog::withoutGlobalScopes()
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, SUM(credits_used) as total")
+                ->when($schoolIds !== null, fn ($q) => $q->whereIn('school_id', $schoolIds))
                 ->whereBetween('created_at', [$start, $end])
                 ->groupBy('month')
                 ->get()
@@ -229,5 +274,109 @@ class AnalyticsController extends Controller
 
             return $series === 'revenue' ? (float) $value : (int) $value;
         })->values()->toArray();
+    }
+
+    /**
+     * Geographic breakdown — schools grouped by state, then city within each state.
+     *
+     * Returns:
+     * [
+     *   'by_state' => [['state' => 'Lagos', 'count' => 12], ...],   // sorted desc
+     *   'by_city'  => [['city' => 'Ikeja', 'state' => 'Lagos', 'count' => 5], ...],
+     * ]
+     *
+     * @return array{by_state: array<int, array{state: string, count: int}>, by_city: array<int, array{city: string, state: string, count: int}>}
+     */
+    private function geoBreakdown(): array
+    {
+        $byState = School::tenants()
+            ->select('state', DB::raw('COUNT(*) as count'))
+            ->whereNotNull('state')
+            ->where('state', '!=', '')
+            ->groupBy('state')
+            ->orderByDesc('count')
+            ->limit(15)
+            ->get()
+            ->map(fn ($r) => ['state' => (string) $r->state, 'count' => (int) $r->count])
+            ->values()
+            ->toArray();
+
+        $byCity = School::tenants()
+            ->select('city', 'state', DB::raw('COUNT(*) as count'))
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->groupBy('city', 'state')
+            ->orderByDesc('count')
+            ->limit(20)
+            ->get()
+            ->map(fn ($r) => ['city' => (string) $r->city, 'state' => (string) $r->state, 'count' => (int) $r->count])
+            ->values()
+            ->toArray();
+
+        return ['by_state' => $byState, 'by_city' => $byCity];
+    }
+
+    /**
+     * Cohort analysis — for each month in the window, how many schools that joined
+     * that month were still active (had at least one user login) 3 months later?
+     *
+     * Returns an array of cohort rows:
+     * [
+     *   ['cohort' => 'Feb '25', 'joined' => 4, 'active_3m' => 3, 'retention' => 75.0],
+     *   ...
+     * ]
+     * Cohorts within 3 months of today are excluded (too early to measure).
+     *
+     * @param  Collection<int, string>  $monthKeys
+     * @return array<int, array{cohort: string, joined: int, active_3m: int, retention: float}>
+     */
+    private function cohortAnalysis(Collection $monthKeys, CarbonInterface $start, CarbonInterface $end, ?array $schoolIds = null): array
+    {
+        $cutoff = now()->subMonths(3)->startOfMonth();
+        $rows = [];
+
+        // Fetch school IDs with their creation month in one query
+        $schools = School::tenants()
+            ->select('id', DB::raw("DATE_FORMAT(created_at, '%Y-%m') as join_month"))
+            ->when($schoolIds !== null, fn ($q) => $q->whereIn('id', $schoolIds))
+            ->whereBetween('created_at', [$start, $end])
+            ->get()
+            ->groupBy('join_month');
+
+        foreach ($monthKeys as $monthKey) {
+            $cohortMonth = Carbon::parse($monthKey.'-01');
+
+            // Skip cohorts less than 3 months ago — retention is not yet measurable
+            if ($cohortMonth->gte($cutoff)) {
+                continue;
+            }
+
+            $schoolsInCohort = $schools->get($monthKey, collect());
+            $joined = $schoolsInCohort->count();
+
+            if ($joined === 0) {
+                continue;
+            }
+
+            $ids = $schoolsInCohort->pluck('id');
+            $retentionWindowStart = $cohortMonth->copy()->addMonths(3)->startOfMonth();
+            $retentionWindowEnd = $cohortMonth->copy()->addMonths(3)->endOfMonth();
+
+            // Count how many of these schools had at least one user login during month+3
+            $active = User::withoutGlobalScopes()
+                ->whereIn('school_id', $ids)
+                ->whereBetween('last_login_at', [$retentionWindowStart, $retentionWindowEnd])
+                ->distinct('school_id')
+                ->count('school_id');
+
+            $rows[] = [
+                'cohort' => $cohortMonth->format("M 'y"),
+                'joined' => $joined,
+                'active_3m' => $active,
+                'retention' => $joined > 0 ? round(($active / $joined) * 100, 1) : 0.0,
+            ];
+        }
+
+        return $rows;
     }
 }

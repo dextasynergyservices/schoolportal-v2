@@ -365,7 +365,7 @@
                         @foreach ($recentPurchases as $purchase)
                             <div class="activity-item">
                                 @if ($purchase->purchaser?->avatar_url)
-                                    <img src="{{ $purchase->purchaser->avatar_url }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
+                                    <img src="{{ $purchase->purchaser->avatarTableUrl() }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
                                 @else
                                     <div class="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                                         {{ $purchase->purchaser ? strtoupper(substr($purchase->purchaser->name, 0, 1)) : '?' }}
@@ -407,7 +407,7 @@
                         @foreach ($recentActivity as $log)
                             <div class="activity-item">
                                 @if ($log->user?->avatar_url)
-                                    <img src="{{ $log->user->avatar_url }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
+                                    <img src="{{ $log->user->avatarTableUrl() }}" alt="" class="w-9 h-9 rounded-full object-cover shrink-0">
                                 @elseif ($log->user)
                                     <div class="w-9 h-9 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-600 ring-1 ring-zinc-300 dark:ring-zinc-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
                                         {{ strtoupper(substr($log->user->name, 0, 1)) }}

@@ -4,7 +4,17 @@
             <flux:button variant="subtle" size="sm" href="{{ route('admin.results.index') }}" wire:navigate icon="arrow-left">
                 {{ __('Back to Uploaded Results') }}
             </flux:button>
+            <flux:button variant="subtle" size="sm" href="{{ route('admin.results.edit', $result) }}" wire:navigate icon="arrow-path">
+                {{ __('Replace Result') }}
+            </flux:button>
         </x-admin-header>
+
+        @if (session('success'))
+            <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
+        @endif
+        @if (session('error'))
+            <flux:callout variant="danger" icon="exclamation-circle">{{ session('error') }}</flux:callout>
+        @endif
 
         <div class="max-w-2xl rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
             <dl class="space-y-4 text-sm">
@@ -52,7 +62,7 @@
                 </div>
                 @if ($result->notes)
                     <div>
-                        <dt class="text-zinc-500 mb-1">{{ __('Notes') }}</dt>
+                        <dt class="text-zinc-500 mb-1">{{ __('Notes / Replacement Reason') }}</dt>
                         <dd class="font-medium">{{ $result->notes }}</dd>
                     </div>
                 @endif

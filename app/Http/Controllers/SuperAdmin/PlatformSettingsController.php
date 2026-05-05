@@ -29,10 +29,22 @@ class PlatformSettingsController extends Controller
             'allowed_file_types' => ['required', 'string', 'max:500'],
             'max_upload_size_mb' => ['required', 'integer', 'min:1', 'max:100'],
             'credit_price_per_5' => ['required', 'integer', 'min:100', 'max:50000'],
+            // Feature flag platform defaults (checkboxes — absent means false)
+            'feature_default_enable_parent_portal' => ['nullable', 'boolean'],
+            'feature_default_enable_quiz_generator' => ['nullable', 'boolean'],
+            'feature_default_enable_game_generator' => ['nullable', 'boolean'],
+            'feature_default_enable_teacher_approval' => ['nullable', 'boolean'],
+            'feature_default_enable_cbt_results_for_parents' => ['nullable', 'boolean'],
         ]);
 
         // Checkboxes: absent when unchecked
         $validated['maintenance_mode'] = $request->boolean('maintenance_mode');
+
+        // Resolve boolean feature flag defaults (checkboxes absent = false)
+        foreach (array_keys(PlatformSetting::FEATURE_FLAGS) as $flag) {
+            $key = "feature_default_{$flag}";
+            $validated[$key] = $request->boolean($key);
+        }
 
         foreach ($validated as $key => $value) {
             PlatformSetting::set($key, $value ?? '');

@@ -16,7 +16,7 @@
                                 <img :src="preview" alt="Preview" class="w-full h-full object-cover" />
                             </template>
                             <template x-if="!preview && !removed && '{{ $student->avatar_url }}'">
-                                <img src="{{ $student->avatar_url }}" alt="{{ $student->name }}" class="w-full h-full object-cover" />
+                                <img src="{{ $student->avatarProfileUrl() }}" alt="{{ $student->name }}" class="w-full h-full object-cover" />
                             </template>
                             <template x-if="!preview && (removed || !'{{ $student->avatar_url }}')">
                                 <flux:icon.user class="w-8 h-8 text-zinc-400" />

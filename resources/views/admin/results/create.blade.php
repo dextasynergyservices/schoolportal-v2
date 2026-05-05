@@ -2,6 +2,14 @@
     <div class="space-y-6">
         <x-admin-header :title="__('Upload Result')" />
 
+        @if (session('error'))
+            <flux:callout variant="danger" icon="exclamation-circle">{{ session('error') }}</flux:callout>
+        @endif
+
+        @if (session('success'))
+            <flux:callout variant="success" icon="check-circle">{{ session('success') }}</flux:callout>
+        @endif
+
         <div class="max-w-2xl rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
             <form method="POST" action="{{ route('admin.results.store') }}" enctype="multipart/form-data" class="space-y-6">
                 @csrf

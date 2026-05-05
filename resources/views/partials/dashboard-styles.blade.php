@@ -21,6 +21,22 @@
         0% { background-position: -200% 0; }
         100% { background-position: 200% 0; }
     }
+
+    /* ── Stat Card Skeleton Loading ── */
+    [data-stat-loading] .stat-value {
+        background: linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s ease infinite;
+        color: transparent !important;
+        border-radius: 6px;
+        min-width: 60px;
+        display: inline-block;
+        pointer-events: none;
+    }
+    :is(.dark [data-stat-loading] .stat-value) {
+        background: linear-gradient(90deg, rgba(255,255,255,0.07) 25%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.07) 75%);
+        background-size: 200% 100%;
+    }
     @keyframes pulse-ring {
         0% { transform: scale(0.8); opacity: 0.5; }
         80%, 100% { transform: scale(2); opacity: 0; }

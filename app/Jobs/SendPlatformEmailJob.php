@@ -57,6 +57,7 @@ class SendPlatformEmailJob implements ShouldQueue
                     $record->subject,
                     $record->body,
                     $record->attachments ?? [],
+                    $school,
                 ));
 
             $record->increment('sent_count');

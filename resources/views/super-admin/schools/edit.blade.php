@@ -88,10 +88,39 @@
                             <flux:label>{{ __('City') }}</flux:label>
                             <flux:input name="city" :value="old('city', $school->city)" />
                         </flux:field>
-                        <flux:field>
+
+                        {{-- State: dropdown for Nigerian states, free-text fallback for others --}}
+                        @php
+                            $savedState = old('state', $school->state ?? '');
+                            $stateIsListed = in_array($savedState, $nigerianStates, true);
+                            $statePreset = $stateIsListed ? $savedState : ($savedState !== '' ? '__other__' : '');
+                            $stateCustom  = $stateIsListed ? '' : $savedState;
+                        @endphp
+                        <flux:field
+                            x-data="{
+                                preset: @js($statePreset),
+                                custom: @js($stateCustom),
+                                get final() { return this.preset === '__other__' ? this.custom : this.preset; },
+                            }"
+                        >
                             <flux:label>{{ __('State') }}</flux:label>
-                            <flux:input name="state" :value="old('state', $school->state)" />
+                            {{-- Hidden input carries the final value to the server --}}
+                            <input type="hidden" name="state" :value="final" />
+                            <flux:select x-model="preset" :placeholder="__('Select state…')">
+                                @foreach ($nigerianStates as $s)
+                                    <option value="{{ $s }}">{{ $s }}</option>
+                                @endforeach
+                                <option value="__other__">{{ __('Other / Not Listed') }}</option>
+                            </flux:select>
+                            <div x-show="preset === '__other__'" x-cloak class="mt-2">
+                                <flux:input
+                                    x-model="custom"
+                                    :placeholder="__('Enter state or region')"
+                                    aria-label="{{ __('Custom state name') }}"
+                                />
+                            </div>
                         </flux:field>
+
                         <flux:field>
                             <flux:label>{{ __('Country') }}</flux:label>
                             <flux:input name="country" :value="old('country', $school->country)" />
@@ -220,7 +249,7 @@
                     <div x-show="!preview">
                         @if ($school->logo_url)
                             <img
-                                src="{{ $school->logo_url }}"
+                                src="{{ $school->logoMediumUrl() }}"
                                 alt="{{ $school->name }} logo"
                                 class="size-20 rounded-lg border border-zinc-200 object-contain bg-white p-1 dark:border-zinc-700 dark:bg-zinc-800"
                             />

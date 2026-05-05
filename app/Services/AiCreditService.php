@@ -10,6 +10,7 @@ use App\Models\AiCreditUsageLog;
 use App\Models\School;
 use App\Models\User;
 use App\Notifications\CreditPurchaseConfirmation;
+use Illuminate\Support\Facades\DB;
 
 class AiCreditService
 {
@@ -50,42 +51,71 @@ class AiCreditService
     /**
      * Deduct 1 credit for an AI generation. Free credits consumed first, then purchased.
      * Returns true on success, false if insufficient credits.
+     *
+     * Uses a DB transaction with a row-level lock (lockForUpdate) so concurrent
+     * requests cannot both pass the credits check and both decrement — which would
+     * let credits go negative.
      */
     public function deductCredit(School $school, User $user, string $usageType, ?int $entityId = null, ?int $levelId = null): bool
     {
-        if (! $this->hasCredits($school, $levelId)) {
+        $deducted = DB::transaction(function () use ($school, $user, $usageType, $entityId, $levelId): bool {
+            // Re-read the school row with an exclusive lock so no other transaction
+            // can read or write it until this transaction commits.
+            $lockedSchool = School::lockForUpdate()->find($school->id);
+
+            if (! $lockedSchool) {
+                return false;
+            }
+
+            // If level allocation is configured, lock that row too and check it.
+            if ($levelId) {
+                $allocation = AiCreditAllocation::where('school_id', $lockedSchool->id)
+                    ->where('level_id', $levelId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($allocation) {
+                    if ($allocation->remainingCredits() < 1) {
+                        return false;
+                    }
+                    $allocation->increment('used_credits');
+                }
+            }
+
+            // Check school-wide balance.
+            $balance = $lockedSchool->ai_free_credits + $lockedSchool->ai_purchased_credits;
+            if ($balance < 1) {
+                return false;
+            }
+
+            // Deduct: free credits first, then purchased.
+            if ($lockedSchool->ai_free_credits > 0) {
+                $lockedSchool->decrement('ai_free_credits');
+            } else {
+                $lockedSchool->decrement('ai_purchased_credits');
+            }
+
+            // Log usage inside the transaction so it's rolled back if anything fails.
+            AiCreditUsageLog::create([
+                'school_id' => $lockedSchool->id,
+                'user_id' => $user->id,
+                'level_id' => $levelId,
+                'usage_type' => $usageType,
+                'entity_id' => $entityId,
+                'credits_used' => 1,
+            ]);
+
+            return true;
+        });
+
+        if (! $deducted) {
             return false;
         }
 
-        // If level allocation exists, deduct from there
-        if ($levelId) {
-            $allocation = AiCreditAllocation::where('school_id', $school->id)
-                ->where('level_id', $levelId)
-                ->first();
+        // Refresh the school model so the caller sees the updated balance.
+        $school->refresh();
 
-            if ($allocation && $allocation->remainingCredits() >= 1) {
-                $allocation->increment('used_credits');
-            }
-        }
-
-        // Deduct from school pool: free credits first, then purchased
-        if ($school->ai_free_credits > 0) {
-            $school->decrement('ai_free_credits');
-        } else {
-            $school->decrement('ai_purchased_credits');
-        }
-
-        // Log usage
-        AiCreditUsageLog::create([
-            'school_id' => $school->id,
-            'user_id' => $user->id,
-            'level_id' => $levelId,
-            'usage_type' => $usageType,
-            'entity_id' => $entityId,
-            'credits_used' => 1,
-        ]);
-
-        // Warn school admins when credits drop to or below the warning threshold
+        // Warn school admins when credits drop to or below the warning threshold.
         $remaining = $this->getSchoolBalance($school);
         if ($remaining <= 3) {
             app(NotificationService::class)->notifyLowCredits($school->id, $remaining);
@@ -96,25 +126,32 @@ class AiCreditService
 
     /**
      * Purchase credits (completes a purchase record and adds credits to school).
+     *
+     * Both the status update and the credit increment happen inside a single
+     * transaction so a mid-flight failure cannot leave the purchase "completed"
+     * without the credits being added.
      */
     public function completePurchase(AiCreditPurchase $purchase): void
     {
-        $purchase->update(['status' => 'completed']);
+        DB::transaction(function () use ($purchase): void {
+            $purchase->update(['status' => 'completed']);
 
+            $school = School::lockForUpdate()->find($purchase->school_id);
+            $school->increment('ai_purchased_credits', $purchase->credits);
+            $school->increment('ai_credits_total_purchased', $purchase->credits);
+        });
+
+        // Notifications run outside the transaction — a notification failure should
+        // never roll back a completed purchase.
         $school = School::find($purchase->school_id);
-        $school->increment('ai_purchased_credits', $purchase->credits);
-        $school->increment('ai_credits_total_purchased', $purchase->credits);
-
         $formattedAmount = '₦'.number_format((float) $purchase->amount_naira, 0);
 
-        // Notify super admins of the purchase (database + email)
         app(NotificationService::class)->notifyCreditPurchased(
             $school,
             $purchase->credits,
             $formattedAmount,
         );
 
-        // Send confirmation email to the purchaser (school admin)
         $purchaser = User::withoutGlobalScopes()->find($purchase->purchased_by);
         if ($purchaser?->email) {
             $newBalance = $school->ai_free_credits + $school->ai_purchased_credits;

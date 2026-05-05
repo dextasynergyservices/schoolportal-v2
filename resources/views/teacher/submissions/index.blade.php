@@ -85,7 +85,7 @@
                                     @break
                                 @case('exam')
                                     @php
-                                        $examEntity = \App\Models\Exam::find($submission->entity_id);
+                                        $examEntity = $examEntities->get($submission->entity_id);
                                         $examCategoryLabel = match ($examEntity?->category ?? 'exam') {
                                             'assessment' => __('Assessment'),
                                             'assignment' => __('CBT Assignment'),
@@ -128,11 +128,9 @@
                                     'notice' => route('teacher.notices.index'),
                                     'quiz' => route('teacher.quizzes.show', $submission->entity_id),
                                     'game' => route('teacher.games.show', $submission->entity_id),
-                                    'exam' => (function () use ($submission) {
-                                        $exam = \App\Models\Exam::find($submission->entity_id);
-                                        if (! $exam) return null;
-                                        return route('teacher.exams.show', $exam);
-                                    })(),
+                                    'exam' => ($examEntities->get($submission->entity_id)
+                                        ? route('teacher.exams.show', $examEntities->get($submission->entity_id))
+                                        : null),
                                     'report_card' => route('teacher.scores.reports'),
                                     default => null,
                                 };

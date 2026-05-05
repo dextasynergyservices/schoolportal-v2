@@ -22,6 +22,7 @@ class AcademicSession extends Model
         'end_date',
         'is_current',
         'status',
+        'archived_at',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ class AcademicSession extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'is_current' => 'boolean',
+            'archived_at' => 'datetime',
         ];
     }
 

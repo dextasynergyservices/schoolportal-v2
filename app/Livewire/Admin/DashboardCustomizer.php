@@ -131,7 +131,7 @@ class DashboardCustomizer extends Component
         $user->save();
 
         $this->showPanel = false;
-        $this->dispatch('dashboard-updated');
+        $this->dispatch('dashboard-updated', widgets: $this->widgets);
     }
 
     public function resetDefaults(): void

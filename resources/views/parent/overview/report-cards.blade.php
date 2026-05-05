@@ -21,7 +21,7 @@
                             <div class="flex items-center gap-3 mb-4">
                                 <div class="flex items-center justify-center w-11 h-11 rounded-full bg-indigo-100 dark:bg-indigo-900/30 shrink-0">
                                     @if ($child->avatar_url)
-                                        <img src="{{ $child->avatar_url }}" alt="{{ $child->name }}" class="w-11 h-11 rounded-full object-cover">
+                                        <img src="{{ $child->avatarTableUrl() }}" alt="{{ $child->name }}" class="w-11 h-11 rounded-full object-cover">
                                     @else
                                         <span class="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ Str::of($child->name)->explode(' ')->map(fn($n) => Str::substr($n, 0, 1))->take(2)->implode('') }}</span>
                                     @endif

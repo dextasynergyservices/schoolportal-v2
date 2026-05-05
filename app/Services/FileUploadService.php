@@ -8,6 +8,7 @@ use Cloudinary\Api\Upload\UploadApi;
 use Cloudinary\Asset\File;
 use Cloudinary\Configuration\Configuration;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 
 class FileUploadService
 {
@@ -36,7 +37,7 @@ class FileUploadService
      */
     public function uploadAvatar(UploadedFile $file, int $schoolId): array
     {
-        $result = $this->uploader->upload($file->getRealPath(), [
+        $result = $this->retryUpload(fn () => $this->uploader->upload($file->getRealPath(), [
             'folder' => "schoolportal/{$schoolId}/avatars",
             'transformation' => [
                 'width' => 400,
@@ -46,7 +47,7 @@ class FileUploadService
                 'quality' => 'auto',
                 'format' => 'webp',
             ],
-        ]);
+        ]));
 
         return [
             'url' => $result['secure_url'],
@@ -61,10 +62,10 @@ class FileUploadService
      */
     public function uploadSchoolLogo(UploadedFile $file, int $schoolId): array
     {
-        $result = $this->uploader->upload($file->getRealPath(), [
+        $result = $this->retryUpload(fn () => $this->uploader->upload($file->getRealPath(), [
             'folder' => "schoolportal/{$schoolId}/branding",
             'resource_type' => 'image',
-        ]);
+        ]));
 
         return [
             'url' => $result['secure_url'],
@@ -74,20 +75,45 @@ class FileUploadService
 
     /**
      * Delete an image from Cloudinary by its public ID.
+     * Returns true on success, false if the delete fails (logs a warning rather
+     * than throwing, so controllers do not 500 when Cloudinary is unreachable).
      */
-    public function delete(string $publicId): void
+    public function delete(string $publicId): bool
     {
-        $this->uploader->destroy($publicId);
+        try {
+            $this->uploader->destroy($publicId);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Cloudinary delete failed for image', [
+                'public_id' => $publicId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**
      * Delete a raw file (PDF, DOCX, etc.) from Cloudinary by its public ID.
      * Raw files require resource_type=raw — the default destroy() uses 'image'
      * which would silently return "not found" for raw resources.
+     * Returns true on success, false on failure (logs a warning instead of throwing).
      */
-    public function deleteRaw(string $publicId): void
+    public function deleteRaw(string $publicId): bool
     {
-        $this->uploader->destroy($publicId, ['resource_type' => 'raw']);
+        try {
+            $this->uploader->destroy($publicId, ['resource_type' => 'raw']);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Cloudinary delete failed for raw resource', [
+                'public_id' => $publicId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**
@@ -128,7 +154,7 @@ class FileUploadService
         }
 
         try {
-            $result = $this->uploader->upload($uploadPath, $options);
+            $result = $this->retryUpload(fn () => $this->uploader->upload($uploadPath, $options));
         } finally {
             if ($tempFile) {
                 @unlink($tempFile);
@@ -163,11 +189,11 @@ class FileUploadService
         $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $originalName);
         $uniqueName = $safeName.'_'.uniqid();
 
-        $result = $this->uploader->upload($filePath, [
+        $result = $this->retryUpload(fn () => $this->uploader->upload($filePath, [
             'folder' => "schoolportal/{$schoolId}/results",
             'resource_type' => 'raw',
             'public_id' => $uniqueName.'.'.$extension,
-        ]);
+        ]));
 
         return [
             'url' => $result['secure_url'],
@@ -213,11 +239,11 @@ class FileUploadService
         copy($file->getRealPath(), $tempFile);
 
         try {
-            $result = $this->uploader->upload($tempFile, [
+            $result = $this->retryUpload(fn () => $this->uploader->upload($tempFile, [
                 'folder' => 'schoolportal/platform/email-attachments',
                 'resource_type' => 'raw',
                 'public_id' => $uniqueName.'.'.$extension,
-            ]);
+            ]));
         } finally {
             @unlink($tempFile);
         }
@@ -253,11 +279,11 @@ class FileUploadService
         copy($file->getRealPath(), $tempFile);
 
         try {
-            $result = $this->uploader->upload($tempFile, [
+            $result = $this->retryUpload(fn () => $this->uploader->upload($tempFile, [
                 'folder' => "schoolportal/{$schoolId}/{$subfolder}",
                 'resource_type' => 'raw',
                 'public_id' => $uniqueName.'.'.$extension,
-            ]);
+            ]));
         } finally {
             @unlink($tempFile);
         }
@@ -311,5 +337,38 @@ class FileUploadService
         ]);
 
         $configured = true;
+    }
+
+    /**
+     * Upload to Cloudinary with exponential-backoff retry on transient failures.
+     *
+     * @param  callable(): mixed  $fn  Closure that performs the actual upload and returns the result.
+     * @param  int  $maxAttempts  Number of upload attempts (default 3).
+     * @return mixed Cloudinary upload result.
+     *
+     * @throws \Throwable Re-throws the last exception after all attempts are exhausted.
+     */
+    private function retryUpload(callable $fn, int $maxAttempts = 3): mixed
+    {
+        $lastException = null;
+        $delayMs = 2000; // Start at 2 s, doubles on each retry.
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                return $fn();
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                Log::warning("Cloudinary upload attempt {$attempt}/{$maxAttempts} failed.", [
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < $maxAttempts) {
+                    usleep($delayMs * 1000);
+                    $delayMs *= 2;
+                }
+            }
+        }
+
+        throw $lastException;
     }
 }

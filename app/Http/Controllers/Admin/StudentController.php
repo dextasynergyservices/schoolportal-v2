@@ -11,6 +11,8 @@ use App\Models\ParentStudent;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
 use App\Models\StudentProfile;
+use App\Models\StudentSubjectScore;
+use App\Models\StudentTermReport;
 use App\Models\User;
 use App\Notifications\PasswordResetByAdmin;
 use App\Notifications\StudentMovedClassNotification;
@@ -20,6 +22,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -589,5 +593,216 @@ class StudentController extends Controller
             'from' => $currentClass->name,
             'to' => $newClass->name,
         ]));
+    }
+
+    /**
+     * Export a single student's full profile as CSV (GDPR data portability).
+     */
+    public function exportFullProfileCsv(User $student): StreamedResponse
+    {
+        abort_unless($student->role === 'student', 404);
+
+        $student->load([
+            'studentProfile.class.level',
+            'level',
+            'parentUsers',
+        ]);
+
+        $profile = $student->studentProfile;
+        $class = $profile?->class;
+        $level = $class?->level ?? $student->level;
+
+        $parents = $student->parentUsers->map(function (User $parent) {
+            return $parent->name.($parent->phone ? ' ('.$parent->phone.')' : '');
+        })->implode(' | ');
+
+        $filename = 'student-profile-'.$student->id.'-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($student, $profile, $class, $level, $parents) {
+            $handle = fopen('php://output', 'w');
+
+            // UTF-8 BOM for Excel compatibility.
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Field', 'Value',
+            ]);
+
+            $rows = [
+                ['Name', $student->name],
+                ['Username', $student->username],
+                ['Email', $student->email ?? ''],
+                ['Phone', $student->phone ?? ''],
+                ['Gender', $student->gender ?? ''],
+                ['Level', $level?->name ?? ''],
+                ['Class', $class?->name ?? ''],
+                ['Admission Number', $profile?->admission_number ?? ''],
+                ['Date of Birth', $profile?->date_of_birth?->format('Y-m-d') ?? ''],
+                ['Blood Group', $profile?->blood_group ?? ''],
+                ['Address', $profile?->address ?? ''],
+                ['Medical Notes', $profile?->medical_notes ?? ''],
+                ['Parents / Guardians', $parents],
+                ['Status', $student->is_active ? 'Active' : 'Inactive'],
+                ['Account Created', $student->created_at->format('Y-m-d H:i')],
+                ['Last Login', $student->last_login_at?->format('Y-m-d H:i') ?? 'Never'],
+                ['Is Anonymized', $student->is_anonymized ? 'Yes' : 'No'],
+            ];
+
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Export a student's full academic records (all terms/sessions/subjects) as CSV.
+     */
+    public function exportAcademicRecordsCsv(User $student): StreamedResponse
+    {
+        abort_unless($student->role === 'student', 404);
+
+        $scores = StudentSubjectScore::where('student_id', $student->id)
+            ->with([
+                'subject:id,name',
+                'term:id,name,term_number,session_id',
+                'term.session:id,name',
+                'class:id,name',
+            ])
+            ->orderBy('session_id')
+            ->orderBy('term_id')
+            ->orderBy('subject_id')
+            ->get();
+
+        // Index term reports by [session_id][term_id] for quick lookup.
+        $reports = StudentTermReport::where('student_id', $student->id)
+            ->with(['session:id,name', 'term:id,name'])
+            ->get()
+            ->keyBy(fn ($r) => $r->session_id.'-'.$r->term_id);
+
+        $admissionNo = $student->studentProfile?->admission_number ?? $student->id;
+        $filename = 'academic-records-'.$admissionNo.'-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($scores, $reports) {
+            $handle = fopen('php://output', 'w');
+
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Session',
+                'Term',
+                'Class',
+                'Subject',
+                'Score',
+                'Max Score',
+                'Term Total Score',
+                'Term Average Score',
+                'Class Position',
+                'Out Of',
+                'Term Status',
+                'Teacher Comment',
+            ]);
+
+            foreach ($scores as $score) {
+                $reportKey = $score->session_id.'-'.$score->term_id;
+                $report = $reports[$reportKey] ?? null;
+
+                fputcsv($handle, [
+                    $score->term?->session?->name ?? '',
+                    $score->term?->name ?? '',
+                    $score->class?->name ?? '',
+                    $score->subject?->name ?? '',
+                    $score->score,
+                    $score->max_score,
+                    $report?->total_weighted_score ?? '',
+                    $report?->average_weighted_score ?? '',
+                    $report?->position ?? '',
+                    $report?->out_of ?? '',
+                    $report?->status ?? '',
+                    $report?->teacher_comment ?? '',
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Anonymize a student's personal data (GDPR right to erasure).
+     */
+    public function anonymize(Request $request, User $student, FileUploadService $uploadService): RedirectResponse
+    {
+        abort_unless($student->role === 'student', 404);
+
+        if ($student->is_anonymized) {
+            return back()->with('error', __('This student record has already been anonymized.'));
+        }
+
+        $oldAvatarPublicId = null;
+
+        DB::transaction(function () use ($student, &$oldAvatarPublicId) {
+            // If the student has an avatar, capture its public ID for deletion after transaction.
+            if ($student->avatar_url) {
+                // Extract public_id from Cloudinary URL or use a stored field if available.
+                // We store the URL; deletion will be attempted by the service on best-effort.
+                $oldAvatarPublicId = $student->avatar_public_id ?? null;
+            }
+
+            // Anonymize the user record.
+            $student->update([
+                'name' => 'Anonymized Student',
+                'username' => 'deleted_'.$student->id,
+                'email' => null,
+                'phone' => null,
+                'avatar_url' => null,
+                'password' => Hash::make(Str::random(64)),
+                'is_anonymized' => true,
+                'is_active' => false,
+                'deactivation_reason' => 'Data anonymized per GDPR/privacy request.',
+                'deactivated_at' => now(),
+            ]);
+
+            // Anonymize the student profile.
+            if ($student->studentProfile) {
+                $student->studentProfile->update([
+                    'date_of_birth' => null,
+                    'address' => null,
+                    'blood_group' => null,
+                    'medical_notes' => null,
+                    'admission_number' => 'DELETED-'.$student->id,
+                ]);
+            }
+
+            AuditLog::create([
+                'school_id' => $student->school_id,
+                'user_id' => auth()->id(),
+                'action' => 'student.anonymized',
+                'entity_type' => 'user',
+                'entity_id' => $student->id,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+        });
+
+        // Attempt to delete Cloudinary avatar outside the transaction (best-effort).
+        if ($oldAvatarPublicId) {
+            try {
+                $uploadService->delete($oldAvatarPublicId);
+            } catch (\Throwable) {
+                // Non-fatal: log and continue.
+                Log::warning('Failed to delete avatar from Cloudinary during anonymization', [
+                    'student_id' => $student->id,
+                    'public_id' => $oldAvatarPublicId,
+                ]);
+            }
+        }
+
+        return redirect()->route('admin.students.index')
+            ->with('success', __('Student record has been anonymized and all personal data removed.'));
     }
 }

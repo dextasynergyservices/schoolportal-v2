@@ -192,6 +192,13 @@
                             :class="finalPercentage >= 70 ? 'bg-green-500' : (finalPercentage >= 40 ? 'bg-amber-500' : 'bg-red-500')"
                             :style="'width:' + finalPercentage + '%'"></div>
                     </div>
+
+                    {{-- Offline queued notice --}}
+                    <div x-show="offlineScoreQueued" class="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                        <svg class="size-4 shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.584 10.587a2 2 0 0 0 2.828 2.83m5.145 5.145A9.955 9.955 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.106.654-4.062 1.77-5.672m3.144-2.65A9.956 9.956 0 0 1 12 2c5.523 0 10 4.477 10 10 0 2.107-.655 4.063-1.77 5.673"/></svg>
+                        {{ __("Offline — your score will be saved when you reconnect.") }}
+                    </div>
+
                     <div class="mt-6 flex items-center justify-center gap-3">
                         <flux:button variant="primary" @click="resetGame()">{{ __('Play Again') }}</flux:button>
                         <flux:button variant="subtle" href="{{ route('student.games.index') }}" wire:navigate>{{ __('Back to Games') }}</flux:button>
@@ -212,6 +219,7 @@
             const gameId = {{ $game->id }};
             const completeUrl = '{{ route("student.games.complete", $game) }}';
             const csrfToken = '{{ csrf_token() }}';
+            const scoreQueueKey = 'game_score_queue_' + gameId;
 
             return {
                 state: 'ready',
@@ -221,6 +229,7 @@
                 finalScore: 0,
                 finalMaxScore: 0,
                 finalPercentage: 0,
+                offlineScoreQueued: false,
 
                 // Memory Match
                 cards: [],
@@ -264,6 +273,23 @@
                     return m + ':' + String(sec).padStart(2, '0');
                 },
 
+                init() {
+                    // Check for a queued score from a previous offline session
+                    // (e.g. student completed the game while offline, then came back)
+                    this._onlineHandler = () => {
+                        if (this.offlineScoreQueued) {
+                            try {
+                                const queued = JSON.parse(localStorage.getItem(scoreQueueKey) || 'null');
+                                if (queued) {
+                                    this.offlineScoreQueued = false;
+                                    this._sendScore(queued.score, queued.max_score, queued.time_spent_seconds);
+                                }
+                            } catch (e) {}
+                        }
+                    };
+                    window.addEventListener('online', this._onlineHandler);
+                },
+
                 startGame() {
                     this.state = 'playing';
                     this.elapsed = 0;
@@ -290,11 +316,42 @@
                     this.finalPercentage = maxScore > 0 ? (score / maxScore * 100) : 0;
                     this.state = 'completed';
 
+                    if (!navigator.onLine) {
+                        // Queue the score — will be sent when back online
+                        this.offlineScoreQueued = true;
+                        try {
+                            localStorage.setItem(scoreQueueKey, JSON.stringify({
+                                score, max_score: maxScore, time_spent_seconds: this.elapsed,
+                            }));
+                        } catch (e) {}
+                        return;
+                    }
+                    this._sendScore(score, maxScore, this.elapsed);
+                },
+
+                _sendScore(score, maxScore, timeSpent) {
                     fetch(completeUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                        body: JSON.stringify({ score, max_score: maxScore, time_spent_seconds: this.elapsed }),
+                        body: JSON.stringify({ score, max_score: maxScore, time_spent_seconds: timeSpent }),
+                    }).then(() => {
+                        try { localStorage.removeItem(scoreQueueKey); } catch (e) {}
+                        this.offlineScoreQueued = false;
+                    }).catch(() => {
+                        // Network error after initial online check — re-queue
+                        this.offlineScoreQueued = true;
+                        try {
+                            localStorage.setItem(scoreQueueKey, JSON.stringify({
+                                score, max_score: maxScore, time_spent_seconds: timeSpent,
+                            }));
+                        } catch (e) {}
                     });
+                },
+
+                destroy() {
+                    clearInterval(this.timer);
+                    clearInterval(this.questionInterval);
+                    if (this._onlineHandler) window.removeEventListener('online', this._onlineHandler);
                 },
 
                 // ── Memory Match ──

@@ -13,6 +13,7 @@ use App\Traits\NotifiesAdminsOnSubmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class AssignmentController extends Controller
@@ -83,37 +84,67 @@ class AssignmentController extends Controller
 
         if ($request->hasFile('assignment_file')) {
             $school = app('current.school');
-            $upload = app(FileUploadService::class)->uploadAssignment($request->file('assignment_file'), $school->id);
+
+            try {
+                $upload = app(FileUploadService::class)->uploadAssignment($request->file('assignment_file'), $school->id);
+            } catch (\Throwable $e) {
+                Log::error('Assignment Cloudinary upload failed', [
+                    'teacher_id' => $teacher->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->withInput()
+                    ->with('error', __('File upload failed. Please try again.'));
+            }
+
             $fileUrl = $upload['url'];
             $filePublicId = $upload['public_id'];
         }
 
-        DB::transaction(function () use ($validated, $teacher, $fileUrl, $filePublicId) {
-            $assignment = Assignment::create([
-                'class_id' => $validated['class_id'],
-                'session_id' => $validated['session_id'],
-                'term_id' => $validated['term_id'],
-                'week_number' => $validated['week_number'],
-                'title' => $validated['title'] ?? null,
-                'description' => $validated['description'] ?? null,
-                'due_date' => $validated['due_date'] ?? null,
-                'file_url' => $fileUrl,
-                'file_public_id' => $filePublicId,
-                'uploaded_by' => $teacher->id,
-                'status' => 'pending',
-            ]);
+        try {
+            DB::transaction(function () use ($validated, $teacher, $fileUrl, $filePublicId) {
+                $assignment = Assignment::create([
+                    'class_id' => $validated['class_id'],
+                    'session_id' => $validated['session_id'],
+                    'term_id' => $validated['term_id'],
+                    'week_number' => $validated['week_number'],
+                    'title' => $validated['title'] ?? null,
+                    'description' => $validated['description'] ?? null,
+                    'due_date' => $validated['due_date'] ?? null,
+                    'file_url' => $fileUrl,
+                    'file_public_id' => $filePublicId,
+                    'uploaded_by' => $teacher->id,
+                    'status' => 'pending',
+                ]);
 
-            $action = TeacherAction::create([
-                'school_id' => $teacher->school_id,
+                $action = TeacherAction::create([
+                    'school_id' => $teacher->school_id,
+                    'teacher_id' => $teacher->id,
+                    'action_type' => 'upload_assignment',
+                    'entity_type' => 'assignment',
+                    'entity_id' => $assignment->id,
+                    'status' => 'pending',
+                ]);
+
+                $this->notifyAdminsOfPendingSubmission($action, $teacher);
+            });
+        } catch (\Throwable $e) {
+            if ($filePublicId) {
+                try {
+                    app(FileUploadService::class)->delete($filePublicId);
+                } catch (\Throwable) {
+                    // Best-effort cleanup
+                }
+            }
+
+            Log::error('Assignment DB save failed after Cloudinary upload', [
                 'teacher_id' => $teacher->id,
-                'action_type' => 'upload_assignment',
-                'entity_type' => 'assignment',
-                'entity_id' => $assignment->id,
-                'status' => 'pending',
+                'error' => $e->getMessage(),
             ]);
 
-            $this->notifyAdminsOfPendingSubmission($action, $teacher);
-        });
+            return redirect()->back()->withInput()
+                ->with('error', __('Failed to submit assignment. The uploaded file has been removed. Please try again.'));
+        }
 
         return redirect()->route('teacher.assignments.index')
             ->with('success', __('Assignment submitted for approval.'));
@@ -178,43 +209,88 @@ class AssignmentController extends Controller
             'due_date' => $validated['due_date'] ?? null,
         ];
 
+        $oldFilePublicId = null;
+        $newFilePublicId = null;
+
         if ($request->hasFile('assignment_file')) {
-            if ($assignment->file_public_id) {
-                app(FileUploadService::class)->delete($assignment->file_public_id);
-            }
             $school = app('current.school');
-            $upload = app(FileUploadService::class)->uploadAssignment($request->file('assignment_file'), $school->id);
+
+            try {
+                $upload = app(FileUploadService::class)->uploadAssignment($request->file('assignment_file'), $school->id);
+            } catch (\Throwable $e) {
+                Log::error('Assignment Cloudinary upload failed during update', [
+                    'teacher_id' => $teacher->id,
+                    'assignment_id' => $assignment->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->withInput()
+                    ->with('error', __('File upload failed. Please try again.'));
+            }
+
+            $newFilePublicId = $upload['public_id'];
+            $oldFilePublicId = $assignment->file_public_id;
             $data['file_url'] = $upload['url'];
             $data['file_public_id'] = $upload['public_id'];
         } elseif ($request->filled('file_url') && $request->input('file_url') !== $assignment->getRawOriginal('file_url')) {
-            if ($assignment->file_public_id) {
-                app(FileUploadService::class)->delete($assignment->file_public_id);
-            }
+            $oldFilePublicId = $assignment->file_public_id;
             $data['file_url'] = $validated['file_url'];
             $data['file_public_id'] = null;
         }
 
-        DB::transaction(function () use ($data, $assignment, $teacher) {
-            $data['status'] = 'pending';
-            $assignment->update($data);
+        try {
+            DB::transaction(function () use ($data, $assignment, $teacher) {
+                $data['status'] = 'pending';
+                $assignment->update($data);
 
-            // Reset the existing TeacherAction to pending and re-notify admins
-            $action = TeacherAction::where('entity_type', 'assignment')
-                ->where('entity_id', $assignment->id)
-                ->where('teacher_id', $teacher->id)
-                ->first();
+                // Reset the existing TeacherAction to pending and re-notify admins
+                $action = TeacherAction::where('entity_type', 'assignment')
+                    ->where('entity_id', $assignment->id)
+                    ->where('teacher_id', $teacher->id)
+                    ->first();
 
-            if ($action) {
-                $action->update([
-                    'status' => 'pending',
-                    'reviewed_by' => null,
-                    'reviewed_at' => null,
-                    'rejection_reason' => null,
-                ]);
+                if ($action) {
+                    $action->update([
+                        'status' => 'pending',
+                        'reviewed_by' => null,
+                        'reviewed_at' => null,
+                        'rejection_reason' => null,
+                    ]);
 
-                $this->notifyAdminsOfPendingSubmission($action, $teacher);
+                    $this->notifyAdminsOfPendingSubmission($action, $teacher);
+                }
+            });
+        } catch (\Throwable $e) {
+            // DB failed — clean up any newly uploaded file to avoid orphan
+            if ($newFilePublicId) {
+                try {
+                    app(FileUploadService::class)->delete($newFilePublicId);
+                } catch (\Throwable) {
+                    // Best-effort cleanup
+                }
             }
-        });
+
+            Log::error('Assignment DB update failed', [
+                'teacher_id' => $teacher->id,
+                'assignment_id' => $assignment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->withInput()
+                ->with('error', __('Failed to update assignment. Please try again.'));
+        }
+
+        // DB succeeded — now safe to remove the old Cloudinary file
+        if ($oldFilePublicId) {
+            try {
+                app(FileUploadService::class)->delete($oldFilePublicId);
+            } catch (\Throwable $e) {
+                Log::warning('Could not delete old assignment file from Cloudinary', [
+                    'public_id' => $oldFilePublicId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return redirect()->route('teacher.assignments.index')
             ->with('success', __('Assignment updated and resubmitted for approval.'));

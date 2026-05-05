@@ -61,7 +61,7 @@
                     <flux:table.row>
                         <flux:table.cell>
                             <div class="flex items-center gap-3">
-                                <flux:avatar size="sm" :src="$parent->avatar_url" :name="$parent->name" />
+                                <flux:avatar size="sm" :src="$parent->avatarTableUrl()" :name="$parent->name" />
                                 <div class="min-w-0">
                                     <div class="truncate font-medium text-zinc-900 dark:text-white">{{ $parent->name }}</div>
                                     <flux:text size="xs" class="text-zinc-500">{{ $parent->username }}</flux:text>

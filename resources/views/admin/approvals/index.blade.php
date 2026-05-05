@@ -46,18 +46,54 @@
             </div>
         @endif
 
-        {{-- Bulk actions toolbar --}}
-        <div x-show="selected.length > 0" x-cloak x-transition class="sticky top-4 z-30 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-lg p-3 flex flex-wrap items-center gap-3">
-            <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300" x-text="selected.length + ' {{ __('submissions selected') }}'"></span>
+        {{-- Bulk actions floating bar (fixed bottom) --}}
+        <div
+            x-show="selected.length > 0"
+            x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-3"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 translate-y-3"
+            class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-2 rounded-2xl bg-zinc-900 dark:bg-zinc-800 shadow-2xl border border-zinc-700/60 text-white whitespace-nowrap"
+        >
+            <span class="text-xs text-zinc-400 pl-1 pr-2 border-r border-zinc-700" x-text="selected.length + ' {{ __('selected') }}'"></span>
+
             <form method="POST" action="{{ route('admin.approvals.bulk-approve') }}" class="inline-flex">
                 @csrf
                 <template x-for="id in selected" :key="id">
                     <input type="hidden" name="action_ids[]" :value="id">
                 </template>
-                <flux:button type="submit" variant="primary" size="sm">{{ __('Approve Selected') }}</flux:button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-medium transition-colors"
+                >
+                    <svg class="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                    {{ __('Approve') }}
+                    <span class="tabular-nums font-semibold" x-text="'(' + selected.length + ')'"></span>
+                </button>
             </form>
-            <flux:button variant="danger" size="sm" @click="showBulkReject = true">{{ __('Reject Selected') }}</flux:button>
-            <flux:button variant="subtle" size="sm" @click="selected = []">{{ __('Clear Selection') }}</flux:button>
+
+            <button
+                type="button"
+                @click="showBulkReject = true"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-medium transition-colors"
+            >
+                <svg class="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                {{ __('Reject') }}
+                <span class="tabular-nums font-semibold" x-text="'(' + selected.length + ')'"></span>
+            </button>
+
+            <button
+                type="button"
+                @click="selected = []"
+                class="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700/70 transition-colors ml-0.5"
+                title="{{ __('Clear selection') }}"
+                aria-label="{{ __('Clear selection') }}"
+            >
+                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
         </div>
 
         <div class="space-y-4">

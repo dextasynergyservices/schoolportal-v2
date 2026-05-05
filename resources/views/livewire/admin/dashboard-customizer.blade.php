@@ -41,7 +41,7 @@
             x-transition:leave-start="translate-x-0"
             x-transition:leave-end="translate-x-full"
             class="fixed right-0 inset-y-0 w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-700/50"
-            @click.outside="open = false"
+            @click.outside="if (open) open = false"
             x-data="{
                 draggingIndex: null,
                 dragOverIndex: null,
@@ -122,7 +122,7 @@
                                 @dragleave="handleDragLeave($event, {{ $index }})"
                                 @drop="handleDrop($event, {{ $index }})"
                                 @dragend="handleDragEnd()"
-                                class="relative flex items-center gap-3 px-3 py-3 rounded-xl border transition-all duration-200 cursor-grab active:cursor-grabbing select-none"
+                                class="group relative flex items-center gap-3 px-3 py-3 rounded-xl border transition-all duration-200 cursor-grab active:cursor-grabbing select-none"
                                 :class="dragOverIndex === {{ $index }}
                                     ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm ring-1 ring-blue-200 dark:ring-blue-800'
                                     : '{{ $widget['visible']
@@ -130,8 +130,8 @@
                                         : 'border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20' }}'"
                                 wire:key="widget-{{ $widget['id'] }}"
                             >
-                                {{-- Drag Handle --}}
-                                <div class="flex flex-col items-center gap-px text-zinc-300 dark:text-zinc-600 shrink-0" aria-hidden="true">
+                                {{-- Drag Handle (visible on hover) --}}
+                                <div class="flex flex-col items-center gap-px text-zinc-400 dark:text-zinc-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150" aria-hidden="true">
                                     <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                                         <circle cx="5" cy="3" r="1.5" />
                                         <circle cx="11" cy="3" r="1.5" />

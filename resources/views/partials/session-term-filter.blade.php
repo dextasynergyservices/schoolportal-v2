@@ -6,7 +6,6 @@
         x-data="{
             sessionId: '{{ $currentSession?->id ?? '' }}',
             termId: '{{ $currentTerm?->id ?? '' }}',
-            terms: {{ Js::from($allSessions->mapWithKeys(fn ($s) => [$s->id => $s->terms()->orderBy('term_number')->get(['id', 'name', 'term_number'])])) }},
             navigate(newSessionId = null, newTermId = null) {
                 const sid = newSessionId ?? this.sessionId;
                 const tid = newTermId ?? this.termId;
@@ -17,9 +16,7 @@
                 window.location.href = url.toString();
             },
             onSessionChange() {
-                const sessionTerms = this.terms[this.sessionId] || [];
-                this.termId = sessionTerms.length ? sessionTerms[0].id : '';
-                this.navigate(this.sessionId, this.termId);
+                this.navigate(this.sessionId, null);
             },
             onTermChange() {
                 this.navigate();
@@ -52,9 +49,11 @@
                 x-on:change="onTermChange()"
                 class="rounded-lg border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-primary/50 focus:border-primary"
             >
-                <template x-for="term in (terms[sessionId] || [])" :key="term.id">
-                    <option :value="term.id" x-text="term.name" :selected="term.id == termId"></option>
-                </template>
+                @foreach ($sessionTerms as $term)
+                    <option value="{{ $term->id }}" @selected($currentTerm?->id === $term->id)>
+                        {{ $term->name }}
+                    </option>
+                @endforeach
             </select>
         </div>
 

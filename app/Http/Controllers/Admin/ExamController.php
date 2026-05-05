@@ -845,6 +845,29 @@ class ExamController extends Controller
             ->with('success', __('Bulk grades saved successfully.'));
     }
 
+    // ── Preview ──
+
+    public function preview(Exam $exam): View
+    {
+        $exam->load(['questions', 'class:id,name', 'subject:id,name']);
+
+        $questions = $exam->shuffle_questions
+            ? $exam->questions->shuffle(crc32((string) $exam->id))
+            : $exam->questions->sortBy('sort_order');
+
+        $category = $exam->category;
+        $label = match ($category) {
+            'assessment' => __('Assessment'),
+            'assignment' => __('Assignment'),
+            default => __('Exam'),
+        };
+
+        return view('shared.exams.preview', array_merge(
+            compact('exam', 'questions', 'category', 'label'),
+            ['routePrefix' => $this->routePrefix()],
+        ));
+    }
+
     // ── Live Monitor & Analytics ──
 
     public function monitor(Exam $exam): View
