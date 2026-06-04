@@ -6,7 +6,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassSubject;
+use App\Models\Exam;
 use App\Models\SchoolClass;
+use App\Models\StudentSubjectScore;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -52,7 +54,25 @@ class SubjectController extends Controller
         $classIds = $validated['class_ids'] ?? [];
         unset($validated['class_ids']);
 
-        $validated['slug'] = Str::slug($validated['name']);
+        $slug = Str::slug($validated['name']);
+        $existingSubject = Subject::where('slug', $slug)->first();
+
+        if ($existingSubject) {
+            $message = $existingSubject->is_active
+                ? __('":name" already exists in the school subject pool. Assign the existing subject to classes instead.', [
+                    'name' => $existingSubject->name,
+                ])
+                : __('":name" already exists but is inactive. Reactivate it from the Subjects page instead of creating another copy.', [
+                    'name' => $existingSubject->name,
+                ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['name' => $message]);
+        }
+
+        $validated['slug'] = $slug;
+        $validated['created_by'] = auth()->id();
 
         $subject = Subject::create($validated);
 
@@ -104,7 +124,18 @@ class SubjectController extends Controller
         $classIds = $validated['class_ids'] ?? [];
         unset($validated['class_ids']);
 
-        $validated['slug'] = Str::slug($validated['name']);
+        $slug = Str::slug($validated['name']);
+        $duplicate = Subject::where('slug', $slug)->where('id', '!=', $subject->id)->first();
+
+        if ($duplicate) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors([
+                    'name' => __('":name" already exists in the school subject pool.', ['name' => $duplicate->name]),
+                ]);
+        }
+
+        $validated['slug'] = $slug;
 
         $subject->update($validated);
 
@@ -134,9 +165,10 @@ class SubjectController extends Controller
 
     public function destroy(Subject $subject): RedirectResponse
     {
-        if ($subject->classes()->exists()) {
+        if (Exam::where('subject_id', $subject->id)->exists()
+            || StudentSubjectScore::where('subject_id', $subject->id)->exists()) {
             return redirect()->route('admin.subjects.index')
-                ->with('error', __('Cannot delete a subject that is assigned to classes. Remove assignments first.'));
+                ->with('error', __('This subject has CBT or score history and cannot be deleted. Deactivate it instead.'));
         }
 
         $subject->delete();

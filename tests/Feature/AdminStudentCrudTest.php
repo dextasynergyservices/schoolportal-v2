@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Term;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\WithSchoolContext;
@@ -53,6 +54,15 @@ class AdminStudentCrudTest extends TestCase
             'username' => 'john_doe',
             'role' => 'student',
             'school_id' => $this->school->id,
+        ]);
+
+        $student = User::where('username', 'john_doe')->firstOrFail();
+        $currentTerm = Term::where('is_current', true)->firstOrFail();
+
+        $this->assertDatabaseHas('student_profiles', [
+            'user_id' => $student->id,
+            'enrolled_session_id' => $currentTerm->session_id,
+            'enrolled_term_id' => $currentTerm->id,
         ]);
     }
 

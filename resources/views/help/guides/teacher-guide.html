@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DX-SchoolPortal — Teacher Guide</title>
+    <style>
+        /* ── Print & PDF Optimization ──────────────────────── */
+        @media print {
+            body { font-size: 11pt; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+            section { page-break-inside: avoid; }
+            h2 { page-break-after: avoid; }
+            a { color: inherit; text-decoration: none; }
+            .cover { page-break-after: always; }
+            .toc details > .sub { display: block; }
+            .toc details summary::before { content: ''; width: 0; }
+        }
+
+        /* ── Base ──────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            line-height: 1.7;
+            color: #1a1a2e;
+            background: #fff;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* ── Cover Page ────────────────────────────────────── */
+        .cover {
+            text-align: center;
+            padding: 4rem 2rem;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .cover-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, #059669, #10b981);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto;
+        }
+        .cover-icon svg { width: 48px; height: 48px; color: white; }
+        .cover-role-badge {
+            display: inline-block;
+            padding: 0.4rem 1.2rem;
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Typography ────────────────────────────────────── */
+        p { margin-bottom: 0.75rem; }
+        strong { color: #059669; }
+        h1 { font-size: 1.75rem; font-weight: 700; color: #059669; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.4rem; font-weight: 700; color: #059669; margin-top: 2.5rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid #d1fae5; }
+        h3 { font-size: 1.1rem; font-weight: 600; color: #1a1a2e; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        h4 { font-size: 1rem; font-weight: 600; color: #444; margin-top: 1rem; margin-bottom: 0.35rem; }
+
+        .cover h1 { font-size: 2.5rem; font-weight: 800; color: #059669; }
+        .cover .subtitle { font-size: 1.25rem; color: #555; }
+        .cover .meta { font-size: 0.875rem; color: #888; margin-top: 2rem; }
+
+        /* ── Lists ──────────────────────────────────────────── */
+        ol, ul { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        li { margin-bottom: 0.3rem; }
+        ol ol, ul ul { margin-top: 0.3rem; }
+
+        /* ── Section header ────────────────────────────────── */
+        .section-header {
+            padding: 1.25rem 1.5rem;
+            border-radius: 12px;
+            margin: 3rem 0 1.5rem;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #059669, #10b981);
+        }
+
+        /* ── Boxes ─────────────────────────────────────────── */
+        .info-box {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .tip-box {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .warning-box {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .important-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        /* ── Tables ────────────────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+        th, td { padding: 0.6rem 0.75rem; text-align: left; border: 1px solid #e5e7eb; }
+        th { background: #f0fdf4; font-weight: 600; color: #374151; }
+        tr:nth-child(even) { background: #fafafa; }
+
+        /* ── Steps ─────────────────────────────────────────── */
+        .steps { counter-reset: step; list-style: none; margin-left: 0; }
+        .steps li {
+            counter-increment: step;
+            padding-left: 2.5rem;
+            position: relative;
+            margin-bottom: 0.75rem;
+        }
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0; top: 0.1rem;
+            width: 1.75rem; height: 1.75rem;
+            background: #059669;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── TOC ───────────────────────────────────────────── */
+        .toc {
+            background: #f0fdf4;
+            border: 1px solid #d1fae5;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+        }
+        .toc h2 { margin-top: 0; border: none; }
+        .toc ol { margin-left: 1.25rem; }
+        .toc li { margin-bottom: 0.3rem; }
+        .toc a { color: #059669; text-decoration: none; }
+        .toc details { margin-bottom: 0.3rem; }
+        .toc details summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 0.4rem; }
+        .toc details summary::-webkit-details-marker { display: none; }
+        .toc details summary::before { content: '▸'; font-size: 0.85rem; color: #059669; transition: transform 0.2s; display: inline-block; width: 1rem; flex-shrink: 0; }
+        .toc ul.sub { margin-left: 1.5rem; list-style: disc; }
+        .toc a:hover { text-decoration: underline; }
+        .toc details > .sub { margin-top: 0.25rem; }
+        .toc details[open] > summary::before { transform: rotate(90deg); }
+
+        /* ── Flow Diagrams ─────────────────────────────────── */
+        .flow {
+            background: #f0fdf4;
+            border: 1px solid #d1fae5;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            margin: 1rem 0;
+            color: #374151;
+        }
+
+        /* ── Sidebar Reference ─────────────────────────────── */
+        .sidebar-ref {
+            background: #f0fdf4;
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin: 0.75rem 0;
+            font-size: 0.9rem;
+        }
+        .sidebar-ref strong { color: #059669; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .badge-blue { background: #dbeafe; color: #1d4ed8; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; }
+        .badge-teal { background: #ccfbf1; color: #0f766e; }
+
+        hr { border: none; border-top: 1px solid #d1fae5; margin: 2rem 0; }
+        code { background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.88em; color: #047857; }
+    </style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════════╗ -->
+<!-- ║                     COVER PAGE                          ║ -->
+<!-- ╚══════════════════════════════════════════════════════════╝ -->
+<div class="cover">
+    <div class="cover-icon">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+        </svg>
+    </div>
+    <span class="cover-role-badge">📚 For Teachers</span>
+    <h1>DX-SchoolPortal</h1>
+    <p class="subtitle">Teacher's Complete Guide</p>
+    <p style="color: #666; max-width: 520px;">Everything you need to know as a teacher — from entering scores and creating CBT exams to uploading results, generating AI-powered quizzes, and posting notices for your students.</p>
+    <div class="meta">
+        <p>Version 2.0 &nbsp;·&nbsp; Last Updated: July 2025</p>
+        <p style="margin-top: 0.5rem;">This guide is exclusively for <strong>Teachers</strong>.</p>
+    </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════╗ -->
+<!-- ║                   TABLE OF CONTENTS                     ║ -->
+<!-- ╚══════════════════════════════════════════════════════════╝ -->
+<div class="toc page-break">
+    <h2>Table of Contents</h2>
+    <ol>
+        <li><a href="#overview">Your Role on DX-SchoolPortal</a></li>
+        <li><a href="#login">Logging In</a></li>
+        <li><a href="#navigation">Navigating the Portal</a></li>
+        <li><a href="#dashboard">Your Dashboard</a></li>
+        <li><a href="#approval-workflow">Understanding the Approval Workflow</a></li>
+        <li>
+            <details>
+                <summary><a href="#students">Your Students</a></summary>
+                <ul class="sub">
+                    <li><a href="#students-view">Viewing Your Class List</a></li>
+                    <li><a href="#students-insights">Student Insights &amp; Analytics</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#scores">Score Entry &amp; Report Cards</a></summary>
+                <ul class="sub">
+                    <li><a href="#scores-entry">Entering Scores</a></li>
+                    <li><a href="#scores-report-cards">Generating Report Cards</a></li>
+                    <li><a href="#scores-export">Exporting &amp; Downloading</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#results">Uploading Results (PDFs)</a></summary>
+                <ul class="sub">
+                    <li><a href="#results-single">Single Upload</a></li>
+                    <li><a href="#results-status">Checking Approval Status</a></li>
+                </ul>
+            </details>
+        </li>
+        <li><a href="#assignments">Assignments</a></li>
+        <li>
+            <details>
+                <summary><a href="#cbt">CBT (Computer-Based Testing)</a></summary>
+                <ul class="sub">
+                    <li><a href="#cbt-categories">Three CBT Categories</a></li>
+                    <li><a href="#cbt-create">Creating a CBT Exam</a></li>
+                    <li><a href="#cbt-questions">Adding Questions</a></li>
+                    <li><a href="#cbt-ai">AI Question Generation</a></li>
+                    <li><a href="#cbt-publish">Publishing &amp; Monitoring</a></li>
+                    <li><a href="#cbt-results">Viewing Results</a></li>
+                    <li><a href="#cbt-grading">Grading Theory Questions</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#quizzes">AI Quizzes</a></summary>
+                <ul class="sub">
+                    <li><a href="#quizzes-create">Creating a Quiz</a></li>
+                    <li><a href="#quizzes-ai">AI Generation (From Document or Prompt)</a></li>
+                    <li><a href="#quizzes-manual">Manual Creation</a></li>
+                    <li><a href="#quizzes-results">Viewing Quiz Results</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#games">Educational Games</a></summary>
+                <ul class="sub">
+                    <li><a href="#games-types">Game Types Explained</a></li>
+                    <li><a href="#games-create">Creating a Game</a></li>
+                    <li><a href="#games-stats">Viewing Game Stats</a></li>
+                </ul>
+            </details>
+        </li>
+        <li><a href="#notices">Posting Notices</a></li>
+        <li><a href="#submissions">Tracking All Your Submissions</a></li>
+        <li><a href="#ai-credits">AI Credits</a></li>
+        <li><a href="#security">Security &amp; Account Settings</a></li>
+        <li><a href="#faq">Frequently Asked Questions</a></li>
+    </ol>
+</div>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="overview" class="page-break">
+    <h2>1. Your Role on DX-SchoolPortal</h2>
+    <p>As a teacher, DX-SchoolPortal gives you a dedicated workspace to manage everything for your assigned class(es) — all from one place, on any device.</p>
+
+    <h3>What You Can Do</h3>
+    <table>
+        <thead>
+            <tr><th>Feature</th><th>What You Can Do</th><th>Approval Required?</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Score Entry</td><td>Enter and edit student scores for your classes</td><td>No (admin can lock)</td></tr>
+            <tr><td>Report Cards</td><td>Generate, view, download, and add comments</td><td>Submit to admin for approval</td></tr>
+            <tr><td>Uploaded Results (PDFs)</td><td>Upload result PDFs for students in your classes</td><td><strong>Yes</strong></td></tr>
+            <tr><td>Assignments</td><td>Upload class assignments by week</td><td><strong>Yes</strong></td></tr>
+            <tr><td>CBT Exams &amp; Assessments</td><td>Create, publish, monitor, and grade online exams</td><td><strong>Yes</strong></td></tr>
+            <tr><td>AI Quizzes</td><td>Create quizzes (AI-generated or manual)</td><td><strong>Yes</strong></td></tr>
+            <tr><td>Educational Games</td><td>Create interactive games for students</td><td><strong>Yes</strong></td></tr>
+            <tr><td>Notices</td><td>Post announcements to students/parents</td><td><strong>Yes</strong></td></tr>
+            <tr><td>Student Insights</td><td>View analytics for students in your classes</td><td>No</td></tr>
+        </tbody>
+    </table>
+
+    <div class="important-box">
+        <strong>Key rule:</strong> Everything you upload or create goes into a <strong>pending approval queue</strong>. Your school administrator reviews it and either approves (making it visible to students) or rejects it (with a reason for you to address). You will be notified of the outcome.
+    </div>
+
+    <h3>Your Scope: Your Classes Only</h3>
+    <p>You can only see and act on students in the classes assigned to you by your administrator. If you believe you should have access to additional classes, contact your administrator.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="login">
+    <h2>2. Logging In</h2>
+    <p>Open your school's portal URL in any web browser (Chrome, Firefox, Safari, Edge — works on phone, tablet, or computer).</p>
+
+    <ol class="steps">
+        <li>Navigate to your school's portal URL (e.g., <em>portal.yourschool.com/portal/login</em>).</li>
+        <li>Enter your <strong>Username</strong> — provided by your school administrator. Teachers log in with username only (not email).</li>
+        <li>Enter your <strong>Password</strong>.</li>
+        <li>Click <strong>"Log in"</strong>. You'll be taken directly to your teacher dashboard.</li>
+    </ol>
+
+    <div class="info-box">
+        <strong>First login:</strong> If the admin just created your account, you may be required to change the default password. Follow the on-screen prompts to set your new password.
+    </div>
+
+    <h3>Forgot Your Password?</h3>
+    <p>Teachers typically don't have email linked to their accounts. If you forget your password, contact your school administrator — they can reset it from your profile in the admin panel.</p>
+
+    <h3>Logging Out</h3>
+    <p>Always log out when done, especially on shared or school computers. Click your name/avatar in the top-right corner and select <strong>"Log out"</strong>. Sessions also auto-expire after a period of inactivity.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="navigation">
+    <h2>3. Navigating the Portal</h2>
+
+    <h3>On Desktop / Laptop</h3>
+    <ul>
+        <li><strong>Sidebar</strong> (left) — Main navigation, grouped into sections: Teaching, Scores &amp; Reports, Content, CBT &amp; Interactive, Communications, Tracking, and Settings.</li>
+        <li><strong>Top bar</strong> — Shows your school logo, a notifications bell (for approval results), and your profile menu (top-right).</li>
+        <li><strong>Main area</strong> — Page content.</li>
+    </ul>
+
+    <h3>On Mobile / Tablet</h3>
+    <ul>
+        <li>Tap the <strong>☰ hamburger icon</strong> (top-left) to open the navigation sidebar.</li>
+        <li>Tap any menu item to navigate, then tap outside the sidebar to close it.</li>
+    </ul>
+
+    <h3>Key UI Elements</h3>
+    <ul>
+        <li><strong>Notifications Bell</strong> — Alerts you when submissions are approved or rejected by the admin. Click to view details.</li>
+        <li><strong>Session &amp; Term Dropdowns</strong> — Appear on most data pages. Switch between periods to view or enter data for different terms.</li>
+        <li><strong>Breadcrumbs</strong> — At the top of detail pages so you can easily navigate back.</li>
+        <li><strong>Dark Mode</strong> — Available from Settings → Appearance.</li>
+    </ul>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="dashboard">
+    <h2>4. Your Dashboard</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Teaching → Dashboard</div>
+
+    <p>Your dashboard gives an at-a-glance view of your teaching workspace:</p>
+    <ul>
+        <li><strong>Welcome banner</strong> — Greeting, your name, current session and term.</li>
+        <li><strong>Rejected submissions alert</strong> — Prominently shown if any of your recent uploads were rejected by the admin. It displays the rejection reason so you know exactly what to fix and re-submit.</li>
+        <li><strong>Statistics cards:</strong>
+            <ul>
+                <li>Students in your assigned classes</li>
+                <li>Pending submissions (awaiting admin approval)</li>
+                <li>Published content (approved and live)</li>
+                <li>Active CBT exams</li>
+                <li>Published quizzes and games</li>
+            </ul>
+        </li>
+        <li><strong>Quick Actions</strong> — Shortcut buttons for common tasks: Upload Result, Add Assignment, Create CBT, Create Quiz.</li>
+        <li><strong>Session/Term filter</strong> — Use the dropdowns at the top to switch between different academic periods.</li>
+    </ul>
+
+    <div class="tip-box">
+        <strong>Tip:</strong> Check your dashboard at the start of each day. Any rejected content from the admin will be clearly highlighted here, reminding you to address and re-submit it.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="approval-workflow" class="page-break">
+    <h2>5. Understanding the Approval Workflow</h2>
+
+    <p>Everything you create or upload — results, assignments, CBT exams, quizzes, games, and notices — goes through an approval process before students or parents can see it.</p>
+
+    <div class="flow">You create/upload content
+       ↓
+  Status: ⏳ Pending Approval
+       ↓
+  Admin reviews your submission
+       ↓
+  ┌────────────────┬────────────────────────────────┐
+  │ ✅ APPROVED    │ ❌ REJECTED                    │
+  │                │                                │
+  │ Content is     │ You receive a notification     │
+  │ immediately    │ with the rejection reason.     │
+  │ visible to     │ Edit/fix the content and       │
+  │ students and   │ re-submit.                     │
+  │ parents.       │                                │
+  └────────────────┴────────────────────────────────┘</div>
+
+    <h3>Checking Approval Status</h3>
+    <p>You can always check the status of all your submissions in one place:</p>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Tracking → My Submissions</div>
+    <p>Each item shows one of three statuses:</p>
+    <ul>
+        <li><span class="badge badge-amber">Pending</span> — Awaiting admin review. Students cannot see it yet.</li>
+        <li><span class="badge badge-green">Approved</span> — Live and visible to students/parents.</li>
+        <li><span class="badge badge-red">Rejected</span> — Read the rejection reason and re-submit with the necessary corrections.</li>
+    </ul>
+
+    <div class="info-box">
+        <strong>Note:</strong> Your school admin may have disabled the approval requirement for some or all content types. If that is the case, your content will be auto-approved and published immediately. Ask your admin if you're unsure.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="students" class="page-break">
+    <h2>6. Your Students</h2>
+
+    <section id="students-view">
+        <h3 id="students-view">6.1 Viewing Your Class List</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> Teaching → My Students</div>
+
+        <p>This page lists all students in the classes assigned to you. For each student you can see:</p>
+        <ul>
+            <li>Full name and username</li>
+            <li>Class and level</li>
+            <li>Profile photo (if uploaded)</li>
+            <li>Gender and admission number</li>
+        </ul>
+
+        <p>You can <strong>search</strong> by name and <strong>filter</strong> by class if you teach multiple classes. You cannot edit student details — only your administrator can do that.</p>
+    </section>
+
+    <section id="students-insights">
+        <h3 id="students-insights">6.2 Student Insights &amp; Analytics</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> Tracking → Student Insights</div>
+
+        <p>View performance analytics for your students:</p>
+        <ul>
+            <li>Score trends across subjects and terms</li>
+            <li>CBT exam performance (scores, attempts, pass/fail rates)</li>
+            <li>Quiz results and average scores</li>
+            <li>Game activity and progress</li>
+            <li>Assignments available vs. downloaded</li>
+        </ul>
+
+        <p>Use this to identify students who may need extra attention and to gauge overall class performance.</p>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="scores" class="page-break">
+    <h2>7. Score Entry &amp; Report Cards</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Scores &amp; Reports → Score Entry | Scores &amp; Reports → Report Cards</div>
+
+    <section id="scores-entry">
+        <h3>7.1 Entering Scores</h3>
+        <ol class="steps">
+            <li>Go to <em>Scores &amp; Reports → Score Entry</em>.</li>
+            <li>Select the <strong>Session</strong> and <strong>Term</strong> from the dropdowns at the top.</li>
+            <li>Select your <strong>Class</strong> (e.g., Primary 3) and the <strong>Subject</strong> (e.g., Mathematics).</li>
+            <li>A score sheet table appears with all students in that class as rows, and the score components as columns (e.g., CA1, CA2, Exam — as set up by your administrator).</li>
+            <li>Click on any cell and type the student's score for that component. Press <kbd>Tab</kbd> to move to the next cell.</li>
+            <li>Click <strong>"Save Scores"</strong> to save your entries. You can save partially and return later to complete it.</li>
+        </ol>
+
+        <div class="tip-box">
+            <strong>Tips for faster entry:</strong>
+            <ul>
+                <li>Use <kbd>Tab</kbd> to move forward through cells, <kbd>Shift+Tab</kbd> to go back.</li>
+                <li>Leave a cell blank if a student was absent or has no score yet — blank is not the same as zero.</li>
+                <li>Scores are validated against the maximum for each component. You'll see an error if you enter more than the allowed maximum.</li>
+            </ul>
+        </div>
+
+        <h4>Locking Scores</h4>
+        <p>Once you're satisfied that scores for a subject are final, you (or the admin) can click <strong>"Lock Scores"</strong> to prevent further changes. This is typically done after the term ends. Locked scores are shown with a lock icon; ask your admin to unlock if you need to make corrections.</p>
+    </section>
+
+    <section id="scores-report-cards">
+        <h3>7.2 Generating Report Cards</h3>
+        <ol class="steps">
+            <li>Go to <em>Scores &amp; Reports → Report Cards</em>.</li>
+            <li>Select the <strong>Session</strong>, <strong>Term</strong>, and <strong>Class</strong>.</li>
+            <li>Click <strong>"Generate Reports"</strong>. The system compiles all subject scores for each student into their report card automatically.</li>
+            <li>Review the generated report cards — check each student's totals, grades, and position.</li>
+            <li>Click <strong>"Edit Data"</strong> on a report card to add:
+                <ul>
+                    <li>Your <strong>class teacher's comment</strong></li>
+                    <li>Attendance data (days present/absent)</li>
+                    <li>Any other custom fields your school uses</li>
+                </ul>
+            </li>
+            <li>Use <strong>"Bulk Edit"</strong> to add comments or data to all report cards at once.</li>
+            <li>When ready, click <strong>"Bulk Submit"</strong> to send all report cards to the admin for approval and publishing.</li>
+        </ol>
+
+        <div class="warning-box">
+            <strong>Important:</strong> Students and parents cannot see report cards until they are approved and published by the administrator. Submit them as early as possible to give the admin time to review.
+        </div>
+    </section>
+
+    <section id="scores-export">
+        <h3>7.3 Exporting &amp; Downloading</h3>
+        <ul>
+            <li><strong>Download PDF:</strong> Click the download icon on any individual report card to get a printable PDF.</li>
+            <li><strong>Download All (ZIP):</strong> Download all report cards for a class as a single ZIP file of PDFs.</li>
+            <li><strong>Export CSV:</strong> Export raw score data to a spreadsheet for your own records.</li>
+        </ul>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="results" class="page-break">
+    <h2>8. Uploading Results (PDFs)</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Content → Uploaded Results</div>
+
+    <p>In addition to system-generated report cards, you can upload traditional result PDF files (scanned result sheets, externally generated reports, etc.) for individual students in your classes.</p>
+
+    <section id="results-single">
+        <h3>8.1 Uploading a Result</h3>
+        <ol class="steps">
+            <li>Go to <em>Content → Uploaded Results</em> and click <strong>"Upload Result"</strong>.</li>
+            <li>Select the <strong>Student</strong> from the dropdown (only students in your classes appear).</li>
+            <li>Select the <strong>Session</strong> and <strong>Term</strong> this result is for.</li>
+            <li>Click <strong>"Choose File"</strong> and select the PDF from your device. Maximum file size: 10MB.</li>
+            <li>Click <strong>"Upload"</strong>.</li>
+        </ol>
+
+        <p>The result is now in your pending queue. The administrator will review and approve it. Once approved, the student and their parent(s) can view the PDF securely.</p>
+    </section>
+
+    <section id="results-status">
+        <h3>8.2 Checking the Status of Uploaded Results</h3>
+        <p>On the Uploaded Results page, you can see all your uploaded results and their current status:</p>
+        <ul>
+            <li><span class="badge badge-amber">Pending</span> — Awaiting admin approval.</li>
+            <li><span class="badge badge-green">Approved</span> — Visible to the student and parent.</li>
+            <li><span class="badge badge-red">Rejected</span> — The admin sent it back. View the reason and re-upload the correct file.</li>
+        </ul>
+    </section>
+
+    <div class="info-box">
+        <strong>Security:</strong> Result PDFs are stored securely in the cloud and accessed only through time-limited signed links. Students and parents cannot share the direct link with others.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="assignments" class="page-break">
+    <h2>9. Assignments</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Content → Assignments</div>
+
+    <p>Upload weekly assignments for your classes so students can access them from their portal.</p>
+
+    <h3>Creating an Assignment</h3>
+    <ol class="steps">
+        <li>Go to <em>Content → Assignments</em> and click <strong>"Add Assignment"</strong>.</li>
+        <li>Select the <strong>Class</strong>, <strong>Session</strong>, <strong>Term</strong>, and <strong>Week Number</strong> (1–12, corresponding to the week of term).</li>
+        <li>Enter an <strong>Assignment Title</strong> (e.g., "Week 3 Mathematics Homework").</li>
+        <li>Optionally enter a <strong>Description</strong> with instructions for students.</li>
+        <li>Upload the assignment file (PDF, Word document, image, etc.).</li>
+        <li>Optionally set a <strong>Due Date</strong> — students will see overdue assignments highlighted in red.</li>
+        <li>Click <strong>"Create"</strong>.</li>
+    </ol>
+
+    <p>The assignment goes to <strong>Pending Approval</strong>. Once the admin approves it, it appears in the relevant students' portal.</p>
+
+    <h3>Editing or Deleting an Assignment</h3>
+    <ul>
+        <li>You can edit an assignment (change the file, title, or due date) while it is still <strong>Pending</strong> or if it was <strong>Rejected</strong>.</li>
+        <li>Once <strong>Approved</strong>, contact your admin to make changes.</li>
+        <li>You can delete your own pending or rejected assignments.</li>
+    </ul>
+
+    <div class="tip-box">
+        <strong>Tip:</strong> Be consistent with week numbers. Week 1 is the first week of term, Week 12 is the last. Students filter assignments by week, so using the correct number helps them find the right assignment quickly.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="cbt" class="page-break">
+    <h2>10. CBT (Computer-Based Testing)</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> CBT &amp; Interactive → CBT</div>
+
+    <p>CBT allows you to create online exams, assessments, and assignments that students take directly on the portal. Results are automatically scored for objective questions.</p>
+
+    <section id="cbt-categories">
+        <h3>10.1 Three CBT Categories</h3>
+        <table>
+            <thead><tr><th>Category</th><th>Purpose</th><th>Examples</th></tr></thead>
+            <tbody>
+                <tr><td><span class="badge badge-blue">Exam</span></td><td>Formal examinations</td><td>End-of-term exam, mid-term exam, mock exam</td></tr>
+                <tr><td><span class="badge badge-green">Assessment</span></td><td>Continuous assessment tests</td><td>CA Test 1, CA Test 2, pop quiz, class test</td></tr>
+                <tr><td><span class="badge badge-purple">Assignment</span></td><td>Homework / take-home work</td><td>Weekly homework, research project, exercises</td></tr>
+            </tbody>
+        </table>
+        <p>Each category has its own tab on the CBT page. The creation process is identical for all three.</p>
+    </section>
+
+    <section id="cbt-create">
+        <h3>10.2 Creating a CBT Exam</h3>
+        <ol class="steps">
+            <li>Go to <em>CBT &amp; Interactive → CBT</em> and click the tab for the category you want (Exams, Assessments, or Assignments).</li>
+            <li>Click <strong>"Create"</strong>.</li>
+            <li>Fill in the basic details:
+                <ul>
+                    <li><strong>Title</strong> — e.g., "Mid-Term Mathematics Exam"</li>
+                    <li><strong>Class</strong> — Select from your assigned classes</li>
+                    <li><strong>Subject</strong> — Select existing, or type to create a new subject inline</li>
+                    <li><strong>Session &amp; Term</strong></li>
+                </ul>
+            </li>
+            <li>Configure settings:
+                <ul>
+                    <li><strong>Time Limit</strong> — Minutes allowed for the exam (leave blank for no limit)</li>
+                    <li><strong>Pass Mark %</strong> — Minimum score to pass (e.g., 50)</li>
+                    <li><strong>Max Attempts</strong> — How many times a student can retake (usually 1 for exams)</li>
+                    <li><strong>Due Date</strong> — When the exam closes (optional)</li>
+                    <li><strong>Shuffle Questions</strong> — Randomise question order for each student</li>
+                    <li><strong>Shuffle Options</strong> — Randomise answer option order</li>
+                    <li><strong>Show Correct Answers</strong> — Whether students see correct answers after submission</li>
+                </ul>
+            </li>
+            <li>Optionally link to a <strong>Score Component</strong> (e.g., "CA1") so that CBT scores feed directly into report cards.</li>
+            <li>Click <strong>"Next"</strong> or <strong>"Save &amp; Add Questions"</strong>.</li>
+        </ol>
+    </section>
+
+    <section id="cbt-questions">
+        <h3>10.3 Adding Questions Manually</h3>
+        <p>Click <strong>"Add Question"</strong> and choose the question type:</p>
+
+        <table>
+            <thead><tr><th>Question Type</th><th>Description</th><th>Auto-scored?</th></tr></thead>
+            <tbody>
+                <tr><td>Multiple Choice (MCQ)</td><td>4 options, one correct answer</td><td>✅ Yes</td></tr>
+                <tr><td>True / False</td><td>Two options: True or False</td><td>✅ Yes</td></tr>
+                <tr><td>Fill in the Blank</td><td>Student types a word or phrase</td><td>✅ Yes (exact match)</td></tr>
+                <tr><td>Short Answer</td><td>Brief text response (1–2 sentences)</td><td>❌ Manual grading</td></tr>
+                <tr><td>Theory / Essay</td><td>Long-form written answer</td><td>❌ Manual grading</td></tr>
+                <tr><td>Matching</td><td>Match items from two columns</td><td>✅ Yes</td></tr>
+            </tbody>
+        </table>
+
+        <p>For each question, fill in:</p>
+        <ul>
+            <li><strong>Question text</strong> — The question itself</li>
+            <li><strong>Answer options</strong> (for MCQ/True-False/Matching)</li>
+            <li><strong>Correct answer</strong> — Mark which option is correct</li>
+            <li><strong>Points</strong> — Score for a correct answer (default: 1)</li>
+            <li><strong>Explanation</strong> (optional) — Shown to students after submission if correct answers are enabled</li>
+        </ul>
+
+        <p>Click <strong>"Add Another Question"</strong> to continue adding, or <strong>"Done"</strong> when finished.</p>
+    </section>
+
+    <section id="cbt-ai">
+        <h3>10.4 AI Question Generation</h3>
+        <p>Instead of typing questions manually, you can use AI to generate questions from your lesson content. This costs <strong>1 credit</strong> per generation.</p>
+
+        <ol class="steps">
+            <li>On the question creation page, click <strong>"AI Generate"</strong>.</li>
+            <li>Choose your source:
+                <ul>
+                    <li><strong>Upload Document</strong> — Upload a PDF, Word document, or image of your lesson notes, textbook chapter, or any printed material (up to 10MB).</li>
+                    <li><strong>Paste Link</strong> — Provide a Google Docs link, website URL, or online resource URL.</li>
+                </ul>
+            </li>
+            <li>Configure generation settings:
+                <ul>
+                    <li><strong>Number of questions</strong>: 5, 10, 15, 20, or 30</li>
+                    <li><strong>Difficulty</strong>: Easy, Medium, or Hard</li>
+                    <li><strong>Question types</strong>: Select which types you want (MCQ, True/False, Fill Blank, Short Answer, Theory, Matching)</li>
+                </ul>
+            </li>
+            <li>Click <strong>"Generate Questions"</strong>. The AI reads your content and creates questions.</li>
+            <li><strong>Review every question carefully.</strong> You can:
+                <ul>
+                    <li>Edit the question text</li>
+                    <li>Change answer options</li>
+                    <li>Mark the correct answer</li>
+                    <li>Adjust point values</li>
+                    <li>Add or edit the explanation</li>
+                    <li>Delete any question you don't want</li>
+                    <li>Add additional manual questions</li>
+                </ul>
+            </li>
+            <li>If you need more questions, click <strong>"Generate More"</strong> (costs another credit).</li>
+            <li>Click <strong>"Save Questions"</strong> when satisfied.</li>
+        </ol>
+
+        <div class="warning-box">
+            <strong>Always review AI-generated questions!</strong> AI can occasionally produce inaccurate questions or have the wrong correct answer. You are responsible for the accuracy of questions your students see.
+        </div>
+    </section>
+
+    <section id="cbt-publish">
+        <h3>10.5 Publishing &amp; Monitoring</h3>
+        <p>After saving your CBT exam, it has <span class="badge badge-amber">Pending</span> status. Once the administrator approves it:</p>
+
+        <ol class="steps">
+            <li>Find the exam on the CBT page (it now shows as <span class="badge badge-green">Approved</span>).</li>
+            <li>Click <strong>"Publish"</strong> to make it available to students. Students will immediately see it on their CBT page.</li>
+            <li>To monitor the exam in real time, click <strong>"Monitor"</strong> to see:
+                <ul>
+                    <li>Which students have started the exam</li>
+                    <li>Which students have submitted</li>
+                    <li>Live submission count</li>
+                    <li>Time remaining for students still in-progress</li>
+                </ul>
+            </li>
+            <li>You can <strong>"Unpublish"</strong> at any time to close the exam before its due date.</li>
+        </ol>
+    </section>
+
+    <section id="cbt-results">
+        <h3>10.6 Viewing Results</h3>
+        <p>After students submit:</p>
+        <ol class="steps">
+            <li>Click <strong>"Results"</strong> on the exam card.</li>
+            <li>See a summary: average score, pass rate, score distribution.</li>
+            <li>View individual student results: score, percentage, pass/fail, time taken, number of attempts.</li>
+            <li>Click a student's result to see their answer for each question (and whether it was correct).</li>
+            <li>View <strong>question analytics</strong>: which questions had the highest wrong-answer rate.</li>
+            <li>Click <strong>"Export CSV"</strong> to download all results as a spreadsheet.</li>
+        </ol>
+    </section>
+
+    <section id="cbt-grading">
+        <h3>10.7 Grading Theory / Short Answer Questions</h3>
+        <p>For questions that require manual grading (Short Answer, Theory/Essay), you must grade them yourself:</p>
+        <ol class="steps">
+            <li>On the results page, click <strong>"Grade"</strong>.</li>
+            <li>You'll see each student's written answer for each theory/short-answer question.</li>
+            <li>Assign a score (between 0 and the question's maximum points).</li>
+            <li>You can also add a comment/feedback for the student.</li>
+            <li>For faster grading, use <strong>"Bulk Grade"</strong> — see all students' answers to the same question side by side.</li>
+            <li>Click <strong>"Save Grades"</strong>. The student's total score updates automatically.</li>
+        </ol>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="quizzes" class="page-break">
+    <h2>11. AI Quizzes</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> CBT &amp; Interactive → Quizzes</div>
+
+    <p>Quizzes are lighter-weight, primarily multiple-choice assessments — great for revision, formative assessment, or fun challenges. Unlike full CBT exams, quizzes are quicker to create and take.</p>
+
+    <section id="quizzes-create">
+        <h3>11.1 Creating a Quiz</h3>
+        <ol class="steps">
+            <li>Go to <em>CBT &amp; Interactive → Quizzes</em> and click <strong>"Create Quiz"</strong>.</li>
+            <li>Choose your creation method: <strong>AI Generate</strong> or <strong>Manual</strong>.</li>
+            <li>Set the quiz details:
+                <ul>
+                    <li><strong>Title</strong></li>
+                    <li><strong>Class</strong></li>
+                    <li><strong>Session &amp; Term</strong></li>
+                    <li><strong>Time Limit</strong> (optional)</li>
+                    <li><strong>Passing Score %</strong> (e.g., 60)</li>
+                    <li><strong>Max Attempts</strong> (how many times students can retake)</li>
+                    <li><strong>Shuffle Questions / Options</strong></li>
+                    <li><strong>Show Correct Answers after submission</strong></li>
+                </ul>
+            </li>
+        </ol>
+    </section>
+
+    <section id="quizzes-ai">
+        <h3>11.2 AI Generation (From Document or Prompt)</h3>
+        <p>Costs <strong>1 credit</strong> per generation. You get the same AI generation experience as CBT:</p>
+        <ol class="steps">
+            <li>Choose <strong>"From Document"</strong> — upload a PDF, Word doc, or image of your lesson notes — <em>or</em> choose <strong>"From Prompt"</strong> — type what you want, e.g. <em>"Generate 10 multiple choice questions on the water cycle for Primary 5"</em>.</li>
+            <li>Select: number of questions, question types (MCQ, True/False, Fill Blank), and difficulty.</li>
+            <li>Click <strong>"Generate"</strong>.</li>
+            <li>Review and edit all generated questions carefully.</li>
+            <li>Click <strong>"Save"</strong>. The quiz goes to <strong>Pending Approval</strong>.</li>
+        </ol>
+    </section>
+
+    <section id="quizzes-manual">
+        <h3>11.3 Manual Creation (Free — No Credits)</h3>
+        <ol class="steps">
+            <li>Choose <strong>"Manual"</strong> as the creation method.</li>
+            <li>Click <strong>"Add Question"</strong>.</li>
+            <li>Enter the question text, choose the type, add answer options, mark the correct answer, and optionally add an explanation.</li>
+            <li>Repeat for each question.</li>
+            <li>Click <strong>"Save"</strong>.</li>
+        </ol>
+        <p>Manual creation has no limit — you can create as many quizzes with as many questions as you want at no cost.</p>
+    </section>
+
+    <section id="quizzes-results">
+        <h3>11.4 Viewing Quiz Results</h3>
+        <p>After the quiz is published and students attempt it:</p>
+        <ul>
+            <li>Click <strong>"View Results"</strong> on the quiz card.</li>
+            <li>See class stats: average score, highest/lowest score, pass rate.</li>
+            <li>View a score distribution chart.</li>
+            <li>See each student's score, percentage, pass/fail, and time taken.</li>
+            <li>See which questions were answered incorrectly most often.</li>
+            <li>Click <strong>"Export CSV"</strong> for a downloadable results file.</li>
+        </ul>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="games" class="page-break">
+    <h2>12. Educational Games</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> CBT &amp; Interactive → Games</div>
+
+    <p>Create fun, educational games that students play from their portal. Games reinforce learning through engagement and healthy competition.</p>
+
+    <section id="games-types">
+        <h3>12.1 Game Types Explained</h3>
+        <table>
+            <thead><tr><th>Game Type</th><th>How Students Play It</th><th>Best For</th><th>AI Generates</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>Memory Match</strong></td>
+                    <td>Flip cards to find matching term–definition pairs. Fewer moves = better score.</td>
+                    <td>Vocabulary, science terms, history facts</td>
+                    <td>8–15 term/definition pairs</td>
+                </tr>
+                <tr>
+                    <td><strong>Word Scramble</strong></td>
+                    <td>Unscramble jumbled letters to spell key terms. 3 hints available.</td>
+                    <td>Spelling, vocabulary, key concepts</td>
+                    <td>10–20 words with hints</td>
+                </tr>
+                <tr>
+                    <td><strong>Quiz Race</strong></td>
+                    <td>Rapid-fire MCQ questions, 10 seconds each. Score = speed × accuracy. Class leaderboard!</td>
+                    <td>Revision, exam prep, competitive review</td>
+                    <td>15–25 MCQ questions</td>
+                </tr>
+                <tr>
+                    <td><strong>Flashcard Study</strong></td>
+                    <td>Swipe through flashcards. Self-rate each as "Got it" or "Review again". Tracks mastery.</td>
+                    <td>Self-paced study, pre-exam revision</td>
+                    <td>15–30 flashcard pairs</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section id="games-create">
+        <h3>12.2 Creating a Game</h3>
+        <ol class="steps">
+            <li>Go to <em>CBT &amp; Interactive → Games</em> and click <strong>"Create Game"</strong>.</li>
+            <li>Select the <strong>Game Type</strong> (Memory Match, Word Scramble, Quiz Race, or Flashcard Study).</li>
+            <li>Choose your creation method:
+                <ul>
+                    <li><strong>AI Generate (from document)</strong> — Upload lesson notes or a document. AI extracts relevant content and generates game data. Costs 1 credit.</li>
+                    <li><strong>AI Generate (from prompt)</strong> — Type a description, e.g. <em>"Create a memory match game about Nigerian states and capitals for Primary 4"</em>. Costs 1 credit.</li>
+                    <li><strong>Manual</strong> — Type in all content yourself. Always free, no limits.</li>
+                </ul>
+            </li>
+            <li>Fill in details:
+                <ul>
+                    <li><strong>Title</strong></li>
+                    <li><strong>Class</strong></li>
+                    <li><strong>Session &amp; Term</strong></li>
+                    <li><strong>Difficulty</strong>: Easy, Medium, Hard</li>
+                    <li><strong>Time Limit</strong> (optional)</li>
+                </ul>
+            </li>
+            <li>Review and edit the generated/entered game content (pairs, words, questions, or cards).</li>
+            <li>Click <strong>"Save"</strong>. The game goes to <strong>Pending Approval</strong>.</li>
+        </ol>
+    </section>
+
+    <section id="games-stats">
+        <h3>12.3 Viewing Game Stats</h3>
+        <p>After the game is published and students play it:</p>
+        <ul>
+            <li>Click <strong>"View Stats"</strong> on the game card.</li>
+            <li>See: total play count, average score, completion rate.</li>
+            <li>For <strong>Quiz Race</strong>: view the class leaderboard with ranked scores.</li>
+            <li>See per-student play history — how many times each student played and their best score.</li>
+        </ul>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="notices" class="page-break">
+    <h2>13. Posting Notices</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Communications → Notices</div>
+
+    <p>Post announcements for students and/or parents — upcoming events, class updates, important reminders, etc.</p>
+
+    <ol class="steps">
+        <li>Go to <em>Communications → Notices</em> and click <strong>"Create Notice"</strong>.</li>
+        <li>Enter a <strong>Title</strong> (e.g., "Sports Day — Friday, 14 March").</li>
+        <li>Enter the <strong>Content</strong> — the full text of your notice.</li>
+        <li>Optionally upload an <strong>Image</strong> (a photo, poster, or banner for the notice).</li>
+        <li>Choose <strong>Target Levels</strong> — leave blank to target all levels, or select specific ones (e.g., only Primary).</li>
+        <li>Choose <strong>Target Roles</strong> — leave blank for all, or select <em>Students</em>, <em>Parents</em>, or both.</li>
+        <li>Optionally set an <strong>Expiry Date</strong> — the notice will automatically stop appearing after this date.</li>
+        <li>Click <strong>"Create"</strong>. The notice goes to <strong>Pending Approval</strong>.</li>
+    </ol>
+
+    <div class="info-box">
+        <strong>After approval:</strong> You can publish/unpublish your approved notices at any time from the Notices page. You can also edit notice details before re-submitting if rejected.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="submissions">
+    <h2>14. Tracking All Your Submissions</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Tracking → My Submissions</div>
+
+    <p>This is your central view of everything you've submitted — results, assignments, CBT exams, quizzes, games, and notices — and their current approval status.</p>
+
+    <ul>
+        <li>Filter by content type (results / assignments / CBT / quizzes / games / notices).</li>
+        <li>Filter by status (Pending / Approved / Rejected).</li>
+        <li>For <span class="badge badge-red">Rejected</span> items, click to see the rejection reason from the admin.</li>
+        <li>Edit and re-submit rejected items directly from this page.</li>
+    </ul>
+
+    <div class="tip-box">
+        <strong>Tip:</strong> Bookmark the "My Submissions" page. Checking it regularly means you'll catch rejections quickly and can re-submit before deadlines.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="ai-credits">
+    <h2>15. AI Credits</h2>
+
+    <p>AI credits are used whenever you generate questions or game content using the AI feature. Manual creation is always free — AI is optional.</p>
+
+    <h3>How Credits Work</h3>
+    <ul>
+        <li><strong>1 credit = 1 AI generation</strong> (one quiz, one CBT question set, or one game).</li>
+        <li>"Generate More" for an existing quiz or CBT also costs 1 credit.</li>
+        <li>Your school gets <strong>15 free credits per month</strong>, reset on the 1st. Your administrator may also purchase extra credits.</li>
+        <li>Credits are shown on the creation page when you select AI Generate.</li>
+    </ul>
+
+    <h3>Running Out of Credits?</h3>
+    <p>If your school or level has no credits left:</p>
+    <ul>
+        <li>You can still create everything <strong>manually</strong> — no limits.</li>
+        <li>Contact your administrator to purchase more credits (only they can do this).</li>
+        <li>Free credits reset on the 1st of next month.</li>
+    </ul>
+
+    <div class="info-box">
+        <strong>Note:</strong> Your admin may allocate a credit budget to your level (e.g., Primary gets 20 credits per month). The credits display on the creation page will reflect your level's available balance.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="security" class="page-break">
+    <h2>16. Security &amp; Account Settings</h2>
+
+    <h3>Changing Your Password</h3>
+    <ol class="steps">
+        <li>Click your <strong>name/avatar</strong> in the top-right corner.</li>
+        <li>Select <strong>"Settings"</strong>.</li>
+        <li>Go to the <strong>"Security"</strong> tab.</li>
+        <li>Enter your current password, then your new password twice to confirm.</li>
+        <li>Click <strong>"Update Password"</strong>.</li>
+    </ol>
+
+    <h3>Two-Factor Authentication (2FA)</h3>
+    <p>For added security, enable 2FA from <em>Settings → Security → "Enable Two-Factor Authentication"</em>. You'll need an authenticator app (Google Authenticator, Authy, etc.). Save the recovery codes in a safe place.</p>
+
+    <h3>Session Security</h3>
+    <ul>
+        <li>Sessions auto-expire after a period of inactivity. You'll be redirected to the login page.</li>
+        <li>Always <strong>log out</strong> when using a shared or school computer.</li>
+    </ul>
+
+    <h3>Profile Settings</h3>
+    <p>From <em>Settings → Profile</em>, you can update your display name and (if applicable) email address. Class assignments and other school data are managed by your administrator.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="faq" class="page-break">
+    <h2>17. Frequently Asked Questions</h2>
+
+    <h4>Q: Why can't I see certain students?</h4>
+    <p>You can only see students in classes your administrator has assigned to you. If you should have access to other classes, ask your admin to update your class assignments.</p>
+
+    <h4>Q: My uploaded result was rejected. What do I do?</h4>
+    <p>Go to <em>Tracking → My Submissions</em> and click on the rejected item to read the admin's rejection reason. Fix the issue (e.g., wrong student selected, corrupted file) and upload again.</p>
+
+    <h4>Q: Can I publish content directly without admin approval?</h4>
+    <p>Only if your administrator has turned off the approval requirement in school settings. By default, approval is required. Check with your admin.</p>
+
+    <h4>Q: Can I create quizzes and games without AI credits?</h4>
+    <p>Yes. Choose <strong>"Manual"</strong> creation mode for quizzes, games, and CBT exams. Manual creation is always free with no limits.</p>
+
+    <h4>Q: A student is missing from the score entry table. Why?</h4>
+    <p>The student may have been deactivated or moved to a different class by the admin. Check the student list in <em>Teaching → My Students</em> and confirm with your administrator.</p>
+
+    <h4>Q: The CBT exam auto-submitted for a student. Will their answers be saved?</h4>
+    <p>Yes. All answers are auto-saved continuously. When time expires, whatever has been answered is automatically submitted. No answers are lost.</p>
+
+    <h4>Q: Can I see results from previous terms?</h4>
+    <p>Yes. Use the <strong>Session</strong> and <strong>Term</strong> dropdowns on any data page to switch to a previous period and view historical data.</p>
+
+    <h4>Q: What file types can I upload for assignments and results?</h4>
+    <p>PDF is preferred for results. For assignments, most document formats are accepted (PDF, DOC/DOCX, images). Maximum file size is 10MB.</p>
+
+    <h4>Q: Can I edit a quiz after it's been published?</h4>
+    <p>Published quizzes with student attempts cannot be edited (it would invalidate existing scores). Unpublish the quiz first, then make changes. If already approved, contact your admin.</p>
+
+    <h4>Q: How do I report a portal issue or get help?</h4>
+    <p>Contact your school administrator. They can escalate technical issues to the platform support team.</p>
+</section>
+
+
+<hr>
+<div style="text-align: center; padding: 2rem 0; color: #888; font-size: 0.85rem;">
+    <p><strong>DX-SchoolPortal — Teacher's Guide</strong> &nbsp;·&nbsp; Version 2.0 &nbsp;·&nbsp; © 2025 DX-SchoolPortal</p>
+    <p class="no-print" style="margin-top: 1rem;">
+        <strong>To save as PDF:</strong> Press <kbd>Ctrl</kbd>+<kbd>P</kbd> (or <kbd>Cmd</kbd>+<kbd>P</kbd> on Mac) → select <strong>"Save as PDF"</strong>.
+    </p>
+</div>
+
+</body>
+</html>

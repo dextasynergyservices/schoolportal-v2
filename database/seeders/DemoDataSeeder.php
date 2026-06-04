@@ -166,7 +166,7 @@ class DemoDataSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        Term::create([
+        $firstTerm = Term::create([
             'school_id' => $school->id,
             'session_id' => $session->id,
             'term_number' => 1,
@@ -225,6 +225,7 @@ class DemoDataSeeder extends Seeder
                 'school_id' => $school->id,
                 'class_id' => $s['class']->id,
                 'enrolled_session_id' => $session->id,
+                'enrolled_term_id' => $firstTerm->id,
             ]);
 
             $studentUsers[$s['username']] = $user;

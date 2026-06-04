@@ -51,6 +51,7 @@ class ExamGradingService
                 ? round(($earnedPoints / $allQuestionPoints) * 100, 2)
                 : 0;
             $attempt->passed = $attempt->percentage >= $attempt->exam->passing_score;
+            $attempt->status = 'graded';
         }
 
         $attempt->save();
@@ -74,15 +75,16 @@ class ExamGradingService
             return;
         }
 
-        $isCorrect = match ($question->type) {
-            'multiple_choice', 'true_false' => $this->matchExact($answer->selected_answer, $question->correct_answer),
-            'fill_blank' => $this->matchFillBlank($answer->selected_answer, $question->correct_answer),
-            default => false,
+        [$isCorrect, $pointsEarned] = match ($question->type) {
+            'multiple_choice', 'true_false' => $this->gradeExactAnswer($answer->selected_answer, $question->correct_answer, $question->points),
+            'fill_blank' => $this->gradeFillBlankAnswer($answer->selected_answer, $question->correct_answer, $question->points),
+            'matching' => $this->gradeMatchingAnswer($answer->selected_answer, $question),
+            default => [false, 0],
         };
 
         $answer->update([
             'is_correct' => $isCorrect,
-            'points_earned' => $isCorrect ? $question->points : 0,
+            'points_earned' => $pointsEarned,
             'answered_at' => $answer->answered_at ?? now(),
         ]);
     }
@@ -138,6 +140,16 @@ class ExamGradingService
         return Str::lower(trim($selected)) === Str::lower(trim($correct));
     }
 
+    /**
+     * @return array{0: bool, 1: int}
+     */
+    private function gradeExactAnswer(?string $selected, ?string $correct, int $points): array
+    {
+        $isCorrect = $this->matchExact($selected, $correct);
+
+        return [$isCorrect, $isCorrect ? $points : 0];
+    }
+
     private function matchFillBlank(?string $selected, ?string $correct): bool
     {
         if ($selected === null || $correct === null) {
@@ -160,5 +172,59 @@ class ExamGradingService
         }
 
         return false;
+    }
+
+    /**
+     * @return array{0: bool, 1: int}
+     */
+    private function gradeFillBlankAnswer(?string $selected, ?string $correct, int $points): array
+    {
+        $isCorrect = $this->matchFillBlank($selected, $correct);
+
+        return [$isCorrect, $isCorrect ? $points : 0];
+    }
+
+    /**
+     * @return array{0: bool, 1: int}
+     */
+    private function gradeMatchingAnswer(?string $selected, ExamQuestion $question): array
+    {
+        if ($selected === null || $selected === '') {
+            return [false, 0];
+        }
+
+        $selectedPairs = json_decode($selected, true);
+        if (! is_array($selectedPairs)) {
+            return [false, 0];
+        }
+
+        $correctPairs = collect($question->options ?? [])
+            ->values()
+            ->filter(fn ($pair) => is_array($pair) && isset($pair['right']))
+            ->values();
+
+        if ($correctPairs->isEmpty()) {
+            return [false, 0];
+        }
+
+        $correctCount = 0;
+        foreach ($correctPairs as $index => $pair) {
+            $selectedRight = $selectedPairs[$index] ?? $selectedPairs[(string) $index] ?? null;
+
+            if ($this->normaliseMatchValue($selectedRight) === $this->normaliseMatchValue($pair['right'])) {
+                $correctCount++;
+            }
+        }
+
+        $totalPairs = $correctPairs->count();
+        $isCorrect = $correctCount === $totalPairs;
+        $pointsEarned = (int) round(($correctCount / $totalPairs) * $question->points);
+
+        return [$isCorrect, $pointsEarned];
+    }
+
+    private function normaliseMatchValue(mixed $value): string
+    {
+        return Str::lower(trim(preg_replace('/\s+/', ' ', (string) $value)));
     }
 }

@@ -427,7 +427,7 @@
                                         <legend class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ __('Report Type') }}</legend>
                                         @if (in_array('midterm', $enabledReportTypes))
                                             <label class="flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50" :class="reportType === 'midterm' && 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'">
-                                                <input type="radio" name="report_type" value="midterm" x-model="reportType" class="text-indigo-600">
+                                                <input type="radio" name="report_type" value="midterm" x-model="reportType" x-on:change="onReportContextChange()" class="text-indigo-600">
                                                 <div>
                                                     <div class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Mid-Term Report') }}</div>
                                                     <div class="text-xs text-zinc-500">{{ __('Based on current term scores') }}</div>
@@ -436,7 +436,7 @@
                                         @endif
                                         @if (in_array('full_term', $enabledReportTypes))
                                             <label class="flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50" :class="reportType === 'full_term' && 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'">
-                                                <input type="radio" name="report_type" value="full_term" x-model="reportType" class="text-indigo-600">
+                                                <input type="radio" name="report_type" value="full_term" x-model="reportType" x-on:change="onReportContextChange()" class="text-indigo-600">
                                                 <div>
                                                     <div class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Full Term Report') }}</div>
                                                     <div class="text-xs text-zinc-500">{{ __('Complete term report with all components') }}</div>
@@ -445,7 +445,7 @@
                                         @endif
                                         @if (in_array('session', $enabledReportTypes))
                                             <label class="flex items-center gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50" :class="reportType === 'session' && 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'">
-                                                <input type="radio" name="report_type" value="session" x-model="reportType" class="text-indigo-600">
+                                                <input type="radio" name="report_type" value="session" x-model="reportType" x-on:change="onReportContextChange()" class="text-indigo-600">
                                                 <div>
                                                     <div class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Session Report') }}</div>
                                                     <div class="text-xs text-zinc-500">{{ __('Aggregated across all terms') }}</div>
@@ -461,7 +461,7 @@
                                 </div>
                                 <div x-show="selectedClassId && reportType === 'session'" x-cloak>
                                     <flux:label>{{ __('Session') }}</flux:label>
-                                    <flux:select name="session_id">
+                                    <flux:select name="session_id" x-model="selectedSessionId" x-on:change="onReportContextChange()">
                                         @foreach ($sessions as $session)
                                             <option value="{{ $session->id }}" @selected($session->is_current)>{{ $session->name }}</option>
                                         @endforeach
@@ -521,6 +521,8 @@
         return {
             showModal: false,
             selectedClassId: '{{ $selectedClassId ?? '' }}',
+            selectedTermId: '{{ $selectedTermId ?? '' }}',
+            selectedSessionId: '{{ $sessions->firstWhere('is_current', true)?->id ?? '' }}',
             reportType: 'full_term',
             scope: 'bulk',
             students: [],
@@ -548,10 +550,25 @@
                 }
             },
 
+            async onReportContextChange() {
+                this.clearStudent();
+                this.students = [];
+                this.filteredStudents = [];
+                if (this.selectedClassId) {
+                    await this.fetchStudents();
+                }
+            },
+
             async fetchStudents() {
                 this.loadingStudents = true;
                 try {
-                    const response = await fetch(classStudentsBaseUrl + this.selectedClassId);
+                    const params = new URLSearchParams();
+                    if (this.reportType === 'session' && this.selectedSessionId) {
+                        params.set('session_id', this.selectedSessionId);
+                    } else if (this.selectedTermId) {
+                        params.set('term_id', this.selectedTermId);
+                    }
+                    const response = await fetch(classStudentsBaseUrl + this.selectedClassId + '?' + params.toString());
                     this.students = await response.json();
                     this.filteredStudents = this.students;
                 } catch (e) {

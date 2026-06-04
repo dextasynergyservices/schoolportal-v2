@@ -70,7 +70,8 @@ class GameController extends Controller
 
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
-        $availableCredits = $this->creditService->getAvailableCredits($school, $teacher->level_id ? (int) $teacher->level_id : null);
+        $levelId = $this->creditService->resolveTeacherLevelId($teacher);
+        $availableCredits = $this->creditService->getAvailableCredits($school, $levelId);
 
         return view('teacher.games.create', compact('classes', 'currentSession', 'currentTerm', 'availableCredits'));
     }
@@ -95,7 +96,7 @@ class GameController extends Controller
             abort(403);
         }
 
-        $levelId = $teacher->level_id ? (int) $teacher->level_id : null;
+        $levelId = $this->creditService->resolveTeacherLevelId($teacher, (int) $validated['class_id']);
         if (! $this->creditService->hasCredits($school, $levelId)) {
             return redirect()->route('teacher.games.create')
                 ->with('error', __('No AI credits remaining. Create games manually or ask your admin to purchase more.'));

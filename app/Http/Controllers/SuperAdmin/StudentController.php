@@ -134,6 +134,7 @@ class StudentController extends Controller
         DB::transaction(function () use ($validated) {
             $school = School::findOrFail($validated['school_id']);
             $currentSession = $school->currentSession();
+            $currentTerm = $school->currentTerm();
 
             $user = User::withoutGlobalScopes()->create([
                 'school_id' => $validated['school_id'],
@@ -156,6 +157,7 @@ class StudentController extends Controller
                 'blood_group' => $validated['blood_group'] ?? null,
                 'medical_notes' => $validated['medical_notes'] ?? null,
                 'enrolled_session_id' => $currentSession?->id,
+                'enrolled_term_id' => $currentTerm?->id,
             ]);
         });
 

@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\AcademicSession;
 use App\Models\Exam;
+use App\Models\ExamAccessReset;
 use App\Models\ExamAnswer;
 use App\Models\ExamAttempt;
 use App\Models\ExamQuestion;
@@ -121,6 +122,57 @@ class StudentExamTest extends TestCase
         ]);
     }
 
+    public function test_student_stale_attempt_link_redirects_to_their_exam_start_page(): void
+    {
+        $otherStudent = User::factory()->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+        ]);
+
+        StudentProfile::create([
+            'user_id' => $otherStudent->id,
+            'school_id' => $this->school->id,
+            'class_id' => $this->class->id,
+        ]);
+
+        $otherAttempt = ExamAttempt::create([
+            'exam_id' => $this->exam->id,
+            'student_id' => $otherStudent->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'started_at' => now(),
+            'status' => 'in_progress',
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.take', $otherAttempt))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('exam_attempts', [
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'attempt_number' => 1,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    public function test_student_can_start_legacy_exam_with_zero_max_attempts(): void
+    {
+        $this->exam->update(['max_attempts' => 0]);
+
+        $this->actingAs($this->student)
+            ->post(route('student.exams.start', $this->exam))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('exam_attempts', [
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'attempt_number' => 1,
+            'status' => 'in_progress',
+        ]);
+    }
+
     public function test_student_cannot_exceed_max_attempts(): void
     {
         // Use up all attempts
@@ -140,7 +192,8 @@ class StudentExamTest extends TestCase
 
         $this->actingAs($this->student)
             ->post(route('student.exams.start', $this->exam))
-            ->assertForbidden();
+            ->assertRedirect(route('student.exams.show', $this->exam))
+            ->assertSessionHas('error');
     }
 
     public function test_student_can_save_answer(): void
@@ -176,8 +229,84 @@ class StudentExamTest extends TestCase
             ->assertRedirect();
 
         $attempt->refresh();
-        $this->assertContains($attempt->status, ['submitted', 'grading']);
+        $this->assertSame('graded', $attempt->status);
+        $this->assertSame(10, $attempt->score);
+        $this->assertEquals(100.0, (float) $attempt->percentage);
         $this->assertNotNull($attempt->submitted_at);
+    }
+
+    public function test_objective_exam_results_show_score_immediately_after_submit(): void
+    {
+        $attempt = $this->startAttempt();
+        $question = $this->exam->questions->first();
+
+        $response = $this->actingAs($this->student)
+            ->post(route('student.exams.submit', $attempt), [
+                'answers' => [
+                    $question->id => 'Water',
+                ],
+            ]);
+
+        $response->assertRedirect(route('student.exams.results', $attempt));
+
+        $attempt->refresh();
+        $this->assertSame('graded', $attempt->status);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.results', $attempt))
+            ->assertOk()
+            ->assertDontSee('Grading in Progress')
+            ->assertSee('10/10')
+            ->assertSee('100.0%');
+    }
+
+    public function test_matching_exam_results_show_score_immediately_after_submit(): void
+    {
+        $matchingQuestion = ExamQuestion::create([
+            'exam_id' => $this->exam->id,
+            'school_id' => $this->school->id,
+            'type' => 'matching',
+            'question_text' => 'Match each country to its capital',
+            'options' => [
+                ['left' => 'Nigeria', 'right' => 'Abuja'],
+                ['left' => 'Ghana', 'right' => 'Accra'],
+                ['left' => 'Kenya', 'right' => 'Nairobi'],
+                ['left' => 'Egypt', 'right' => 'Cairo'],
+            ],
+            'correct_answer' => null,
+            'points' => 4,
+            'sort_order' => 2,
+        ]);
+        $this->exam->load('questions');
+
+        $attempt = $this->startAttempt();
+        $multipleChoiceQuestion = $this->exam->questions->firstWhere('type', 'multiple_choice');
+
+        $response = $this->actingAs($this->student)
+            ->post(route('student.exams.submit', $attempt), [
+                'answers' => [
+                    $multipleChoiceQuestion->id => 'Water',
+                    $matchingQuestion->id => json_encode([
+                        0 => 'Abuja',
+                        1 => 'Accra',
+                        2 => 'Nairobi',
+                        3 => 'Cairo',
+                    ]),
+                ],
+            ]);
+
+        $response->assertRedirect(route('student.exams.results', $attempt));
+
+        $attempt->refresh();
+        $this->assertSame('graded', $attempt->status);
+        $this->assertSame(14, $attempt->score);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.results', $attempt))
+            ->assertOk()
+            ->assertDontSee('Grading in Progress')
+            ->assertSee('14/14')
+            ->assertSee('100.0%');
     }
 
     public function test_student_can_view_results(): void
@@ -196,6 +325,31 @@ class StudentExamTest extends TestCase
             ->get(route('student.exams.results', $attempt))
             ->assertOk()
             ->assertViewIs('student.exams.results');
+    }
+
+    public function test_attempt_pages_use_exam_category_label(): void
+    {
+        $this->exam->update(['category' => 'assignment', 'title' => 'English Assignment']);
+        $attempt = $this->startAttempt();
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.take', $attempt))
+            ->assertOk()
+            ->assertViewHas('label', 'Assignment');
+
+        $attempt->update([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'score' => 8,
+            'total_points' => 10,
+            'percentage' => 80.0,
+            'passed' => true,
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.results', $attempt))
+            ->assertOk()
+            ->assertViewHas('label', 'Assignment');
     }
 
     public function test_student_cannot_access_other_students_attempt(): void
@@ -314,7 +468,158 @@ class StudentExamTest extends TestCase
         $response->assertOk();
         $response->assertViewHas('closed', fn ($closed) => $closed->contains($closedExam));
         $response->assertSee('Missed');
-        $response->assertSee('You did not attempt this item.');
+        $response->assertSee('You missed this exam.');
+    }
+
+    public function test_elapsed_in_progress_attempt_is_not_shown_as_resumable(): void
+    {
+        $this->exam->update([
+            'time_limit_minutes' => 10,
+            'max_attempts' => 2,
+            'available_until' => now()->addHour(),
+        ]);
+
+        $attempt = ExamAttempt::create([
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'status' => 'in_progress',
+            'started_at' => now()->subMinutes(20),
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.index'))
+            ->assertOk()
+            ->assertDontSee('Resume')
+            ->assertDontSee('Retake')
+            ->assertSee('Time Elapsed')
+            ->assertSee('View Results');
+
+        $this->assertSame('timed_out', $attempt->fresh()->status);
+        $this->assertSame('time_elapsed', $attempt->fresh()->completion_reason);
+    }
+
+    public function test_reset_access_allows_student_to_start_again_after_time_elapsed(): void
+    {
+        $this->exam->update([
+            'time_limit_minutes' => 10,
+            'max_attempts' => 2,
+            'available_until' => now()->addHour(),
+        ]);
+
+        ExamAttempt::create([
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'status' => 'timed_out',
+            'completion_reason' => 'time_elapsed',
+            'started_at' => now()->subMinutes(20),
+            'submitted_at' => now()->subMinutes(10),
+        ]);
+
+        ExamAccessReset::create([
+            'school_id' => $this->school->id,
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'granted_by' => $this->admin->id,
+            'available_from' => now()->subMinute(),
+            'available_until' => now()->addHour(),
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.index'))
+            ->assertOk()
+            ->assertSee('Reset access')
+            ->assertSee('Start Again')
+            ->assertDontSee('Retake');
+
+        $this->assertTrue($this->exam->fresh()->canStudentAttempt($this->student->id));
+    }
+
+    public function test_active_reset_allows_a_fresh_attempt_on_a_closed_exam(): void
+    {
+        $closedExam = $this->createPublishedExamWithWindow(
+            availableFrom: now()->subDays(2),
+            availableUntil: now()->subHour(),
+        );
+
+        ExamAttempt::create([
+            'exam_id' => $closedExam->id,
+            'student_id' => $this->student->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'status' => 'timed_out',
+            'started_at' => now()->subHours(2),
+            'submitted_at' => now()->subHour(),
+        ]);
+
+        $reset = ExamAccessReset::create([
+            'school_id' => $this->school->id,
+            'exam_id' => $closedExam->id,
+            'student_id' => $this->student->id,
+            'granted_by' => $this->admin->id,
+            'available_from' => now()->subMinute(),
+            'available_until' => now()->addHour(),
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.index'))
+            ->assertOk()
+            ->assertSee('Reset access')
+            ->assertSee($closedExam->title);
+
+        $this->actingAs($this->student)
+            ->post(route('student.exams.start', $closedExam))
+            ->assertRedirect();
+
+        $freshAttempt = ExamAttempt::where('exam_id', $closedExam->id)
+            ->where('student_id', $this->student->id)
+            ->where('attempt_number', 2)
+            ->firstOrFail();
+
+        $this->assertSame('in_progress', $freshAttempt->status);
+        $this->assertSame($freshAttempt->id, $reset->fresh()->attempt_id);
+        $this->assertNotNull($reset->fresh()->used_at);
+    }
+
+    public function test_reset_access_does_not_apply_to_another_student(): void
+    {
+        $closedExam = $this->createPublishedExamWithWindow(
+            availableFrom: now()->subDays(2),
+            availableUntil: now()->subHour(),
+        );
+
+        ExamAccessReset::create([
+            'school_id' => $this->school->id,
+            'exam_id' => $closedExam->id,
+            'student_id' => $this->student->id,
+            'granted_by' => $this->admin->id,
+            'available_from' => now()->subMinute(),
+            'available_until' => now()->addHour(),
+        ]);
+
+        $otherStudent = User::factory()->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+        ]);
+        StudentProfile::create([
+            'user_id' => $otherStudent->id,
+            'school_id' => $this->school->id,
+            'class_id' => $this->class->id,
+        ]);
+
+        $this->actingAs($otherStudent)
+            ->post(route('student.exams.start', $closedExam))
+            ->assertRedirect(route('student.exams.show', $closedExam))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseMissing('exam_attempts', [
+            'exam_id' => $closedExam->id,
+            'student_id' => $otherStudent->id,
+        ]);
     }
 
     public function test_empty_state_shown_only_when_all_four_buckets_are_empty(): void

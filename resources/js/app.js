@@ -7,6 +7,281 @@
  * remove formatting, word + char count.
  */
 document.addEventListener('alpine:init', () => {
+    Alpine.data('helpGuideSearch', () => ({
+        query: '',
+        matches: [],
+        activeIndex: 0,
+        contentRoot: null,
+
+        prepareContent() {
+            this.contentRoot = this.$refs.content ?? null;
+            if (!this.contentRoot) return;
+
+            this.contentRoot.querySelectorAll('a[href^="#"]').forEach((link) => {
+                link.addEventListener('click', () => {
+                    this.matches.forEach((match) => {
+                        match.removeAttribute('data-active');
+                    });
+                    this.activeIndex = 0;
+                });
+            });
+
+            this.search();
+        },
+
+        matchLabel() {
+            if (!this.query.trim()) return '';
+            if (this.matches.length === 0) return '0 matches';
+
+            return `${this.activeIndex + 1} / ${this.matches.length}`;
+        },
+
+        search() {
+            if (!this.contentRoot) return;
+
+            this.clearHighlights();
+
+            const term = this.query.trim();
+            if (term.length < 2) {
+                this.matches = [];
+                this.activeIndex = 0;
+                return;
+            }
+
+            const walker = document.createTreeWalker(this.contentRoot, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    const parent = node.parentElement;
+                    if (!parent) return NodeFilter.FILTER_REJECT;
+                    if (['SCRIPT', 'STYLE', 'MARK'].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
+                    if (!node.nodeValue.toLowerCase().includes(term.toLowerCase())) return NodeFilter.FILTER_REJECT;
+
+                    return NodeFilter.FILTER_ACCEPT;
+                },
+            });
+
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+
+            for (const node of nodes) {
+                this.highlightNode(node, term);
+            }
+
+            this.matches = [...this.contentRoot.querySelectorAll('mark[data-help-search]')];
+            this.activeIndex = 0;
+            this.focusActive();
+        },
+
+        highlightNode(node, term) {
+            const text = node.nodeValue;
+            const lowerText = text.toLowerCase();
+            const lowerTerm = term.toLowerCase();
+            const fragment = document.createDocumentFragment();
+
+            let cursor = 0;
+            let index = lowerText.indexOf(lowerTerm, cursor);
+
+            while (index !== -1) {
+                if (index > cursor) {
+                    fragment.appendChild(document.createTextNode(text.slice(cursor, index)));
+                }
+
+                const mark = document.createElement('mark');
+                mark.dataset.helpSearch = 'true';
+                mark.textContent = text.slice(index, index + term.length);
+                fragment.appendChild(mark);
+
+                cursor = index + term.length;
+                index = lowerText.indexOf(lowerTerm, cursor);
+            }
+
+            if (cursor < text.length) {
+                fragment.appendChild(document.createTextNode(text.slice(cursor)));
+            }
+
+            node.parentNode.replaceChild(fragment, node);
+        },
+
+        clearHighlights() {
+            if (!this.contentRoot) return;
+
+            this.contentRoot.querySelectorAll('mark[data-help-search]').forEach((mark) => {
+                mark.replaceWith(document.createTextNode(mark.textContent));
+            });
+            this.contentRoot.normalize();
+        },
+
+        clear() {
+            this.query = '';
+            this.search();
+        },
+
+        focusActive() {
+            this.matches.forEach((match) => {
+                match.removeAttribute('data-active');
+            });
+            const active = this.matches[this.activeIndex];
+            if (!active) return;
+
+            active.dataset.active = 'true';
+            active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        },
+
+        next() {
+            if (this.matches.length === 0) return;
+
+            this.activeIndex = (this.activeIndex + 1) % this.matches.length;
+            this.focusActive();
+        },
+
+        previous() {
+            if (this.matches.length === 0) return;
+
+            this.activeIndex = (this.activeIndex - 1 + this.matches.length) % this.matches.length;
+            this.focusActive();
+        },
+    }));
+
+    Alpine.data('gradebook', (initialScores, compsMeta, inputCols) => ({
+        scores: { ...initialScores },
+        dirty: {},
+        saving: false,
+
+        get changeCount() {
+            return Object.values(this.dirty).filter(Boolean).length;
+        },
+
+        isDirty(key) {
+            return !!this.dirty[key];
+        },
+
+        handleInput(event, sid, subid, cid) {
+            const key = `${sid}-${subid}-${cid}`;
+            const raw = event.target.value;
+            const val = raw === '' ? null : parseFloat(raw);
+            this.scores[key] = val;
+            this.dirty[key] = true;
+        },
+
+        clampValue(event) {
+            const max = parseFloat(event.target.max);
+            const min = parseFloat(event.target.min) || 0;
+            let val = parseFloat(event.target.value);
+            if (!Number.isNaN(val)) {
+                val = Math.min(Math.max(val, min), max);
+                event.target.value = val;
+                const key = event.target.dataset.key;
+                if (key && this.dirty[key]) this.scores[key] = val;
+            }
+        },
+
+        liveTotal(sid, subid) {
+            let total = 0;
+            for (const comp of compsMeta) {
+                const key = `${sid}-${subid}-${comp.id}`;
+                const score =
+                    this.scores[key] !== undefined && this.scores[key] !== null ? parseFloat(this.scores[key]) : null;
+                if (score !== null && !Number.isNaN(score) && comp.max > 0) {
+                    total += (score / comp.max) * comp.weight;
+                }
+            }
+
+            return Math.round(total * 10) / 10;
+        },
+
+        formatTotal(val) {
+            if (val === 0) return '-';
+
+            return `${val.toFixed(1)}%`;
+        },
+
+        handleKeydown(e) {
+            const target = e.target;
+            if (!target.matches('input.cell-input')) return;
+
+            const inputs = [...this.$el.querySelectorAll('input.cell-input:not([disabled])')];
+            const idx = inputs.indexOf(target);
+            if (idx === -1) return;
+
+            let next = null;
+
+            if (e.key === 'Tab' && !e.shiftKey) {
+                e.preventDefault();
+                next = inputs[idx + 1];
+            } else if (e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                next = inputs[idx - 1];
+            } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                next = inputs[idx + inputCols];
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                next = inputs[idx - inputCols];
+            } else if (e.key === 'ArrowRight') {
+                if (target.selectionStart === target.value.length) {
+                    e.preventDefault();
+                    next = inputs[idx + 1];
+                }
+            } else if (e.key === 'ArrowLeft') {
+                if (target.selectionStart === 0) {
+                    e.preventDefault();
+                    next = inputs[idx - 1];
+                }
+            }
+
+            if (next) {
+                next.focus();
+                next.select();
+            }
+        },
+
+        async save() {
+            if (this.changeCount === 0 || this.saving) return;
+            this.saving = true;
+
+            const changes = Object.entries(this.dirty)
+                .filter(([, d]) => d)
+                .map(([key]) => {
+                    const parts = key.split('-');
+                    return {
+                        student_id: parseInt(parts[0], 10),
+                        subject_id: parseInt(parts[1], 10),
+                        component_id: parseInt(parts[2], 10),
+                        score: this.scores[key],
+                    };
+                });
+
+            try {
+                await this.$wire.saveScores(changes);
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        onSaved() {
+            this.dirty = {};
+            this.$nextTick(() => {
+                this.$el.querySelectorAll('input.cell-input').forEach((input) => {
+                    const key = input.dataset.key;
+                    if (key) {
+                        this.scores[key] = input.value === '' ? null : parseFloat(input.value);
+                    }
+                });
+            });
+        },
+
+        discard() {
+            this.$el.querySelectorAll('input.cell-input').forEach((input) => {
+                const key = input.dataset.key;
+                if (key && this.dirty[key]) {
+                    const original = initialScores[key];
+                    input.value = original !== null && original !== undefined ? original : '';
+                    this.scores[key] = original !== null && original !== undefined ? original : null;
+                }
+            });
+            this.dirty = {};
+        },
+    }));
+
     Alpine.data('richEditor', () => ({
         showLinkDialog: false,
         showTextColorPicker: false,

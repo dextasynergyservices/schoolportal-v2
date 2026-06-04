@@ -1,6 +1,16 @@
 <x-layouts::app :title="__('Add Subject')">
     <div class="space-y-6">
-        <x-admin-header :title="__('Add Subject')" />
+        <x-admin-header :title="__('Add Subject')" :description="__('Create a new school subject. Existing subjects should be assigned from the subject pool.')">
+            <flux:button variant="subtle" icon="squares-2x2" href="{{ route('admin.subjects.assignments') }}" wire:navigate>
+                {{ __('Assign Existing Subject') }}
+            </flux:button>
+        </x-admin-header>
+
+        @if ($errors->any())
+            <flux:callout variant="danger" icon="exclamation-circle">
+                {{ $errors->first() }}
+            </flux:callout>
+        @endif
 
         <div class="max-w-xl rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
             <form method="POST" action="{{ route('admin.subjects.store') }}" class="space-y-6">

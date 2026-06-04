@@ -11,6 +11,7 @@ use App\Models\ExamQuestion;
 use App\Models\SchoolClass;
 use App\Models\ScoreComponent;
 use App\Models\Subject;
+use App\Models\TeacherAction;
 use App\Models\Term;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,6 +86,16 @@ class TeacherExamTest extends TestCase
             ->assertViewIs('teacher.exams.index');
     }
 
+    public function test_teacher_can_view_cbt_create_form(): void
+    {
+        $this->actingAs($this->teacher)
+            ->get(route('teacher.exams.create'))
+            ->assertOk()
+            ->assertViewIs('teacher.exams.create')
+            ->assertSee('addSubject($el)', false)
+            ->assertSee('saveSubject($el)', false);
+    }
+
     public function test_teacher_can_create_exam_with_pending_status(): void
     {
         $this->actingAs($this->teacher)
@@ -148,6 +159,71 @@ class TeacherExamTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_teacher_inline_subject_creation_assigns_subject_to_selected_class(): void
+    {
+        $response = $this->actingAs($this->teacher)
+            ->postJson(route('teacher.exams.store-subject'), [
+                'name' => 'Basic Technology',
+                'class_id' => $this->class->id,
+            ])
+            ->assertOk();
+
+        $subjectId = $response->json('subject.id');
+
+        $this->assertDatabaseHas('subjects', [
+            'id' => $subjectId,
+            'school_id' => $this->school->id,
+            'created_by' => $this->teacher->id,
+        ]);
+        $this->assertDatabaseHas('class_subject', [
+            'class_id' => $this->class->id,
+            'subject_id' => $subjectId,
+            'teacher_id' => $this->teacher->id,
+        ]);
+    }
+
+    public function test_teacher_inline_existing_subject_requires_explicit_use_action(): void
+    {
+        $this->actingAs($this->teacher)
+            ->postJson(route('teacher.exams.store-subject'), [
+                'name' => $this->subject->name,
+                'class_id' => $this->class->id,
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'already_assigned')
+            ->assertJsonPath('subject.id', $this->subject->id);
+
+        $this->actingAs($this->teacher)
+            ->postJson(route('teacher.exams.store-subject'), [
+                'name' => $this->subject->name,
+                'subject_id' => $this->subject->id,
+                'class_id' => $this->class->id,
+                'assign_existing' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'assigned_existing')
+            ->assertJsonPath('subject.id', $this->subject->id);
+    }
+
+    public function test_teacher_cannot_inline_add_subject_to_unassigned_class(): void
+    {
+        $otherClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'name' => 'Other Class',
+            'slug' => 'other-class-inline-subject',
+        ]);
+
+        $this->actingAs($this->teacher)
+            ->postJson(route('teacher.exams.store-subject'), [
+                'name' => 'Unauthorized Subject',
+                'class_id' => $otherClass->id,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('subjects', ['slug' => 'unauthorized-subject']);
+    }
+
     public function test_teacher_can_view_own_exam(): void
     {
         $exam = $this->createTeacherExam();
@@ -176,6 +252,25 @@ class TeacherExamTest extends TestCase
         $this->actingAs($student)
             ->get(route('teacher.exams.index'))
             ->assertForbidden();
+    }
+
+    public function test_teacher_can_view_cbt_submissions_without_exam_slug_column(): void
+    {
+        $exam = $this->createTeacherExam(['category' => 'assessment']);
+
+        TeacherAction::create([
+            'school_id' => $this->school->id,
+            'teacher_id' => $this->teacher->id,
+            'action_type' => 'create',
+            'entity_type' => 'exam',
+            'entity_id' => $exam->id,
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($this->teacher)
+            ->get(route('teacher.submissions.index'))
+            ->assertOk()
+            ->assertSee('Assessment');
     }
 
     // ── Helper ──

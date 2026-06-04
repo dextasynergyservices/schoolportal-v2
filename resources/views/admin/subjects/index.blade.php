@@ -50,14 +50,12 @@
                         <flux:table.cell>
                             <div class="flex items-center gap-1">
                                 <flux:button variant="subtle" size="xs" icon="pencil-square" href="{{ route('admin.subjects.edit', $subject) }}" wire:navigate aria-label="{{ __('Edit :name', ['name' => $subject->name]) }}" />
-                                @if ($subject->classes_count === 0)
-                                    <x-confirm-delete
-                                        :action="route('admin.subjects.destroy', $subject)"
-                                        :title="__('Delete Subject')"
-                                        :message="__('Are you sure you want to delete this subject? This action cannot be undone.')"
-                                        :ariaLabel="__('Delete :name', ['name' => $subject->name])"
-                                    />
-                                @endif
+                                <x-confirm-delete
+                                    :action="route('admin.subjects.destroy', $subject)"
+                                    :title="__('Delete Subject')"
+                                    :message="__('Delete this subject and remove it from its assigned classes? Subjects with CBT or score history will be protected.')"
+                                    :ariaLabel="__('Delete :name', ['name' => $subject->name])"
+                                />
                             </div>
                         </flux:table.cell>
                     </flux:table.row>

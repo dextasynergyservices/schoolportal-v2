@@ -6,6 +6,31 @@
             </flux:button>
         </div>
 
+        @if (session('error'))
+            <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:border-red-800/60 dark:bg-red-950/60 dark:text-red-100">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        @if (session('success'))
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/60 dark:text-emerald-100">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @php $activeReset = $exam->activeResetForStudent(auth()->id()); @endphp
+        @if ($activeReset)
+            <div class="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 dark:border-purple-800/70 dark:bg-purple-950/50 dark:text-purple-100">
+                <div class="flex items-start gap-3">
+                    <flux:icon name="arrow-path" class="mt-0.5 size-5 shrink-0" />
+                    <div>
+                        <p class="font-semibold">{{ __('Your access has been reset') }}</p>
+                        <p class="mt-0.5">{{ __('You have one fresh attempt available until :date.', ['date' => $activeReset->available_until->format('M j, Y g:i A')]) }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Exam Info Card --}}
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
             <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -155,6 +180,14 @@
                             <div class="flex items-center gap-3">
                                 @if ($prevAttempt->status === 'grading')
                                     <flux:badge color="amber" size="sm">{{ __('Grading') }}</flux:badge>
+                                @elseif ($prevAttempt->wasTimeElapsed())
+                                    <flux:badge color="red" size="sm">{{ __('Time Elapsed') }}</flux:badge>
+                                @elseif (in_array($prevAttempt->completion_reason, ['reset_by_admin', 'force_ended_by_admin'], true))
+                                    <flux:badge color="purple" size="sm">{{ __('Ended by School') }}</flux:badge>
+                                @elseif ($prevAttempt->completion_reason === 'tab_switch_limit')
+                                    <flux:badge color="amber" size="sm">{{ __('Auto-submitted') }}</flux:badge>
+                                @elseif ($prevAttempt->status === 'grading_failed')
+                                    <flux:badge color="red" size="sm">{{ __('Grading Issue') }}</flux:badge>
                                 @elseif ($prevAttempt->percentage !== null)
                                     <span class="text-sm font-bold {{ $prevAttempt->passed ? 'text-green-600' : 'text-red-600' }}">
                                         {{ number_format($prevAttempt->percentage, 0) }}%
@@ -183,14 +216,24 @@
                 @else
                     <flux:modal.trigger name="start-exam-confirm">
                         <flux:button variant="primary" icon="play">
-                            {{ $completedAttempts > 0 ? __('Retake :label', ['label' => $label]) : __('Start :label', ['label' => $label]) }}
+                            @if ($activeReset)
+                                {{ __('Start :label Again', ['label' => $label]) }}
+                            @else
+                                {{ $completedAttempts > 0 ? __('Retake :label', ['label' => $label]) : __('Start :label', ['label' => $label]) }}
+                            @endif
                         </flux:button>
                     </flux:modal.trigger>
 
                     <flux:modal name="start-exam-confirm" class="md:w-[28rem]">
                         <div class="space-y-6">
                             <div>
-                                <flux:heading size="lg">{{ $completedAttempts > 0 ? __('Retake this :label?', ['label' => Str::lower($label)]) : __('Start this :label?', ['label' => Str::lower($label)]) }}</flux:heading>
+                                <flux:heading size="lg">
+                                    @if ($activeReset)
+                                        {{ __('Start this :label again?', ['label' => Str::lower($label)]) }}
+                                    @else
+                                        {{ $completedAttempts > 0 ? __('Retake this :label?', ['label' => Str::lower($label)]) : __('Start this :label?', ['label' => Str::lower($label)]) }}
+                                    @endif
+                                </flux:heading>
                                 <flux:text class="mt-2">
                                     <span class="font-medium text-zinc-900 dark:text-white">{{ $exam->title }}</span>
                                 </flux:text>
@@ -212,13 +255,24 @@
                                         {{ __('No time limit.') }}
                                     </div>
                                 @endif
+                                @if ($activeReset)
+                                    <div class="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                                        <flux:icon name="calendar-days" class="size-4" />
+                                        {{ __('Reset access closes on :date.', ['date' => $activeReset->available_until->format('M j, Y g:i A')]) }}
+                                    </div>
+                                @elseif ($exam->available_until)
+                                    <div class="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+                                        <flux:icon name="calendar-days" class="size-4 text-zinc-400" />
+                                        {{ __('Closes on :date.', ['date' => $exam->available_until->format('M j, Y g:i A')]) }}
+                                    </div>
+                                @endif
                                 <div class="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
                                     <flux:icon name="check-badge" class="size-4 text-zinc-400" />
                                     {{ __(':score% to pass.', ['score' => $exam->passing_score]) }}
                                 </div>
                                 <div class="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
                                     <flux:icon name="arrow-path" class="size-4 text-zinc-400" />
-                                    {{ __('Attempt :n of :max.', ['n' => $completedAttempts + 1, 'max' => $exam->max_attempts]) }}
+                                    {{ __('Attempt :n of :max.', ['n' => $completedAttempts + 1, 'max' => $allowedAttempts]) }}
                                 </div>
                                 @if ($exam->max_tab_switches)
                                     <div class="flex items-center gap-2 text-red-700 dark:text-red-400">
@@ -246,7 +300,11 @@
                                     <flux:button type="button" variant="ghost">{{ __('Cancel') }}</flux:button>
                                 </flux:modal.close>
                                 <flux:button type="submit" variant="primary" icon="play">
-                                    {{ $completedAttempts > 0 ? __('Retake Now') : __('Start Now') }}
+                                    @if ($activeReset)
+                                        {{ __('Start Again') }}
+                                    @else
+                                        {{ $completedAttempts > 0 ? __('Retake Now') : __('Start Now') }}
+                                    @endif
                                 </flux:button>
                             </form>
                         </div>
@@ -255,7 +313,7 @@
             @else
                 <div class="text-center text-sm text-zinc-500 dark:text-zinc-400">
                     <flux:icon name="lock-closed" class="mx-auto h-8 w-8 text-zinc-400 mb-2" />
-                    <p>{{ __('You have used all :max attempts for this :label.', ['max' => $exam->max_attempts, 'label' => Str::lower($label)]) }}</p>
+                    <p>{{ $blockedMessage }}</p>
                 </div>
             @endif
         </div>

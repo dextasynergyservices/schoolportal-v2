@@ -81,14 +81,20 @@ class SettingsController extends Controller
         $settings = $school->settings ?? [];
         $portal = $settings['portal'] ?? [];
 
-        // Merge validated values, but skip any flag that is locked by super admin
+        // Merge all feature flags explicitly so unchecked switches are saved as false.
         $flagKeys = array_keys(PlatformSetting::FEATURE_FLAGS);
-        foreach ($validated as $key => $value) {
-            if (in_array($key, $flagKeys, true) && $school->featureLock($key) !== null) {
-                // Locked — ignore what the school admin submitted
+        foreach ($flagKeys as $key) {
+            if ($school->featureLock($key) !== null) {
                 continue;
             }
-            $portal[$key] = $value;
+
+            $portal[$key] = $request->boolean($key);
+        }
+
+        foreach (['session_timeout_minutes', 'max_file_upload_mb'] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $portal[$key] = $validated[$key];
+            }
         }
 
         $settings['portal'] = $portal;

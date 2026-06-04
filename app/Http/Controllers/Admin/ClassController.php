@@ -91,4 +91,37 @@ class ClassController extends Controller
         return redirect()->route('admin.classes.index')
             ->with('success', __('Class deleted.'));
     }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['integer', 'exists:classes,id'],
+        ]);
+
+        $classes = SchoolClass::withCount('students')
+            ->whereIn('id', $validated['class_ids'])
+            ->get();
+
+        $deletable = $classes->where('students_count', 0);
+        $skipped = $classes->count() - $deletable->count();
+
+        foreach ($deletable as $class) {
+            $class->delete();
+        }
+
+        if ($deletable->isEmpty()) {
+            return redirect()->route('admin.classes.index')
+                ->with('error', __('No classes were deleted. Move students out of selected classes first.'));
+        }
+
+        $message = trans_choice(':count class deleted.|:count classes deleted.', $deletable->count(), ['count' => $deletable->count()]);
+
+        if ($skipped > 0) {
+            $message .= ' '.__(':count selected class(es) with students were skipped.', ['count' => $skipped]);
+        }
+
+        return redirect()->route('admin.classes.index')
+            ->with('success', $message);
+    }
 }

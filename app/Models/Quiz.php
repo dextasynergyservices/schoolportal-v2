@@ -142,8 +142,10 @@ class Quiz extends Model
 
     public function canStudentAttempt(int $studentId): bool
     {
+        $maxAttempts = max(1, (int) ($this->max_attempts ?: 1));
+
         return $this->isAvailableForStudent()
-            && $this->attemptsForStudent($studentId) < $this->max_attempts;
+            && $this->attemptsForStudent($studentId) < $maxAttempts;
     }
 
     public function bestAttemptForStudent(int $studentId): ?QuizAttempt

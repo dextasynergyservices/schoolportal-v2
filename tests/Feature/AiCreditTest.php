@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\AiCreditAllocation;
 use App\Services\AiCreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\WithSchoolContext;
@@ -122,6 +123,65 @@ class AiCreditTest extends TestCase
             'entity_id' => 42,
             'credits_used' => 1,
         ]);
+    }
+
+    public function test_teacher_level_allocation_is_resolved_from_assigned_class(): void
+    {
+        $teacher = $this->createSchoolUser('teacher', ['level_id' => null]);
+        $this->class->update(['teacher_id' => $teacher->id]);
+        $this->school->update([
+            'ai_free_credits' => 5,
+            'ai_purchased_credits' => 0,
+        ]);
+
+        $allocation = AiCreditAllocation::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'allocated_credits' => 3,
+            'used_credits' => 1,
+            'allocated_by' => $this->admin->id,
+        ]);
+
+        $levelId = $this->service->resolveTeacherLevelId($teacher, $this->class->id);
+
+        $this->assertSame($this->level->id, $levelId);
+        $this->assertSame(2, $this->service->getAvailableCredits($this->school->fresh(), $levelId));
+
+        $result = $this->service->deductCredit(
+            school: $this->school,
+            user: $teacher,
+            usageType: 'quiz',
+            levelId: $levelId,
+        );
+
+        $this->assertTrue($result);
+        $this->assertSame(2, $allocation->fresh()->used_credits);
+        $this->assertSame(4, $this->school->fresh()->ai_free_credits);
+        $this->assertDatabaseHas('ai_credit_usage_log', [
+            'school_id' => $this->school->id,
+            'user_id' => $teacher->id,
+            'level_id' => $this->level->id,
+            'usage_type' => 'quiz',
+            'credits_used' => 1,
+        ]);
+    }
+
+    public function test_level_available_credits_never_exceed_school_balance(): void
+    {
+        $this->school->update([
+            'ai_free_credits' => 1,
+            'ai_purchased_credits' => 0,
+        ]);
+
+        AiCreditAllocation::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'allocated_credits' => 5,
+            'used_credits' => 0,
+            'allocated_by' => $this->admin->id,
+        ]);
+
+        $this->assertSame(1, $this->service->getAvailableCredits($this->school->fresh(), $this->level->id));
     }
 
     public function test_admin_can_view_credits_index_page(): void

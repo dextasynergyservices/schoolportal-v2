@@ -63,6 +63,6 @@ class ExamQuestion extends Model
 
     public function isAutoGradable(): bool
     {
-        return in_array($this->type, ['multiple_choice', 'true_false', 'fill_blank']);
+        return in_array($this->type, ['multiple_choice', 'true_false', 'fill_blank', 'matching']);
     }
 }

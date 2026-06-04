@@ -101,6 +101,17 @@ class NotificationTriggersTest extends TestCase
         Notification::assertSentTo($this->admin, LowCreditsWarningNotification::class);
     }
 
+    public function test_database_notifications_are_stored_immediately_for_bell(): void
+    {
+        $this->admin->notify(new LowCreditsWarningNotification(2));
+
+        $this->assertSame(1, $this->admin->fresh()->unreadNotifications()->count());
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => $this->admin->getMorphClass(),
+            'notifiable_id' => $this->admin->id,
+        ]);
+    }
+
     public function test_low_credits_notification_not_sent_when_balance_above_threshold(): void
     {
         Notification::fake();

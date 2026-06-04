@@ -41,14 +41,16 @@ class ExamMonitor extends Component
         }
 
         DB::transaction(function () use ($attempt): void {
-            $elapsed = $this->exam->time_limit_minutes
-                ? $this->exam->time_limit_minutes * 60
-                : (int) $attempt->started_at->diffInSeconds(now());
+            $elapsed = (int) $attempt->started_at->diffInSeconds(now());
+            if ($this->exam->time_limit_minutes) {
+                $elapsed = min($elapsed, $this->exam->time_limit_minutes * 60);
+            }
 
             $attempt->update([
                 'submitted_at' => now(),
                 'time_spent_seconds' => $elapsed,
                 'status' => 'timed_out',
+                'completion_reason' => 'force_ended_by_admin',
             ]);
         });
 
@@ -66,14 +68,16 @@ class ExamMonitor extends Component
 
         foreach ($attempts as $attempt) {
             DB::transaction(function () use ($attempt): void {
-                $elapsed = $this->exam->time_limit_minutes
-                    ? $this->exam->time_limit_minutes * 60
-                    : (int) $attempt->started_at->diffInSeconds(now());
+                $elapsed = (int) $attempt->started_at->diffInSeconds(now());
+                if ($this->exam->time_limit_minutes) {
+                    $elapsed = min($elapsed, $this->exam->time_limit_minutes * 60);
+                }
 
                 $attempt->update([
                     'submitted_at' => now(),
                     'time_spent_seconds' => $elapsed,
                     'status' => 'timed_out',
+                    'completion_reason' => 'force_ended_by_admin',
                 ]);
             });
 

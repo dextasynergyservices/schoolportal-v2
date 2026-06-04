@@ -18,6 +18,7 @@
     'storeRoute' => null,
     'updateRoute' => null,
     'indexRoute' => null,
+    'category' => null,
 ])
 
 @php
@@ -38,6 +39,7 @@
     $routePrefix = $routePrefix ?? 'admin.exams';
     $rolePrefix = explode('.', $routePrefix)[0]; // 'admin' or 'teacher'
     $bankSaveUrl = route($rolePrefix . '.question-bank.save-from-exam');
+    $formCategory = $category ?? request('category') ?? $exam?->category ?? 'exam';
 @endphp
 
 <flux:card>
@@ -59,6 +61,7 @@
         method="POST"
         action="{{ $exam ? ($updateRoute ?? route(($routePrefix ?? 'admin.exams') . '.update', $exam)) : ($storeRoute ?? route(($routePrefix ?? 'admin.exams') . '.store')) }}"
         x-data="examEditor(@js($questionsData))"
+        x-init="$nextTick(() => filterSubjectsForClass($refs.classSelect, $refs.subjectSelect))"
         x-on:submit="submitting = true"
         novalidate
         class="space-y-6"
@@ -66,6 +69,7 @@
         @csrf
         @if ($exam) @method('PUT') @endif
 
+        <input type="hidden" name="category" value="{{ $formCategory }}">
         <input type="hidden" name="source_type" value="{{ $sourceType }}">
         <input type="hidden" name="source_prompt" value="{{ $sourcePrompt }}">
         <input type="hidden" name="source_document_url" value="{{ $sourceDocumentUrl }}">
@@ -75,7 +79,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <flux:input name="title" label="{{ __('Title') }}" value="{{ $exam?->title ?? old('title', '') }}" required />
 
-            <flux:select name="class_id" label="{{ __('Class') }}" required>
+            <flux:select name="class_id" label="{{ __('Class') }}" required x-ref="classSelect" x-on:change="filterSubjectsForClass($event.target, $refs.subjectSelect)">
                 <option value="">{{ __('Select class...') }}</option>
                 @foreach ($classes as $class)
                     <option value="{{ $class->id }}" @selected(old('class_id', $selectedClassId ?? $exam?->class_id) == $class->id)>{{ $class->name }}</option>
@@ -89,7 +93,7 @@
                         <flux:select name="subject_id" required x-ref="subjectSelect">
                             <option value="">{{ __('Select subject...') }}</option>
                             @foreach ($subjects as $subject)
-                                <option value="{{ $subject->id }}" @selected(old('subject_id', $selectedSubjectId ?? $exam?->subject_id) == $subject->id)>{{ $subject->name }}</option>
+                                <option value="{{ $subject->id }}" data-class-ids="{{ $subject->classes->pluck('id')->join(',') }}" @selected(old('subject_id', $selectedSubjectId ?? $exam?->subject_id) == $subject->id)>{{ $subject->name }}</option>
                             @endforeach
                         </flux:select>
                     </div>
@@ -99,30 +103,63 @@
                 {{-- Inline Subject Creation Modal --}}
                 <dialog x-ref="newSubjectModal" class="rounded-xl shadow-xl p-0 backdrop:bg-black/50 w-full max-w-md">
                     <div x-data="{
-                        saving: false, error: '', subjectName: '', shortName: '',
-                        async saveSubject() {
-                            this.saving = true; this.error = '';
+                        saving: false, error: '', subjectName: '', shortName: '', existingSubject: null, existingStatus: '',
+                        async saveSubject(trigger) {
+                            this.saving = true; this.error = ''; this.existingSubject = null; this.existingStatus = '';
                             try {
+                                const dialog = trigger.closest('dialog');
+                                const form = dialog?.closest('form');
+                                const classId = form?.querySelector('[name=class_id]')?.value;
+                                if (!classId) {
+                                    this.saving = false;
+                                    this.error = @js(__('Select a class before adding the subject.'));
+                                    return;
+                                }
                                 const r = await fetch('{{ route(($routePrefix ?? 'admin.exams') . '.store-subject') }}', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
-                                    body: JSON.stringify({ name: this.subjectName.trim(), short_name: this.shortName.trim() })
+                                    body: JSON.stringify({ name: this.subjectName.trim(), short_name: this.shortName.trim(), class_id: classId })
                                 });
                                 const data = await r.json();
+                                if (!r.ok && ['existing_unassigned', 'already_assigned'].includes(data.status)) {
+                                    this.error = data.message;
+                                    this.existingSubject = data.subject;
+                                    this.existingStatus = data.status;
+                                    this.saving = false;
+                                    return;
+                                }
                                 if (!r.ok) { this.error = data.message || 'Validation failed'; this.saving = false; return; }
                                 if (data.error) { this.error = data.error; this.saving = false; return; }
-                                const sel = this.$refs.subjectSelect || document.querySelector('[name=subject_id]');
-                                if (sel) { sel.add(new Option(data.subject.name, data.subject.id, true, true)); sel.value = data.subject.id; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+                                selectSubjectForClass(form, data.subject, classId);
                                 this.subjectName = ''; this.shortName = ''; this.saving = false;
-                                this.$refs.newSubjectModal.close();
+                                dialog?.close();
                             } catch (e) { this.saving = false; this.error = e.message || 'Failed to save.'; }
+                        },
+                        async assignExisting(trigger) {
+                            if (!this.existingSubject) return;
+                            this.saving = true;
+                            try {
+                                const dialog = trigger.closest('dialog');
+                                const form = dialog?.closest('form');
+                                const classId = form?.querySelector('[name=class_id]')?.value;
+                                const r = await fetch('{{ route(($routePrefix ?? 'admin.exams') . '.store-subject') }}', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
+                                    body: JSON.stringify({ name: this.existingSubject.name, subject_id: this.existingSubject.id, class_id: classId, assign_existing: true })
+                                });
+                                const data = await r.json();
+                                if (!r.ok) { this.error = data.message || 'Unable to assign subject'; this.saving = false; return; }
+                                selectSubjectForClass(form, data.subject, classId);
+                                this.subjectName = ''; this.shortName = ''; this.error = ''; this.existingSubject = null; this.existingStatus = ''; this.saving = false;
+                                dialog?.close();
+                            } catch (e) { this.saving = false; this.error = e.message || 'Failed to assign subject.'; }
                         }
                     }" class="p-6 space-y-4">
                         <h3 class="text-lg font-semibold">{{ __('Add New Subject') }}</h3>
                         <div class="space-y-3">
                             <div>
                                 <flux:label>{{ __('Subject Name') }} *</flux:label>
-                                <flux:input type="text" x-model="subjectName" placeholder="{{ __('e.g., Mathematics') }}" required />
+                                <flux:input type="text" x-model="subjectName" x-on:input="existingSubject = null; existingStatus = ''; error = ''" placeholder="{{ __('e.g., Mathematics') }}" required />
                             </div>
                             <div>
                                 <flux:label>{{ __('Short Name (optional)') }}</flux:label>
@@ -130,9 +167,18 @@
                             </div>
                         </div>
                         <p x-show="error" x-text="error" class="text-sm text-red-500"></p>
+                        <button
+                            type="button"
+                            x-show="existingSubject"
+                            x-on:click="assignExisting($el)"
+                            x-bind:disabled="saving"
+                            class="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300"
+                        >
+                            <span x-text="existingStatus === 'already_assigned' ? '{{ __('Use Existing Subject') }}' : '{{ __('Assign to Selected Class') }}'"></span>
+                        </button>
                         <div class="flex justify-end gap-2">
-                            <button type="button" class="px-3 py-1.5 text-sm rounded text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700" x-on:click="subjectName = ''; shortName = ''; error = ''; $refs.newSubjectModal.close()">{{ __('Cancel') }}</button>
-                            <button type="button" class="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50" x-bind:disabled="saving || !subjectName.trim()" x-on:click="saveSubject()">
+                            <button type="button" class="px-3 py-1.5 text-sm rounded text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700" x-on:click="subjectName = ''; shortName = ''; error = ''; $el.closest('dialog')?.close()">{{ __('Cancel') }}</button>
+                            <button type="button" class="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50" x-bind:disabled="saving || !subjectName.trim()" x-on:click="saveSubject($el)">
                                 <span x-show="saving">{{ __('Saving...') }}</span>
                                 <span x-show="!saving">{{ __('Save Subject') }}</span>
                             </button>
@@ -499,6 +545,46 @@
 </flux:card>
 
 <script>
+    function selectSubjectForClass(form, subject, classId) {
+        const select = form?.querySelector('[name=subject_id]');
+        if (!select || !subject) return;
+
+        let option = Array.from(select.options).find(item => String(item.value) === String(subject.id));
+        if (!option) {
+            option = new Option(subject.name, subject.id);
+            select.add(option);
+        }
+
+        const classIds = new Set(String(option.dataset.classIds || '').split(',').filter(Boolean));
+        classIds.add(String(classId));
+        option.dataset.classIds = Array.from(classIds).join(',');
+        option.hidden = false;
+        option.disabled = false;
+        option.selected = true;
+        select.value = String(subject.id);
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function filterSubjectsForClass(classSelect, subjectSelect) {
+        if (!classSelect || !subjectSelect) return;
+
+        const classId = String(classSelect.value || '');
+        let selectedStillAvailable = false;
+
+        Array.from(subjectSelect.options).forEach((option) => {
+            if (!option.value) return;
+
+            const classIds = String(option.dataset.classIds || '').split(',').filter(Boolean);
+            const available = classId !== '' && classIds.includes(classId);
+            option.hidden = !available;
+            option.disabled = !available;
+
+            if (available && option.selected) selectedStillAvailable = true;
+        });
+
+        if (!selectedStillAvailable) subjectSelect.value = '';
+    }
+
     function examEditor(initial) {
         return {
             nextId: initial.length + 1,

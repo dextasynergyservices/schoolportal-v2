@@ -61,9 +61,20 @@
                     @else
                         <flux:badge color="red" size="sm">{{ __('FAILED') }}</flux:badge>
                     @endif
-                    @if ($attempt->status === 'timed_out')
-                        <flux:badge color="amber" size="sm" class="ml-1">{{ __('Timed Out') }}</flux:badge>
-                    @endif
+                </div>
+            @endif
+
+            @if ($attempt->wasTimeElapsed())
+                <div class="mt-3">
+                    <flux:badge color="red" size="sm">{{ __('Time Elapsed') }}</flux:badge>
+                </div>
+            @elseif ($attempt->completion_reason === 'tab_switch_limit')
+                <div class="mt-3">
+                    <flux:badge color="amber" size="sm">{{ __('Auto-submitted after tab-switch limit') }}</flux:badge>
+                </div>
+            @elseif (in_array($attempt->completion_reason, ['reset_by_admin', 'force_ended_by_admin'], true))
+                <div class="mt-3">
+                    <flux:badge color="purple" size="sm">{{ __('Ended by School') }}</flux:badge>
                 </div>
             @endif
 
@@ -90,7 +101,11 @@
             @if ($exam->canStudentAttempt(auth()->id()))
                 <div class="mt-4">
                     <flux:button variant="primary" size="sm" href="{{ route($routePrefix . '.show', $exam) }}" wire:navigate>
-                        {{ __('Retake :label', ['label' => $label]) }} ({{ $exam->completedAttemptsFor(auth()->id()) }}/{{ $exam->max_attempts }})
+                        @if ($exam->hasActiveResetForStudent(auth()->id()))
+                            {{ __('Start :label Again', ['label' => $label]) }}
+                        @else
+                            {{ __('Retake :label', ['label' => $label]) }} ({{ $exam->completedAttemptsFor(auth()->id()) }}/{{ $exam->max_attempts }})
+                        @endif
                     </flux:button>
                 </div>
             @endif

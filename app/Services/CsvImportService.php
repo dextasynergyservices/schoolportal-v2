@@ -154,6 +154,7 @@ class CsvImportService
         $skipped = [];
         $school = app()->bound('current.school') ? app('current.school') : null;
         $sessionId = $school?->currentSession()?->id;
+        $termId = $school?->currentTerm()?->id;
 
         // Get current school_id for the duplicate check
         $schoolId = $school?->id;
@@ -181,7 +182,7 @@ class CsvImportService
             }
 
             try {
-                DB::transaction(function () use ($row, $defaultPassword, $sessionId) {
+                DB::transaction(function () use ($row, $defaultPassword, $sessionId, $termId) {
                     $user = User::create([
                         'name' => $row['name'],
                         'username' => $row['username'],
@@ -201,6 +202,7 @@ class CsvImportService
                         'address' => $row['address'] ?? null,
                         'blood_group' => $row['blood_group'] ?? null,
                         'enrolled_session_id' => $sessionId,
+                        'enrolled_term_id' => $termId,
                     ]);
                 });
 

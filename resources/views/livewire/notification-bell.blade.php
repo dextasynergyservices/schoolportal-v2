@@ -1,4 +1,4 @@
-<div wire:poll.60s="loadNotifications"
+<div wire:poll.15s="loadNotifications"
     x-data="{
         open: false,
         dropStyle: {},

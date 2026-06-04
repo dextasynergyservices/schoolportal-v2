@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Result;
 use App\Models\SchoolClass;
+use App\Models\StudentProfile;
 use App\Models\Term;
 use App\Models\User;
 use App\Services\FileUploadService;
@@ -46,10 +47,11 @@ class BulkResultController extends Controller
         $classId = $request->input('class_id');
         $sessionId = $request->input('session_id');
         $termId = $request->input('term_id');
+        $term = Term::with('session')->findOrFail($termId);
 
         // Get students in the selected class
         $students = User::where('role', 'student')
-            ->whereHas('studentProfile', fn ($q) => $q->where('class_id', $classId))
+            ->whereHas('studentProfile', fn ($q) => $q->where('class_id', $classId)->enrolledByTerm($term))
             ->get()
             ->keyBy(fn ($s) => strtolower($s->username));
 
@@ -86,7 +88,6 @@ class BulkResultController extends Controller
         }
 
         $class = SchoolClass::find($classId);
-        $term = Term::find($termId);
 
         return view('admin.results.bulk-preview', compact(
             'matches',
@@ -116,6 +117,17 @@ class BulkResultController extends Controller
         $imported = 0;
         $school = app('current.school');
         $uploadService = app(FileUploadService::class);
+        $term = Term::with('session')->findOrFail($request->input('term_id'));
+        $eligibleStudentIds = StudentProfile::where('class_id', $request->input('class_id'))
+            ->enrolledByTerm($term)
+            ->pluck('user_id')
+            ->map(fn ($id) => (string) $id);
+
+        if (collect($request->input('imports'))->pluck('student_id')->map(fn ($id) => (string) $id)->diff($eligibleStudentIds)->isNotEmpty()) {
+            return redirect()->back()->withErrors([
+                'imports' => __('Results cannot be uploaded for a student before their enrollment term.'),
+            ]);
+        }
 
         DB::transaction(function () use ($request, &$imported, $school, $uploadService) {
             foreach ($request->input('imports') as $item) {

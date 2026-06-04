@@ -21,7 +21,7 @@
                         {{ $timeGreeting }}, {{ auth()->user()->name }}
                     </p>
                 </div>
-                <a href="{{ route('super-admin.schools.create') }}" wire:navigate class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium transition-colors backdrop-blur-sm border border-white/10">
+                <a href="{{ route('super-admin.schools.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium transition-colors backdrop-blur-sm border border-white/10" wire:navigate>
                     <flux:icon.plus class="w-4 h-4" />
                     {{ __('New School') }}
                 </a>
@@ -224,7 +224,7 @@
                                 <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $alert['school']->name }}</p>
                                 <p class="text-xs text-amber-700 dark:text-amber-400">{{ $alert['message'] }}</p>
                             </div>
-                            <a href="{{ route('super-admin.schools.show', $alert['school']) }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline shrink-0">{{ __('View') }}</a>
+                            <a href="{{ route('super-admin.schools.show', $alert['school']) }}" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline shrink-0">{{ __('View') }}</a>
                         </div>
                     @endforeach
                 </div>
@@ -240,37 +240,37 @@
         <section aria-labelledby="sa-quick-actions-heading" class="dash-animate dash-animate-delay-3">
             <h2 id="sa-quick-actions-heading" class="text-sm font-semibold text-zinc-900 dark:text-white mb-3">{{ __('Quick Actions') }}</h2>
             <div class="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                <a href="{{ route('super-admin.schools.create') }}" wire:navigate class="quick-action">
+                <a href="{{ route('super-admin.schools.create') }}" class="quick-action" wire:navigate>
                     <div class="quick-action-icon bg-blue-100 dark:bg-blue-900/30">
                         <flux:icon.building-office-2 class="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('New School') }}</span>
                 </a>
-                <a href="{{ route('super-admin.students.index') }}" wire:navigate class="quick-action">
+                <a href="{{ route('super-admin.students.index') }}" class="quick-action" wire:navigate>
                     <div class="quick-action-icon bg-emerald-100 dark:bg-emerald-900/30">
                         <flux:icon.academic-cap class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Students') }}</span>
                 </a>
-                <a href="{{ route('super-admin.teachers.index') }}" wire:navigate class="quick-action">
+                <a href="{{ route('super-admin.teachers.index') }}" class="quick-action" wire:navigate>
                     <div class="quick-action-icon bg-purple-100 dark:bg-purple-900/30">
                         <flux:icon.user-group class="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     </div>
                     <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Teachers') }}</span>
                 </a>
-                <a href="{{ route('super-admin.parents.index') }}" wire:navigate class="quick-action">
+                <a href="{{ route('super-admin.parents.index') }}" class="quick-action" wire:navigate>
                     <div class="quick-action-icon bg-pink-100 dark:bg-pink-900/30">
                         <flux:icon.users class="w-4 h-4 text-pink-600 dark:text-pink-400" />
                     </div>
                     <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('Parents') }}</span>
                 </a>
-                <a href="{{ route('super-admin.credits.index') }}" wire:navigate class="quick-action">
+                <a href="{{ route('super-admin.credits.index') }}" class="quick-action" wire:navigate>
                     <div class="quick-action-icon bg-indigo-100 dark:bg-indigo-900/30">
                         <flux:icon.sparkles class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     </div>
                     <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300 text-center">{{ __('AI Credits') }}</span>
                 </a>
-                <a href="{{ route('super-admin.schools.index') }}" wire:navigate class="quick-action">
+                <a href="{{ route('super-admin.schools.index') }}" class="quick-action" wire:navigate>
                     <div class="quick-action-icon bg-zinc-100 dark:bg-zinc-700">
                         <flux:icon.cog-6-tooth class="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
                     </div>
@@ -296,7 +296,7 @@
                 @else
                     <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
                         @foreach ($topSchools as $index => $school)
-                            <a href="{{ route('super-admin.schools.show', $school) }}" wire:navigate class="activity-item group">
+                            <a href="{{ route('super-admin.schools.show', $school) }}" class="activity-item group">
                                 <span class="flex w-7 h-7 shrink-0 items-center justify-center rounded-full text-xs font-bold
                                     {{ $index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                                        ($index === 1 ? 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400' :
@@ -314,7 +314,7 @@
             <div class="dash-panel dash-animate dash-animate-delay-5">
                 <div class="dash-panel-header">
                     <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Recent Schools') }}</h2>
-                    <a href="{{ route('super-admin.schools.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
+                    <a href="{{ route('super-admin.schools.index') }}" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
                 </div>
                 @if ($recentSchools->isEmpty())
                     <div class="p-8 text-center">
@@ -326,7 +326,7 @@
                 @else
                     <div class="divide-y divide-zinc-100 dark:divide-zinc-700/50">
                         @foreach ($recentSchools as $school)
-                            <a href="{{ route('super-admin.schools.show', $school) }}" wire:navigate class="activity-item group">
+                            <a href="{{ route('super-admin.schools.show', $school) }}" class="activity-item group">
                                 <div class="activity-dot bg-blue-100 dark:bg-blue-900/30">
                                     <flux:icon.building-office-2 class="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                 </div>
@@ -351,7 +351,7 @@
             <div class="dash-panel dash-animate dash-animate-delay-5">
                 <div class="dash-panel-header">
                     <h2 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ __('Recent Purchases') }}</h2>
-                    <a href="{{ route('super-admin.credits.index') }}" wire:navigate class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
+                    <a href="{{ route('super-admin.credits.index') }}" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ __('View all') }}</a>
                 </div>
                 @if ($recentPurchases->isEmpty())
                     <div class="p-8 text-center">

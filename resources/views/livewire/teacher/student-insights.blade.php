@@ -123,7 +123,7 @@
                             <div class="flex items-center justify-between gap-2">
                                 <div class="min-w-0">
                                     <p class="text-sm font-medium text-zinc-900 dark:text-white truncate">{{ $student['name'] }}</p>
-                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $student['class'] }}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $student['class'] ?? __('Unassigned') }}</p>
                                 </div>
 
                                 {{-- Mini score indicators --}}

@@ -163,7 +163,7 @@
                             <flux:modal.close>
                                 <flux:button type="button" variant="ghost">{{ __('Keep Reviewing') }}</flux:button>
                             </flux:modal.close>
-                            <flux:button type="submit" variant="primary" icon="paper-airplane" :disabled="!isOnline">
+                            <flux:button type="submit" variant="primary" icon="paper-airplane" x-bind:disabled="!isOnline">
                                 <span x-show="isOnline">{{ __('Submit Now') }}</span>
                                 <span x-show="!isOnline" class="flex items-center gap-1.5">
                                     <svg class="size-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.584 10.587a2 2 0 0 0 2.828 2.83m5.145 5.145A9.955 9.955 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.106.654-4.062 1.77-5.672m3.144-2.65A9.956 9.956 0 0 1 12 2c5.523 0 10 4.477 10 10 0 2.107-.655 4.063-1.77 5.673"/></svg>

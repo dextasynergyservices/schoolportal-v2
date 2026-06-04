@@ -69,7 +69,7 @@ class QuizController extends Controller
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
 
-        $levelId = $teacher->level_id ? (int) $teacher->level_id : null;
+        $levelId = $this->creditService->resolveTeacherLevelId($teacher);
         $availableCredits = $this->creditService->getAvailableCredits($school, $levelId);
 
         return view('teacher.quizzes.create', compact(
@@ -105,7 +105,7 @@ class QuizController extends Controller
             abort(403, 'You can only create quizzes for your assigned classes.');
         }
 
-        $levelId = $teacher->level_id ? (int) $teacher->level_id : null;
+        $levelId = $this->creditService->resolveTeacherLevelId($teacher, (int) $validated['class_id']);
         if (! $this->creditService->hasCredits($school, $levelId)) {
             return redirect()->route('teacher.quizzes.create')
                 ->with('error', __('No AI credits remaining. You can create quizzes manually or ask your admin to purchase more credits.'));

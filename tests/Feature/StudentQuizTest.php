@@ -101,6 +101,39 @@ class StudentQuizTest extends TestCase
         ]);
     }
 
+    public function test_student_can_start_legacy_quiz_with_zero_max_attempts(): void
+    {
+        $this->quiz->update(['max_attempts' => 0]);
+
+        $this->actingAs($this->student)
+            ->post(route('student.quizzes.start', $this->quiz))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('quiz_attempts', [
+            'quiz_id' => $this->quiz->id,
+            'student_id' => $this->student->id,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    public function test_student_can_render_quiz_take_page(): void
+    {
+        $attempt = QuizAttempt::create([
+            'quiz_id' => $this->quiz->id,
+            'student_id' => $this->student->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'status' => 'in_progress',
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.quizzes.take', $attempt))
+            ->assertOk()
+            ->assertViewIs('student.quizzes.take')
+            ->assertSee('Submit Now');
+    }
+
     public function test_student_cannot_start_unpublished_quiz(): void
     {
         $this->quiz->update(['is_published' => false]);

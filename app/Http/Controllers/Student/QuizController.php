@@ -69,8 +69,10 @@ class QuizController extends Controller
     public function take(QuizAttempt $attempt): View|RedirectResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id) {
+        if ((int) $attempt->student_id !== (int) $student->id
+            || (int) $attempt->quiz->class_id !== (int) $classId) {
             abort(403);
         }
 
@@ -110,8 +112,11 @@ class QuizController extends Controller
     public function saveAnswer(Request $request, QuizAttempt $attempt): RedirectResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id || $attempt->status !== 'in_progress') {
+        if ((int) $attempt->student_id !== (int) $student->id
+            || (int) $attempt->quiz->class_id !== (int) $classId
+            || $attempt->status !== 'in_progress') {
             abort(403);
         }
 
@@ -138,8 +143,11 @@ class QuizController extends Controller
     public function submit(Request $request, QuizAttempt $attempt): RedirectResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id || $attempt->status !== 'in_progress') {
+        if ((int) $attempt->student_id !== (int) $student->id
+            || (int) $attempt->quiz->class_id !== (int) $classId
+            || $attempt->status !== 'in_progress') {
             abort(403);
         }
 

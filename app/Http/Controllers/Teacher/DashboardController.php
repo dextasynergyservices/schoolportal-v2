@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
-use App\Models\AiCreditAllocation;
 use App\Models\Assignment;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
@@ -16,6 +15,7 @@ use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\Result;
 use App\Models\TeacherAction;
+use App\Services\AiCreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
@@ -165,14 +165,14 @@ class DashboardController extends Controller
         // (now covered by the cached $stats block above)
 
         // ── AI credits remaining (level allocation or school pool) ───
-        $aiCreditsRemaining = $school->aiCreditsBalance();
+        $creditService = app(AiCreditService::class);
+        $levelId = $creditService->resolveTeacherLevelId($teacher);
+        $aiCreditsRemaining = $creditService->getAvailableCredits($school, $levelId);
         $aiCreditsLabel = __('School pool');
-        if ($teacher->level_id) {
-            $allocation = AiCreditAllocation::where('level_id', $teacher->level_id)->first();
-            if ($allocation) {
-                $aiCreditsRemaining = $allocation->remainingCredits();
-                $aiCreditsLabel = $allocation->level?->name ?? __('Your level');
-            }
+        if ($levelId) {
+            $aiCreditsLabel = $assignedClasses->firstWhere('level_id', $levelId)?->level?->name
+                ?? $teacher->level?->name
+                ?? __('Your level');
         }
 
         // ── Upcoming due dates (assignments with future due_date) ────

@@ -13,6 +13,7 @@ use App\Models\StudentTermReport;
 use App\Models\Subject;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\ScoreAggregationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\WithSchoolContext;
 use Tests\TestCase;
@@ -42,7 +43,10 @@ class AdminScoreReportTest extends TestCase
         $this->session->update(['is_current' => true, 'status' => 'active']);
 
         $this->term = Term::withoutGlobalScopes()
-            ->where('school_id', $this->school->id)->first();
+            ->where('school_id', $this->school->id)
+            ->where('session_id', $this->session->id)
+            ->where('term_number', 1)
+            ->firstOrFail();
         $this->term->update(['is_current' => true, 'status' => 'active']);
 
         $this->subject = Subject::create([
@@ -120,6 +124,76 @@ class AdminScoreReportTest extends TestCase
             'score' => 15.00,
             'source_type' => 'manual',
             'entered_by' => $this->admin->id,
+        ]);
+    }
+
+    public function test_student_enrolled_in_second_term_is_excluded_from_first_term_scores(): void
+    {
+        $secondTerm = Term::where('session_id', $this->session->id)
+            ->where('term_number', 2)
+            ->firstOrFail();
+        $secondTerm->update(['is_current' => true, 'status' => 'active']);
+
+        $this->student->studentProfile->update([
+            'enrolled_session_id' => $this->session->id,
+            'enrolled_term_id' => $secondTerm->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.scores.save'), [
+                'class_id' => $this->class->id,
+                'term_id' => $this->term->id,
+                'scores' => [
+                    $this->student->id => [
+                        $this->subject->id => [
+                            $this->component->id => 15,
+                        ],
+                    ],
+                ],
+            ])
+            ->assertSessionHasErrors('scores');
+
+        $this->assertDatabaseMissing('student_subject_scores', [
+            'student_id' => $this->student->id,
+            'term_id' => $this->term->id,
+        ]);
+
+        $grid = app(ScoreAggregationService::class)
+            ->getClassScoreGrid($this->class->id, $this->term->id, $this->school->id);
+
+        $this->assertNotContains($this->student->id, collect($grid['students'])->pluck('student_id'));
+    }
+
+    public function test_student_enrolled_in_second_term_can_receive_second_term_scores(): void
+    {
+        $secondTerm = Term::where('session_id', $this->session->id)
+            ->where('term_number', 2)
+            ->firstOrFail();
+        $secondTerm->update(['is_current' => true, 'status' => 'active']);
+
+        $this->student->studentProfile->update([
+            'enrolled_session_id' => $this->session->id,
+            'enrolled_term_id' => $secondTerm->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.scores.save'), [
+                'class_id' => $this->class->id,
+                'term_id' => $secondTerm->id,
+                'scores' => [
+                    $this->student->id => [
+                        $this->subject->id => [
+                            $this->component->id => 15,
+                        ],
+                    ],
+                ],
+            ])
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('student_subject_scores', [
+            'student_id' => $this->student->id,
+            'term_id' => $secondTerm->id,
+            'score' => 15,
         ]);
     }
 

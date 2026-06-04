@@ -82,6 +82,7 @@ use App\Http\Controllers\Teacher\ResultController as TeacherResultController;
 use App\Http\Controllers\Teacher\ScoreController as TeacherScoreController;
 use App\Http\Controllers\Teacher\StudentController as TeacherStudentController;
 use App\Http\Controllers\Teacher\StudentImportController as TeacherStudentImportController;
+use App\Http\Controllers\Teacher\SubjectController as TeacherSubjectController;
 use App\Http\Controllers\Teacher\SubmissionController as TeacherSubmissionController;
 use App\Models\Exam;
 use Illuminate\Support\Facades\Route;
@@ -186,9 +187,11 @@ Route::prefix('portal')->group(function () {
             Route::post('parents/{parent}/activate', [ParentController::class, 'activate'])->name('admin.parents.activate');
 
             // Classes
+            Route::delete('classes/bulk-delete', [ClassController::class, 'bulkDestroy'])->name('admin.classes.bulk-destroy');
             Route::resource('classes', ClassController::class)->names('admin.classes')->except('show');
 
             // School Levels
+            Route::delete('levels/bulk-delete', [LevelController::class, 'bulkDestroy'])->name('admin.levels.bulk-destroy');
             Route::resource('levels', LevelController::class)->names('admin.levels')->except('show');
 
             // Subjects
@@ -293,12 +296,14 @@ Route::prefix('portal')->group(function () {
             Route::post('exams/generate', [AdminExamController::class, 'generate'])->name('admin.exams.generate')->middleware('throttle:ai-generation');
             Route::post('exams/store-subject', [AdminExamController::class, 'storeSubject'])->name('admin.exams.store-subject');
             Route::post('exams', [AdminExamController::class, 'store'])->name('admin.exams.store');
+            Route::get('exams/{exam}/reset-access', [AdminExamController::class, 'resetAccessForm'])->name('admin.exams.reset-access');
+            Route::post('exams/{exam}/reset-access', [AdminExamController::class, 'resetAccess'])->name('admin.exams.reset-access.store');
             Route::get('exams/{exam}', [AdminExamController::class, 'show'])->name('admin.exams.show');
             Route::get('exams/{exam}/preview', [AdminExamController::class, 'preview'])->name('admin.exams.preview');
             Route::get('exams/{exam}/edit', [AdminExamController::class, 'edit'])->name('admin.exams.edit');
             Route::put('exams/{exam}', [AdminExamController::class, 'update'])->name('admin.exams.update');
-            Route::post('exams/{exam}/publish', [AdminExamController::class, 'publish'])->name('admin.exams.publish');
-            Route::post('exams/{exam}/unpublish', [AdminExamController::class, 'unpublish'])->name('admin.exams.unpublish');
+            Route::match(['post', 'patch'], 'exams/{exam}/publish', [AdminExamController::class, 'publish'])->name('admin.exams.publish');
+            Route::match(['post', 'patch'], 'exams/{exam}/unpublish', [AdminExamController::class, 'unpublish'])->name('admin.exams.unpublish');
             Route::delete('exams/{exam}', [AdminExamController::class, 'destroy'])->name('admin.exams.destroy');
             Route::get('exams/{exam}/results', [AdminExamController::class, 'results'])->name('admin.exams.results');
             Route::get('exams/{exam}/results/{attempt}/grade', [AdminExamController::class, 'gradeStudent'])->name('admin.exams.grade-student');
@@ -370,6 +375,12 @@ Route::prefix('portal')->group(function () {
             // Students (read-only)
             Route::get('students', [TeacherStudentController::class, 'index'])->name('teacher.students.index');
             Route::get('students-export', [TeacherStudentController::class, 'exportCsv'])->name('teacher.students.export');
+
+            Route::get('subjects', [TeacherSubjectController::class, 'index'])->name('teacher.subjects.index');
+            Route::get('subjects/create', [TeacherSubjectController::class, 'create'])->name('teacher.subjects.create');
+            Route::post('subjects', [TeacherSubjectController::class, 'store'])->name('teacher.subjects.store');
+            Route::post('subjects/assign', [TeacherSubjectController::class, 'assign'])->name('teacher.subjects.assign');
+            Route::delete('subjects/{subject}', [TeacherSubjectController::class, 'destroy'])->name('teacher.subjects.destroy');
             // CSV import disabled — teachers should not add students
             // Route::get('students/import', [TeacherStudentImportController::class, 'create'])->name('teacher.students.import');
             // Route::post('students/import/preview', [TeacherStudentImportController::class, 'preview'])->name('teacher.students.import.preview');
@@ -491,6 +502,9 @@ Route::prefix('portal')->group(function () {
 
             // Insights
             Route::get('insights', TeacherInsightsController::class)->name('teacher.insights');
+
+            // Help Guide
+            Route::get('help', [HelpController::class, 'teacher'])->name('teacher.help');
         });
 
         // ── Student Routes ──
@@ -531,13 +545,13 @@ Route::prefix('portal')->group(function () {
 
             // CBT Exams (canonical routes for all CBT categories)
             Route::get('exams', [StudentExamController::class, 'index'])->name('student.exams.index');
-            Route::get('exams/{exam}', [StudentExamController::class, 'show'])->name('student.exams.show');
-            Route::post('exams/{exam}/start', [StudentExamController::class, 'start'])->name('student.exams.start');
             Route::get('exams/attempt/{attempt}', [StudentExamController::class, 'take'])->name('student.exams.take');
             Route::post('exams/attempt/{attempt}/answer', [StudentExamController::class, 'saveAnswer'])->name('student.exams.save-answer');
             Route::post('exams/attempt/{attempt}/tab-switch', [StudentExamController::class, 'tabSwitch'])->name('student.exams.tab-switch');
             Route::post('exams/attempt/{attempt}/submit', [StudentExamController::class, 'submit'])->name('student.exams.submit');
             Route::get('exams/attempt/{attempt}/results', [StudentExamController::class, 'results'])->name('student.exams.results');
+            Route::get('exams/{exam}', [StudentExamController::class, 'show'])->name('student.exams.show');
+            Route::post('exams/{exam}/start', [StudentExamController::class, 'start'])->name('student.exams.start');
 
             // Games
             Route::get('games', [StudentGameController::class, 'index'])->name('student.games.index');
@@ -548,6 +562,9 @@ Route::prefix('portal')->group(function () {
             // Notices
             Route::get('notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
             Route::get('notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
+
+            // Help Guide
+            Route::get('help', [HelpController::class, 'student'])->name('student.help');
         });
 
         // ── Parent Routes ──
@@ -589,6 +606,9 @@ Route::prefix('portal')->group(function () {
             // Notices
             Route::get('notices', [ParentNoticeController::class, 'index'])->name('parent.notices.index');
             Route::get('notices/{notice}', [ParentNoticeController::class, 'show'])->name('parent.notices.show');
+
+            // Help Guide
+            Route::get('help', [HelpController::class, 'parent'])->name('parent.help');
         });
 
         // ── Super Admin Routes ──

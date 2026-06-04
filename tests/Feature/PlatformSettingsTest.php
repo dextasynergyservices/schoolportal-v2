@@ -235,6 +235,50 @@ class PlatformSettingsTest extends TestCase
             ->assertOk();
     }
 
+    public function test_school_admin_can_turn_off_portal_feature_switches(): void
+    {
+        $admin = User::withoutGlobalScopes()
+            ->where('school_id', $this->targetSchool->id)
+            ->where('role', 'school_admin')
+            ->firstOrFail();
+        $admin->update(['must_change_password' => false, 'email_verified_at' => now()]);
+
+        $this->targetSchool->update([
+            'settings' => [
+                'portal' => [
+                    'enable_parent_portal' => true,
+                    'enable_quiz_generator' => true,
+                    'enable_game_generator' => true,
+                    'enable_teacher_approval' => true,
+                    'enable_cbt_results_for_parents' => true,
+                    'enable_cbt_exam' => true,
+                    'enable_assessment' => true,
+                    'enable_cbt_assignment' => true,
+                    'session_timeout_minutes' => 30,
+                    'max_file_upload_mb' => 10,
+                ],
+            ],
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.settings.portal'), [
+                'session_timeout_minutes' => 30,
+                'max_file_upload_mb' => 10,
+            ])
+            ->assertRedirect(route('admin.settings.index'));
+
+        $portal = $this->targetSchool->fresh()->settings['portal'];
+
+        $this->assertFalse($portal['enable_parent_portal']);
+        $this->assertFalse($portal['enable_quiz_generator']);
+        $this->assertFalse($portal['enable_game_generator']);
+        $this->assertFalse($portal['enable_teacher_approval']);
+        $this->assertFalse($portal['enable_cbt_results_for_parents']);
+        $this->assertFalse($portal['enable_cbt_exam']);
+        $this->assertFalse($portal['enable_assessment']);
+        $this->assertFalse($portal['enable_cbt_assignment']);
+    }
+
     // ── PlatformSetting model ─────────────────────────────────────────────────
 
     public function test_platform_setting_get_returns_typed_integer(): void

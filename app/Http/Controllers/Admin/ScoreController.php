@@ -102,6 +102,16 @@ class ScoreController extends Controller
         $school = auth()->user()->school;
         $class = SchoolClass::findOrFail($request->class_id);
         $term = Term::with('session')->findOrFail($request->term_id);
+        $eligibleStudentIds = StudentProfile::where('class_id', $class->id)
+            ->enrolledByTerm($term)
+            ->pluck('user_id')
+            ->map(fn ($id) => (string) $id);
+
+        if (collect(array_keys($request->scores))->map(fn ($id) => (string) $id)->diff($eligibleStudentIds)->isNotEmpty()) {
+            return redirect()->back()->withErrors([
+                'scores' => __('Scores cannot be entered for a student before their enrollment term.'),
+            ]);
+        }
 
         $updated = 0;
         $userId = auth()->id();
@@ -273,9 +283,19 @@ class ScoreController extends Controller
     /**
      * Get students for a class (JSON endpoint for generate modal).
      */
-    public function classStudents(SchoolClass $class)
+    public function classStudents(Request $request, SchoolClass $class)
     {
-        $students = $class->students()
+        $students = $class->students();
+
+        if ($request->filled('term_id')) {
+            $term = Term::with('session')->findOrFail($request->integer('term_id'));
+            $students->enrolledByTerm($term);
+        } elseif ($request->filled('session_id')) {
+            $session = AcademicSession::findOrFail($request->integer('session_id'));
+            $students->enrolledBySession($session);
+        }
+
+        $students = $students
             ->with('user')
             ->get()
             ->sortBy(fn (StudentProfile $sp) => $sp->user?->name)

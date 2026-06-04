@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GradeExamAttempt;
 use App\Models\ClassSubject;
 use App\Models\Exam;
+use App\Models\ExamAccessReset;
 use App\Models\ExamAnswer;
 use App\Models\ExamAttempt;
 use App\Models\ExamQuestion;
@@ -15,6 +17,8 @@ use App\Models\SchoolLevel;
 use App\Models\ScoreComponent;
 use App\Models\Subject;
 use App\Models\TeacherAction;
+use App\Models\User;
+use App\Notifications\ExamAccessResetNotification;
 use App\Services\AiCreditService;
 use App\Services\ExamGeneratorService;
 use App\Services\ExamGradingService;
@@ -24,9 +28,11 @@ use App\Services\ScoreAggregationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -44,19 +50,25 @@ class ExamController extends Controller
 
     private function resolveCategory(): ?string
     {
-        // 1. Check query param first (unified index page uses ?category=)
+        // 1. Check form input first so POST requests keep the selected CBT type.
+        $inputCategory = request()->input('category');
+        if (in_array($inputCategory, ['exam', 'assessment', 'assignment'], true)) {
+            return $inputCategory;
+        }
+
+        // 2. Check query param (unified index/create pages use ?category=)
         $queryCategory = request()->query('category');
         if (in_array($queryCategory, ['exam', 'assessment', 'assignment'], true)) {
             return $queryCategory;
         }
 
-        // 2. Check route-bound exam model (for show/edit/results/etc.)
+        // 3. Check route-bound exam model (for show/edit/results/etc.)
         $exam = request()->route('exam');
         if ($exam instanceof Exam) {
             return $exam->category;
         }
 
-        // 3. For the unified index (admin.exams.index without ?category), return null = all
+        // 4. For the unified index (admin.exams.index without ?category), return null = all
         $name = request()->route()->getName();
         if ($name === 'admin.exams.index' && ! $queryCategory) {
             return null;
@@ -145,7 +157,7 @@ class ExamController extends Controller
             ->orderBy('name')
             ->get();
 
-        $subjects = Subject::where('is_active', true)->orderBy('name')->get();
+        $subjects = Subject::with('classes:id')->where('is_active', true)->orderBy('name')->get();
         $scoreComponents = ScoreComponent::where('is_active', true)->orderBy('sort_order')->get();
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
@@ -173,11 +185,12 @@ class ExamController extends Controller
             'source_type' => ['required', 'in:file,link'],
             'source_file' => ['required_if:source_type,file', 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
             'document_url' => ['required_if:source_type,link', 'nullable', 'url', 'max:2000'],
-            'question_count' => ['required', 'integer', 'in:5,10,15,20,25,30'],
+            'question_count' => ['required', 'integer', 'min:1', 'max:100'],
             'question_types' => ['required', 'array', 'min:1'],
             'question_types.*' => ['in:multiple_choice,true_false,fill_blank,short_answer,theory,matching'],
             'difficulty' => ['required', 'in:easy,medium,hard'],
         ]);
+        $this->ensureSubjectAssignedToClass((int) $validated['class_id'], (int) $validated['subject_id']);
 
         if (! $this->creditService->hasCredits($school)) {
             return redirect()->route("{$routePrefix}.create")
@@ -226,7 +239,7 @@ class ExamController extends Controller
         $this->creditService->deductCredit($school, auth()->user(), $category);
 
         $classes = SchoolClass::with('level:id,name')->where('is_active', true)->orderBy('name')->get();
-        $subjects = Subject::where('is_active', true)->orderBy('name')->get();
+        $subjects = Subject::with('classes:id')->where('is_active', true)->orderBy('name')->get();
         $scoreComponents = ScoreComponent::where('is_active', true)->orderBy('sort_order')->get();
         $currentSession = $school->currentSession();
         $currentTerm = $school->currentTerm();
@@ -259,6 +272,7 @@ class ExamController extends Controller
         $routePrefix = $this->routePrefix();
 
         $validator = Validator::make($request->all(), [
+            'category' => ['nullable', 'in:exam,assessment,assignment'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'class_id' => ['required', 'exists:classes,id'],
@@ -297,10 +311,19 @@ class ExamController extends Controller
             'questions.*.section_label' => ['nullable', 'string', 'max:100'],
         ]);
 
+        $validator->after(function ($validator) use ($request): void {
+            if ($request->filled(['class_id', 'subject_id'])
+                && ! ClassSubject::where('class_id', $request->integer('class_id'))
+                    ->where('subject_id', $request->integer('subject_id'))
+                    ->exists()) {
+                $validator->errors()->add('subject_id', __('Select a subject assigned to the selected class.'));
+            }
+        });
+
         if ($validator->fails()) {
             // Re-render the form with errors and submitted data (prevents data loss from POST-rendered review pages)
             $classes = SchoolClass::with('level:id,name')->where('is_active', true)->orderBy('name')->get();
-            $subjects = Subject::where('is_active', true)->orderBy('name')->get();
+            $subjects = Subject::with('classes:id')->where('is_active', true)->orderBy('name')->get();
             $scoreComponents = ScoreComponent::where('is_active', true)->orderBy('sort_order')->get();
 
             $sourceType = $request->input('source_type', 'manual');
@@ -322,6 +345,10 @@ class ExamController extends Controller
                 'sourceDocumentPublicId' => $request->input('source_document_public_id'),
                 'difficulty' => $request->input('difficulty', 'medium'),
                 'availableCredits' => $this->creditService->getAvailableCredits($school),
+                'category' => $category,
+                'storeRoute' => route($routePrefix.'.store', ['category' => $category]),
+                'indexRoute' => route($routePrefix.'.index', $category ? ['category' => $category] : []),
+                'routePrefix' => $routePrefix,
             ], $this->viewData()))->withErrors($validator);
         }
 
@@ -446,7 +473,7 @@ class ExamController extends Controller
             ->orderBy('name')
             ->get();
 
-        $subjects = Subject::where('is_active', true)->orderBy('name')->get();
+        $subjects = Subject::with('classes:id')->where('is_active', true)->orderBy('name')->get();
         $scoreComponents = ScoreComponent::where('is_active', true)->orderBy('sort_order')->get();
 
         return view('admin.exams.edit', array_merge(
@@ -498,6 +525,7 @@ class ExamController extends Controller
             'questions.*.points' => ['required', 'integer', 'min:1', 'max:100'],
             'questions.*.section_label' => ['nullable', 'string', 'max:100'],
         ]);
+        $this->ensureSubjectAssignedToClass((int) $validated['class_id'], (int) $validated['subject_id']);
 
         $totalPoints = collect($validated['questions'])->sum('points');
 
@@ -591,6 +619,176 @@ class ExamController extends Controller
             ->with('success', __(':type unpublished.', ['type' => $this->categoryLabel()]));
     }
 
+    public function resetAccessForm(Exam $exam): View|RedirectResponse
+    {
+        if ($exam->status !== 'approved' || ! $exam->is_published) {
+            return redirect()->route($this->routePrefix().'.show', $exam)
+                ->with('error', __('Publish this approved CBT before resetting student access.'));
+        }
+
+        $exam->load(['class:id,name', 'subject:id,name']);
+
+        $students = User::where('role', 'student')
+            ->where('is_active', true)
+            ->whereHas('studentProfile', fn ($query) => $query->where('class_id', $exam->class_id))
+            ->orderBy('name')
+            ->get(['id', 'name', 'username']);
+
+        $attempts = ExamAttempt::with('accessReset')
+            ->where('exam_id', $exam->id)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->orderByDesc('attempt_number')
+            ->get()
+            ->groupBy('student_id');
+
+        $activeResets = ExamAccessReset::where('exam_id', $exam->id)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->active()
+            ->get()
+            ->keyBy('student_id');
+
+        $studentOptions = $students->map(function (User $student) use ($attempts, $activeResets, $exam): array {
+            $studentAttempts = $attempts->get($student->id, collect());
+            $latestAttempt = $studentAttempts->first();
+            $activeReset = $activeResets->get($student->id);
+
+            if ($latestAttempt?->isInProgress()) {
+                $status = $latestAttempt->isResumable() ? __('In progress') : __('Time elapsed');
+                $statusColor = $latestAttempt->isResumable() ? 'amber' : 'red';
+            } elseif ($latestAttempt?->wasTimeElapsed()) {
+                $status = __('Time elapsed');
+                $statusColor = 'red';
+            } elseif ($studentAttempts->contains(fn (ExamAttempt $attempt): bool => $attempt->isComplete())) {
+                $status = __('Completed');
+                $statusColor = 'green';
+            } elseif ($exam->available_until?->isPast()) {
+                $status = __('Missed');
+                $statusColor = 'red';
+            } else {
+                $status = __('Not attempted');
+                $statusColor = 'zinc';
+            }
+
+            return [
+                'id' => $student->id,
+                'name' => $student->name,
+                'username' => $student->username,
+                'status' => $status,
+                'status_color' => $statusColor,
+                'attempts' => $studentAttempts->count(),
+                'active_until' => $activeReset?->available_until?->format('M j, Y g:i A'),
+            ];
+        })->values();
+
+        return view('admin.exams.reset-access', array_merge([
+            'exam' => $exam,
+            'studentOptions' => $studentOptions,
+        ], $this->viewData()));
+    }
+
+    public function resetAccess(Request $request, Exam $exam): RedirectResponse
+    {
+        if ($exam->status !== 'approved' || ! $exam->is_published) {
+            return redirect()->route($this->routePrefix().'.show', $exam)
+                ->with('error', __('Publish this approved CBT before resetting student access.'));
+        }
+
+        $validated = $request->validate([
+            'scope' => ['required', 'in:class,students'],
+            'student_ids' => ['nullable', 'array'],
+            'student_ids.*' => ['integer'],
+            'available_until' => ['required', 'date', 'after:now'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $studentQuery = User::where('role', 'student')
+            ->where('is_active', true)
+            ->whereHas('studentProfile', fn ($query) => $query->where('class_id', $exam->class_id))
+            ->orderBy('id');
+
+        if ($validated['scope'] === 'students') {
+            $selectedIds = collect($validated['student_ids'] ?? [])->map(fn ($id): int => (int) $id)->unique();
+            $students = $studentQuery->whereIn('id', $selectedIds)->get();
+
+            if ($selectedIds->isEmpty() || $students->count() !== $selectedIds->count()) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['student_ids' => __('Select one or more active students from this CBT class.')]);
+            }
+        } else {
+            $students = $studentQuery->get();
+        }
+
+        if ($students->isEmpty()) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['student_ids' => __('There are no active students in this class to reset.')]);
+        }
+
+        $availableUntil = Carbon::parse($validated['available_until']);
+        $attemptsToGrade = collect();
+
+        DB::transaction(function () use ($exam, $students, $availableUntil, $validated, $attemptsToGrade): void {
+            foreach ($students as $student) {
+                User::whereKey($student->id)->lockForUpdate()->firstOrFail();
+
+                $inProgressAttempts = ExamAttempt::where('exam_id', $exam->id)
+                    ->where('student_id', $student->id)
+                    ->where('status', 'in_progress')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($inProgressAttempts as $attempt) {
+                    $elapsed = (int) $attempt->started_at->diffInSeconds(now());
+                    if ($exam->time_limit_minutes) {
+                        $elapsed = min($elapsed, $exam->time_limit_minutes * 60);
+                    }
+
+                    $attempt->update([
+                        'submitted_at' => now(),
+                        'time_spent_seconds' => $elapsed,
+                        'status' => 'timed_out',
+                        'completion_reason' => 'reset_by_admin',
+                    ]);
+                    $attemptsToGrade->push($attempt);
+                }
+
+                ExamAccessReset::where('exam_id', $exam->id)
+                    ->where('student_id', $student->id)
+                    ->whereNull('used_at')
+                    ->delete();
+
+                ExamAccessReset::create([
+                    'exam_id' => $exam->id,
+                    'student_id' => $student->id,
+                    'granted_by' => auth()->id(),
+                    'available_from' => now(),
+                    'available_until' => $availableUntil,
+                    'reason' => $validated['reason'] ?? null,
+                ]);
+            }
+        });
+
+        foreach ($attemptsToGrade as $attempt) {
+            GradeExamAttempt::dispatch($attempt);
+        }
+
+        foreach ($students as $student) {
+            $student->notify(new ExamAccessResetNotification(
+                examTitle: $exam->title,
+                category: $exam->category,
+                examId: $exam->id,
+                availableUntil: $availableUntil,
+            ));
+        }
+
+        return redirect()->route($this->routePrefix().'.show', $exam)
+            ->with('success', __('Fresh access granted to :count student(s) until :date.', [
+                'count' => $students->count(),
+                'date' => $availableUntil->format('M j, Y g:i A'),
+            ]));
+    }
+
     public function destroy(Exam $exam): RedirectResponse
     {
         $routePrefix = $this->routePrefix();
@@ -614,49 +812,70 @@ class ExamController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'short_name' => ['nullable', 'string', 'max:20'],
-            'class_id' => ['nullable', 'exists:classes,id'],
+            'class_id' => ['required', 'exists:classes,id'],
+            'assign_existing' => ['nullable', 'boolean'],
+            'subject_id' => ['nullable', 'integer', 'exists:subjects,id'],
         ]);
 
         $school = app('current.school');
         $slug = Str::slug($validated['name']);
 
-        $existing = Subject::where('school_id', $school->id)->where('slug', $slug)->first();
+        $class = SchoolClass::where('school_id', $school->id)->findOrFail($validated['class_id']);
+        $subject = ! empty($validated['assign_existing']) && ! empty($validated['subject_id'])
+            ? Subject::findOrFail($validated['subject_id'])
+            : Subject::where('slug', $slug)->first();
 
-        if ($existing) {
+        if ($subject && ! $subject->is_active) {
             return response()->json([
-                'message' => 'A subject with this name already exists.',
-            ], 422);
+                'status' => 'inactive',
+                'message' => __('":name" already exists but is inactive. Reactivate it from Subjects before using it.', ['name' => $subject->name]),
+            ], 409);
         }
 
-        $subject = Subject::create([
-            'school_id' => $school->id,
-            'name' => $validated['name'],
-            'slug' => $slug,
-            'short_name' => $validated['short_name'] ?? null,
-            'is_active' => true,
-        ]);
+        if ($subject && empty($validated['assign_existing'])) {
+            $isAssigned = ClassSubject::where('class_id', $class->id)->where('subject_id', $subject->id)->exists();
 
-        if (! empty($validated['class_id'])) {
-            // Verify class belongs to the current school
-            $classExists = SchoolClass::where('id', $validated['class_id'])
-                ->where('school_id', $school->id)
-                ->exists();
-
-            if ($classExists) {
-                ClassSubject::firstOrCreate([
-                    'school_id' => $school->id,
-                    'class_id' => $validated['class_id'],
-                    'subject_id' => $subject->id,
-                ]);
-            }
+            return response()->json([
+                'status' => $isAssigned ? 'already_assigned' : 'existing_unassigned',
+                'message' => $isAssigned
+                    ? __('":name" already exists and is assigned to this class. Use the existing subject.', ['name' => $subject->name])
+                    : __('":name" already exists in the school subject pool. Assign it to this class instead.', ['name' => $subject->name]),
+                'subject' => ['id' => $subject->id, 'name' => $subject->name],
+            ], 409);
         }
+
+        if (! $subject) {
+            $subject = Subject::create([
+                'school_id' => $school->id,
+                'created_by' => auth()->id(),
+                'name' => $validated['name'],
+                'slug' => $slug,
+                'short_name' => $validated['short_name'] ?? null,
+                'is_active' => true,
+            ]);
+        }
+
+        ClassSubject::firstOrCreate(
+            ['class_id' => $class->id, 'subject_id' => $subject->id],
+            ['school_id' => $school->id],
+        );
 
         return response()->json([
+            'status' => ! empty($validated['assign_existing']) ? 'assigned_existing' : 'created',
             'subject' => [
                 'id' => $subject->id,
                 'name' => $subject->name,
             ],
         ]);
+    }
+
+    private function ensureSubjectAssignedToClass(int $classId, int $subjectId): void
+    {
+        if (! ClassSubject::where('class_id', $classId)->where('subject_id', $subjectId)->exists()) {
+            throw ValidationException::withMessages([
+                'subject_id' => __('Select a subject assigned to the selected class.'),
+            ]);
+        }
     }
 
     // ── Results & Grading ──
