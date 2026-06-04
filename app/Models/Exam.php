@@ -156,6 +156,27 @@ class Exam extends Model
             });
     }
 
+    public function scopeAvailableForStudent($query, int $studentId)
+    {
+        return $query->published()
+            ->where(function ($query) use ($studentId): void {
+                $query->where(function ($window): void {
+                    $window->where(function ($from): void {
+                        $from->whereNull('available_from')
+                            ->orWhere('available_from', '<=', now());
+                    })->where(function ($until): void {
+                        $until->whereNull('available_until')
+                            ->orWhere('available_until', '>=', now());
+                    });
+                })->orWhereHas('accessResets', function ($reset) use ($studentId): void {
+                    $reset->where('student_id', $studentId)->active();
+                })->orWhereHas('attempts', function ($attempt) use ($studentId): void {
+                    $attempt->where('student_id', $studentId)
+                        ->where('status', 'in_progress');
+                });
+            });
+    }
+
     /**
      * Published exams that haven't opened yet (available_from is in the future).
      */
@@ -274,6 +295,11 @@ class Exam extends Model
         return $this->hasMany(ExamAttempt::class);
     }
 
+    public function accessResets(): HasMany
+    {
+        return $this->hasMany(ExamAccessReset::class);
+    }
+
     public function attemptsFor(int $studentId): HasMany
     {
         return $this->attempts()->where('student_id', $studentId);
@@ -287,7 +313,7 @@ class Exam extends Model
     public function bestAttemptForStudent(int $studentId): ?ExamAttempt
     {
         return $this->attemptsFor($studentId)
-            ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
+            ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded', 'grading_failed'])
             ->orderByDesc('percentage')
             ->first();
     }
@@ -300,25 +326,81 @@ class Exam extends Model
     public function completedAttemptsFor(int $studentId): int
     {
         return $this->attemptsFor($studentId)
-            ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
+            ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded', 'grading_failed'])
             ->count();
+    }
+
+    public function activeResetForStudent(int $studentId): ?ExamAccessReset
+    {
+        return $this->accessResets()
+            ->where('student_id', $studentId)
+            ->active()
+            ->oldest('available_until')
+            ->first();
+    }
+
+    public function hasActiveResetForStudent(int $studentId): bool
+    {
+        return $this->accessResets()
+            ->where('student_id', $studentId)
+            ->active()
+            ->exists();
+    }
+
+    public function resumableAttemptForStudent(int $studentId): ?ExamAttempt
+    {
+        return $this->attemptsFor($studentId)
+            ->where('status', 'in_progress')
+            ->oldest('attempt_number')
+            ->get()
+            ->first(fn (ExamAttempt $attempt): bool => $attempt->isResumable());
+    }
+
+    public function isAvailableForStudent(int $studentId): bool
+    {
+        if (! $this->is_published) {
+            return false;
+        }
+
+        return $this->isAvailable()
+            || $this->hasActiveResetForStudent($studentId)
+            || $this->resumableAttemptForStudent($studentId) !== null;
     }
 
     public function canStudentAttempt(int $studentId): bool
     {
-        if (! $this->isAvailable()) {
+        if (! $this->isAvailableForStudent($studentId)) {
             return false;
         }
 
-        // Check if student has an in-progress attempt
-        $inProgress = $this->attemptsFor($studentId)
-            ->where('status', 'in_progress')
-            ->exists();
-
-        if ($inProgress) {
-            return true; // Can resume
+        if ($this->resumableAttemptForStudent($studentId)) {
+            return true;
         }
 
-        return $this->completedAttemptsFor($studentId) < $this->max_attempts;
+        if (! $this->isAvailable()) {
+            return $this->hasActiveResetForStudent($studentId);
+        }
+
+        $latestAttempt = $this->latestAttemptFor($studentId);
+        if ($latestAttempt?->wasTimeElapsed() && ! $this->hasActiveResetForStudent($studentId)) {
+            return false;
+        }
+
+        return $this->completedAttemptsFor($studentId) < $this->allowedAttemptsForStudent($studentId);
+    }
+
+    public function allowedAttemptsForStudent(int $studentId): int
+    {
+        $baseAttempts = max(1, (int) ($this->max_attempts ?: 1));
+        $usedResetAttempts = $this->accessResets()
+            ->where('student_id', $studentId)
+            ->whereNotNull('used_at')
+            ->count();
+        $activeResetAttempts = $this->accessResets()
+            ->where('student_id', $studentId)
+            ->active()
+            ->count();
+
+        return $baseAttempts + $usedResetAttempts + $activeResetAttempts;
     }
 }

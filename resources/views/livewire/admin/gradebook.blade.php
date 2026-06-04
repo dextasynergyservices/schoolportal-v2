@@ -218,6 +218,22 @@
             </span>
         </div>
 
+        <form method="POST" action="{{ route($this->role === 'teacher' ? 'teacher.scores.save' : 'admin.scores.save') }}" class="space-y-3">
+            @csrf
+            <input type="hidden" name="class_id" value="{{ $this->classId }}">
+            <input type="hidden" name="term_id" value="{{ $this->termId }}">
+
+            <div class="flex justify-end px-1">
+                <flux:button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    icon="check"
+                >
+                    {{ __('Save Scores') }}
+                </flux:button>
+            </div>
+
         {{-- Scrollable wrapper --}}
         <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm overflow-hidden">
             <div class="overflow-x-auto" @keydown="handleKeydown($event)">
@@ -327,6 +343,7 @@
                                                     data-comp="{{ $cid }}"
                                                     data-max="{{ $comp['max_score'] }}"
                                                     data-weight="{{ $comp['weight'] }}"
+                                                    name="scores[{{ $sid }}][{{ $subid }}][{{ $cid }}]"
                                                     @input="handleInput($event, {{ $sid }}, {{ $subid }}, {{ $cid }})"
                                                     @focus="$el.select()"
                                                     @blur="clampValue($event)"
@@ -355,6 +372,7 @@
                 </table>
             </div>
         </div>
+        </form>
 
     @elseif ($this->classId && $this->termId)
         {{-- Loading or empty --}}
@@ -452,154 +470,3 @@
         </div>
     </div>
 </div>
-
-@push('scripts')
-<script>
-function gradebook(initialScores, compsMeta, inputCols) {
-    return {
-        scores:  { ...initialScores },   // { "sid-subid-cid": float|null }
-        dirty:   {},                      // { "sid-subid-cid": true }
-        saving:  false,
-
-        get changeCount() {
-            return Object.values(this.dirty).filter(Boolean).length;
-        },
-
-        isDirty(key) {
-            return !!this.dirty[key];
-        },
-
-        handleInput(event, sid, subid, cid) {
-            const key = `${sid}-${subid}-${cid}`;
-            const raw = event.target.value;
-            const val = raw === '' ? null : parseFloat(raw);
-            this.scores[key] = val;
-            this.dirty[key]  = true;
-        },
-
-        clampValue(event) {
-            const max = parseFloat(event.target.max);
-            const min = parseFloat(event.target.min) || 0;
-            let val = parseFloat(event.target.value);
-            if (!isNaN(val)) {
-                val = Math.min(Math.max(val, min), max);
-                event.target.value = val;
-                const key = event.target.dataset.key;
-                if (key && this.dirty[key]) this.scores[key] = val;
-            }
-        },
-
-        // Compute live weighted total for a student's subject
-        liveTotal(sid, subid) {
-            let total = 0;
-            for (const comp of compsMeta) {
-                const key   = `${sid}-${subid}-${comp.id}`;
-                const score = (this.scores[key] !== undefined && this.scores[key] !== null)
-                    ? parseFloat(this.scores[key])
-                    : null;
-                if (score !== null && !isNaN(score) && comp.max > 0) {
-                    total += (score / comp.max) * comp.weight;
-                }
-            }
-            return Math.round(total * 10) / 10;
-        },
-
-        formatTotal(val) {
-            if (val === 0) return '—';
-            return val.toFixed(1) + '%';
-        },
-
-        // Keyboard navigation: Tab, Arrow keys, Enter
-        handleKeydown(e) {
-            const target = e.target;
-            if (!target.matches('input.cell-input')) return;
-
-            const inputs = [...this.$el.querySelectorAll('input.cell-input:not([disabled])')];
-            const idx    = inputs.indexOf(target);
-            if (idx === -1) return;
-
-            let next = null;
-
-            if (e.key === 'Tab' && !e.shiftKey) {
-                e.preventDefault();
-                next = inputs[idx + 1];
-            } else if (e.key === 'Tab' && e.shiftKey) {
-                e.preventDefault();
-                next = inputs[idx - 1];
-            } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                next = inputs[idx + inputCols];
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                next = inputs[idx - inputCols];
-            } else if (e.key === 'ArrowRight') {
-                if (target.selectionStart === target.value.length) {
-                    e.preventDefault();
-                    next = inputs[idx + 1];
-                }
-            } else if (e.key === 'ArrowLeft') {
-                if (target.selectionStart === 0) {
-                    e.preventDefault();
-                    next = inputs[idx - 1];
-                }
-            }
-
-            if (next) {
-                next.focus();
-                next.select();
-            }
-        },
-
-        async save() {
-            if (this.changeCount === 0 || this.saving) return;
-            this.saving = true;
-
-            const changes = Object.entries(this.dirty)
-                .filter(([, d]) => d)
-                .map(([key]) => {
-                    const parts = key.split('-');
-                    return {
-                        student_id:   parseInt(parts[0]),
-                        subject_id:   parseInt(parts[1]),
-                        component_id: parseInt(parts[2]),
-                        score: this.scores[key],
-                    };
-                });
-
-            try {
-                await $wire.saveScores(changes);
-            } finally {
-                this.saving = false;
-            }
-        },
-
-        onSaved() {
-            // Livewire fired 'scoresSaved' — clear dirty state
-            this.dirty = {};
-            // Re-sync scores from the freshly rendered inputs
-            this.$nextTick(() => {
-                this.$el.querySelectorAll('input.cell-input').forEach(inp => {
-                    const key = inp.dataset.key;
-                    if (key) {
-                        this.scores[key] = inp.value === '' ? null : parseFloat(inp.value);
-                    }
-                });
-            });
-        },
-
-        discard() {
-            // Reset inputs to their Livewire-rendered values and clear dirty
-            this.$el.querySelectorAll('input.cell-input').forEach(inp => {
-                const key = inp.dataset.key;
-                if (key && this.dirty[key]) {
-                    const orig = initialScores[key];
-                    inp.value = orig !== null && orig !== undefined ? orig : '';
-                    this.scores[key] = orig !== null && orig !== undefined ? orig : null;
-                }
-            });
-            this.dirty = {};
-        },
-    };
-}
-</script>
-@endpush

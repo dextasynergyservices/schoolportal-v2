@@ -30,10 +30,11 @@
             {{-- AI Generation Form --}}
             <div x-show="mode === 'ai'" x-cloak>
                 <flux:card>
-                    <form method="POST" action="{{ route($routePrefix . '.generate') }}" enctype="multipart/form-data" class="space-y-6" x-data="{ generating: false }" x-on:submit="if (generating) { $event.preventDefault(); return; } generating = true;">
+                    <form method="POST" action="{{ route($routePrefix . '.generate', ['category' => $category]) }}" enctype="multipart/form-data" class="space-y-6" x-data="{ generating: false }" x-init="$nextTick(() => filterSubjectsForClass($el.querySelector('[name=class_id]'), $el.querySelector('[name=subject_id]')))" x-on:submit="if (generating) { $event.preventDefault(); return; } generating = true;">
                         @csrf
+                        <input type="hidden" name="category" value="{{ $category ?? 'exam' }}">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <flux:select name="class_id" label="{{ __('Class') }}" required>
+                            <flux:select name="class_id" label="{{ __('Class') }}" required x-on:change="filterSubjectsForClass($event.target, $event.target.form.querySelector('[name=subject_id]'))">
                                 <option value="">{{ __('Select class...') }}</option>
                                 @foreach ($classes as $class)
                                     <option value="{{ $class->id }}" @selected(old('class_id') == $class->id)>{{ $class->name }} ({{ $class->level?->name }})</option>
@@ -41,22 +42,52 @@
                             </flux:select>
 
                             <div x-data="{
-                                showAdd: false, saving: false, error: '', newName: '',
-                                async addSubject() {
-                                    this.saving = true; this.error = '';
+                                showAdd: false, saving: false, error: '', newName: '', existingSubject: null, existingStatus: '',
+                                async addSubject(trigger) {
+                                    this.saving = true; this.error = ''; this.existingSubject = null; this.existingStatus = '';
                                     try {
+                                        const form = trigger.closest('form');
+                                        const classId = form?.querySelector('[name=class_id]')?.value;
+                                        if (!classId) {
+                                            this.saving = false;
+                                            this.error = @js(__('Select a class before adding the subject.'));
+                                            return;
+                                        }
                                         const r = await fetch('{{ route($routePrefix . '.store-subject') }}', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
-                                            body: JSON.stringify({ name: this.newName.trim() })
+                                            body: JSON.stringify({ name: this.newName.trim(), class_id: classId })
                                         });
                                         const data = await r.json();
+                                        if (!r.ok && ['existing_unassigned', 'already_assigned'].includes(data.status)) {
+                                            this.error = data.message;
+                                            this.existingSubject = data.subject;
+                                            this.existingStatus = data.status;
+                                            this.saving = false;
+                                            return;
+                                        }
                                         if (!r.ok) { this.error = data.message || 'Validation failed'; this.saving = false; return; }
                                         if (data.error) { this.error = data.error; this.saving = false; return; }
-                                        const sel = this.$refs.aiSubjectSelect;
-                                        if (sel) { sel.add(new Option(data.subject.name, data.subject.id, true, true)); sel.value = data.subject.id; sel.dispatchEvent(new Event('change', { bubbles: true })); }
-                                        this.newName = ''; this.showAdd = false; this.saving = false;
+                                        selectSubjectForClass(form, data.subject, classId);
+                                        this.newName = ''; this.showAdd = false; this.saving = false; this.existingSubject = null;
                                     } catch (e) { this.saving = false; this.error = e.message || 'Failed to save.'; }
+                                },
+                                async assignExisting(trigger) {
+                                    if (!this.existingSubject) return;
+                                    this.saving = true;
+                                    try {
+                                        const form = trigger.closest('form');
+                                        const classId = form?.querySelector('[name=class_id]')?.value;
+                                        const r = await fetch('{{ route($routePrefix . '.store-subject') }}', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
+                                            body: JSON.stringify({ name: this.existingSubject.name, subject_id: this.existingSubject.id, class_id: classId, assign_existing: true })
+                                        });
+                                        const data = await r.json();
+                                        if (!r.ok) { this.error = data.message || 'Unable to assign subject'; this.saving = false; return; }
+                                        selectSubjectForClass(form, data.subject, classId);
+                                        this.newName = ''; this.error = ''; this.existingSubject = null; this.existingStatus = ''; this.showAdd = false; this.saving = false;
+                                    } catch (e) { this.saving = false; this.error = e.message || 'Failed to assign subject.'; }
                                 }
                             }">
                                 <div class="flex items-end gap-2">
@@ -65,7 +96,7 @@
                                         <flux:select name="subject_id" required x-ref="aiSubjectSelect">
                                             <option value="">{{ __('Select subject...') }}</option>
                                             @foreach ($subjects as $subject)
-                                                <option value="{{ $subject->id }}" @selected(old('subject_id') == $subject->id)>{{ $subject->name }}</option>
+                                                <option value="{{ $subject->id }}" data-class-ids="{{ $subject->classes->pluck('id')->join(',') }}" @selected(old('subject_id') == $subject->id)>{{ $subject->name }}</option>
                                             @endforeach
                                         </flux:select>
                                     </div>
@@ -73,15 +104,24 @@
                                 </div>
                                 <div x-show="showAdd" x-cloak class="mt-2 p-3 border border-zinc-200 dark:border-zinc-700 rounded-lg space-y-2 bg-zinc-50 dark:bg-zinc-800">
                                     <flux:label>{{ __('New Subject Name') }}</flux:label>
-                                    <flux:input type="text" x-model="newName" placeholder="{{ __('e.g., Mathematics') }}" />
+                                    <flux:input type="text" x-model="newName" x-on:input="existingSubject = null; existingStatus = ''; error = ''" placeholder="{{ __('e.g., Mathematics') }}" />
                                     <div class="flex gap-2">
-                                        <button type="button" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50" x-bind:disabled="saving || !newName.trim()" x-on:click="addSubject()">
+                                        <button type="button" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50" x-bind:disabled="saving || !newName.trim()" x-on:click="addSubject($el)">
                                             <span x-show="saving">{{ __('Saving...') }}</span>
                                             <span x-show="!saving">{{ __('Add') }}</span>
                                         </button>
                                         <button type="button" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700" x-on:click="showAdd = false; newName = ''">{{ __('Cancel') }}</button>
                                     </div>
                                     <p x-show="error" x-text="error" class="text-xs text-red-500"></p>
+                                    <button
+                                        type="button"
+                                        x-show="existingSubject"
+                                        x-on:click="assignExisting($el)"
+                                        x-bind:disabled="saving"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300"
+                                    >
+                                        <span x-text="existingStatus === 'already_assigned' ? '{{ __('Use Existing Subject') }}' : '{{ __('Assign to Selected Class') }}'"></span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -120,11 +160,16 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <flux:select name="question_count" label="{{ __('Number of Questions') }}" required>
-                                @foreach ([5, 10, 15, 20, 25, 30] as $count)
-                                    <option value="{{ $count }}" @selected($count === 10)>{{ $count }}</option>
-                                @endforeach
-                            </flux:select>
+                            <flux:input
+                                name="question_count"
+                                type="number"
+                                min="1"
+                                max="100"
+                                step="1"
+                                value="{{ old('question_count', 10) }}"
+                                label="{{ __('Number of Questions') }}"
+                                required
+                            />
 
                             <flux:select name="difficulty" label="{{ __('Difficulty') }}" required>
                                 <option value="easy">{{ __('Easy') }}</option>
@@ -176,8 +221,9 @@
                     'scoreComponents' => $scoreComponents,
                     'currentSession' => $currentSession,
                     'currentTerm' => $currentTerm,
-                    'storeRoute' => route($routePrefix . '.store'),
-                    'indexRoute' => route($routePrefix . '.index'),
+                    'category' => $category,
+                    'storeRoute' => route($routePrefix . '.store', ['category' => $category]),
+                    'indexRoute' => route($routePrefix . '.index', $category ? ['category' => $category] : []),
                     'routePrefix' => $routePrefix,
                 ])
             </div>

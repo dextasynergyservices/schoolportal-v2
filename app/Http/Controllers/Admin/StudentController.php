@@ -280,7 +280,11 @@ class StudentController extends Controller
             $avatarUrl = $uploaded['url'];
         }
 
-        $user = DB::transaction(function () use ($validated, $avatarUrl) {
+        $school = app('current.school');
+        $currentSession = $school->currentSession();
+        $currentTerm = $school->currentTerm();
+
+        $user = DB::transaction(function () use ($validated, $avatarUrl, $currentSession, $currentTerm) {
             $user = User::create([
                 'name' => $validated['name'],
                 'username' => $validated['username'],
@@ -301,7 +305,8 @@ class StudentController extends Controller
                 'address' => $validated['address'] ?? null,
                 'blood_group' => $validated['blood_group'] ?? null,
                 'medical_notes' => $validated['medical_notes'] ?? null,
-                'enrolled_session_id' => app('current.school')->currentSession()?->id,
+                'enrolled_session_id' => $currentSession?->id,
+                'enrolled_term_id' => $currentTerm?->id,
             ]);
 
             // Link existing parents

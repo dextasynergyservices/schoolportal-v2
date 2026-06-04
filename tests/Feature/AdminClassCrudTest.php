@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\SchoolClass;
+use App\Models\SchoolLevel;
 use App\Models\StudentProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -111,6 +112,72 @@ class AdminClassCrudTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertDatabaseHas('classes', ['id' => $this->class->id]);
+    }
+
+    public function test_admin_can_bulk_delete_empty_classes_and_skip_classes_with_students(): void
+    {
+        $emptyClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'name' => 'Bulk Empty Class',
+            'slug' => 'bulk-empty-class',
+        ]);
+
+        $student = User::factory()->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+        ]);
+
+        StudentProfile::create([
+            'user_id' => $student->id,
+            'school_id' => $this->school->id,
+            'class_id' => $this->class->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.classes.bulk-destroy'), [
+                'class_ids' => [$emptyClass->id, $this->class->id],
+            ])
+            ->assertRedirect(route('admin.classes.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('classes', ['id' => $emptyClass->id]);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id]);
+    }
+
+    public function test_admin_can_delete_level_without_classes(): void
+    {
+        $emptyLevel = SchoolLevel::create([
+            'school_id' => $this->school->id,
+            'name' => 'Empty Level',
+            'slug' => 'empty-level',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.levels.destroy', $emptyLevel))
+            ->assertRedirect(route('admin.levels.index'));
+
+        $this->assertDatabaseMissing('school_levels', ['id' => $emptyLevel->id]);
+    }
+
+    public function test_admin_can_bulk_delete_empty_levels_and_skip_levels_with_classes(): void
+    {
+        $emptyLevel = SchoolLevel::create([
+            'school_id' => $this->school->id,
+            'name' => 'Bulk Empty Level',
+            'slug' => 'bulk-empty-level',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.levels.bulk-destroy'), [
+                'level_ids' => [$emptyLevel->id, $this->level->id],
+            ])
+            ->assertRedirect(route('admin.levels.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('school_levels', ['id' => $emptyLevel->id]);
+        $this->assertDatabaseHas('school_levels', ['id' => $this->level->id]);
     }
 
     public function test_teacher_cannot_access_class_crud(): void

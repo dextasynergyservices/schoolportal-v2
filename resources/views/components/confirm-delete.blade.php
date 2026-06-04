@@ -30,6 +30,7 @@
     {{-- Trigger button --}}
     @if ($buttonLabel)
         <flux:button
+            type="button"
             :variant="$buttonVariant"
             :size="$buttonSize"
             :icon="$buttonIcon"
@@ -40,6 +41,7 @@
         </flux:button>
     @else
         <flux:button
+            type="button"
             :variant="$buttonVariant"
             :size="$buttonSize"
             :icon="$buttonIcon"
@@ -95,7 +97,7 @@
 
                 {{-- Actions --}}
                 <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center" x-data="{ deleting: false }">
-                    <flux:button variant="ghost" x-on:click="open = false" x-bind:disabled="deleting">
+                    <flux:button type="button" variant="ghost" x-on:click="open = false" x-bind:disabled="deleting">
                         {{ $cancelLabel }}
                     </flux:button>
 

@@ -12,6 +12,7 @@
             </div>
             <div>
                 <flux:select name="class_id">
+                    <option value="" @selected(! $selectedClassId)>{{ __('All Classes') }}</option>
                     @foreach ($classes as $class)
                         <option value="{{ $class->id }}" @selected($selectedClassId == $class->id)>
                             {{ $class->name }} ({{ $class->students_count }})
@@ -21,7 +22,7 @@
             </div>
             <flux:button type="submit" variant="filled" size="sm">{{ __('Filter') }}</flux:button>
             @if (request()->has('search'))
-                <flux:button variant="subtle" size="sm" href="{{ route('teacher.students.index', ['class_id' => $selectedClassId]) }}" wire:navigate>{{ __('Clear') }}</flux:button>
+                <flux:button variant="subtle" size="sm" href="{{ route('teacher.students.index', $selectedClassId ? ['class_id' => $selectedClassId] : []) }}" wire:navigate>{{ __('Clear') }}</flux:button>
             @endif
         </form>
 
@@ -48,7 +49,7 @@
                 @empty
                     <flux:table.row>
                         <flux:table.cell colspan="4" class="text-center py-8">
-                            {{ __('No students found in this class.') }}
+                            {{ $selectedClassId ? __('No students found in this class.') : __('No students found in your assigned classes.') }}
                         </flux:table.cell>
                     </flux:table.row>
                 @endforelse

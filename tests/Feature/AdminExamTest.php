@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\AcademicSession;
+use App\Models\ClassSubject;
 use App\Models\Exam;
+use App\Models\ExamAccessReset;
 use App\Models\ExamQuestion;
+use App\Models\SchoolClass;
 use App\Models\ScoreComponent;
+use App\Models\StudentProfile;
 use App\Models\Subject;
 use App\Models\Term;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\WithSchoolContext;
 use Tests\TestCase;
@@ -49,6 +54,12 @@ class AdminExamTest extends TestCase
             'is_active' => true,
         ]);
 
+        ClassSubject::create([
+            'school_id' => $this->school->id,
+            'class_id' => $this->class->id,
+            'subject_id' => $this->subject->id,
+        ]);
+
         $this->component = ScoreComponent::create([
             'school_id' => $this->school->id,
             'name' => 'Exam',
@@ -73,7 +84,9 @@ class AdminExamTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.exams.create'))
             ->assertOk()
-            ->assertViewIs('admin.exams.create');
+            ->assertViewIs('admin.exams.create')
+            ->assertSee('addSubject($el)', false)
+            ->assertSee('saveSubject($el)', false);
     }
 
     public function test_admin_can_store_exam_with_questions(): void
@@ -117,6 +130,106 @@ class AdminExamTest extends TestCase
             ->where('title', 'Mid-Term Science Exam')->first();
 
         $this->assertCount(2, $exam->questions);
+    }
+
+    public function test_admin_cannot_store_cbt_with_subject_not_assigned_to_selected_class(): void
+    {
+        $unassignedSubject = Subject::create([
+            'school_id' => $this->school->id,
+            'name' => 'Unassigned Subject',
+            'slug' => 'unassigned-subject',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('admin.exams.store'), [
+                'title' => 'Invalid CBT',
+                'class_id' => $this->class->id,
+                'subject_id' => $unassignedSubject->id,
+                'source_type' => 'manual',
+                'max_score' => 100,
+                'passing_score' => 50,
+                'max_attempts' => 1,
+                'questions' => [[
+                    'type' => 'true_false',
+                    'question_text' => 'Test?',
+                    'options' => ['True', 'False'],
+                    'correct_answer' => 'True',
+                    'points' => 10,
+                ]],
+            ]);
+
+        $response->assertOk()->assertViewHas('errors');
+        $this->assertTrue($response->viewData('errors')->has('subject_id'));
+        $this->assertDatabaseMissing('exams', ['title' => 'Invalid CBT']);
+    }
+
+    public function test_admin_inline_subject_creation_assigns_subject_to_selected_class(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->postJson(route('admin.exams.store-subject'), [
+                'name' => 'Civic Education',
+                'class_id' => $this->class->id,
+            ])
+            ->assertOk();
+
+        $subjectId = $response->json('subject.id');
+
+        $this->assertDatabaseHas('subjects', [
+            'id' => $subjectId,
+            'school_id' => $this->school->id,
+            'created_by' => $this->admin->id,
+        ]);
+        $this->assertDatabaseHas('class_subject', [
+            'class_id' => $this->class->id,
+            'subject_id' => $subjectId,
+        ]);
+    }
+
+    public function test_inline_existing_subject_requires_explicit_assignment_to_another_class(): void
+    {
+        $otherClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'name' => 'Other Class',
+            'slug' => 'other-class-shared-subject',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.exams.store-subject'), [
+                'name' => $this->subject->name,
+                'class_id' => $otherClass->id,
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'existing_unassigned')
+            ->assertJsonPath('subject.id', $this->subject->id);
+
+        $this->assertSame(1, Subject::where('slug', $this->subject->slug)->count());
+        $this->assertDatabaseMissing('class_subject', [
+            'class_id' => $otherClass->id,
+            'subject_id' => $this->subject->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.exams.store-subject'), [
+                'name' => $this->subject->name,
+                'subject_id' => $this->subject->id,
+                'class_id' => $otherClass->id,
+                'assign_existing' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'assigned_existing')
+            ->assertJsonPath('subject.id', $this->subject->id);
+
+        $this->assertDatabaseHas('class_subject', [
+            'class_id' => $this->class->id,
+            'subject_id' => $this->subject->id,
+        ]);
+        $this->assertDatabaseHas('class_subject', [
+            'class_id' => $otherClass->id,
+            'subject_id' => $this->subject->id,
+        ]);
     }
 
     public function test_admin_can_view_exam_details(): void
@@ -179,6 +292,85 @@ class AdminExamTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_can_open_reset_access_for_published_approved_cbt(): void
+    {
+        $exam = $this->createExam(['is_published' => true, 'published_at' => now()]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.exams.reset-access', $exam))
+            ->assertOk()
+            ->assertViewIs('admin.exams.reset-access')
+            ->assertSee('Reset CBT Access');
+    }
+
+    public function test_admin_can_reset_access_for_selected_students_only(): void
+    {
+        $exam = $this->createExam(['is_published' => true, 'published_at' => now()]);
+        [$selectedStudent, $otherStudent] = $this->createStudents(2);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.exams.reset-access.store', $exam), [
+                'scope' => 'students',
+                'student_ids' => [$selectedStudent->id],
+                'available_until' => now()->addHour()->format('Y-m-d H:i:s'),
+                'reason' => 'Approved absence',
+            ])
+            ->assertRedirect(route('admin.exams.show', $exam));
+
+        $this->assertDatabaseHas('exam_access_resets', [
+            'exam_id' => $exam->id,
+            'student_id' => $selectedStudent->id,
+            'reason' => 'Approved absence',
+        ]);
+        $this->assertDatabaseMissing('exam_access_resets', [
+            'exam_id' => $exam->id,
+            'student_id' => $otherStudent->id,
+        ]);
+    }
+
+    public function test_admin_can_reset_access_for_entire_class(): void
+    {
+        $exam = $this->createExam(['is_published' => true, 'published_at' => now()]);
+        $students = $this->createStudents(3);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.exams.reset-access.store', $exam), [
+                'scope' => 'class',
+                'available_until' => now()->addHours(2)->format('Y-m-d H:i:s'),
+            ])
+            ->assertRedirect(route('admin.exams.show', $exam));
+
+        $this->assertSame(
+            $students->count(),
+            ExamAccessReset::where('exam_id', $exam->id)->count(),
+        );
+    }
+
+    public function test_admin_cannot_reset_access_for_student_outside_cbt_class(): void
+    {
+        $exam = $this->createExam(['is_published' => true, 'published_at' => now()]);
+        $outsideStudent = User::factory()->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from(route('admin.exams.reset-access', $exam))
+            ->post(route('admin.exams.reset-access.store', $exam), [
+                'scope' => 'students',
+                'student_ids' => [$outsideStudent->id],
+                'available_until' => now()->addHour()->format('Y-m-d H:i:s'),
+            ])
+            ->assertRedirect(route('admin.exams.reset-access', $exam))
+            ->assertSessionHasErrors('student_ids');
+
+        $this->assertDatabaseMissing('exam_access_resets', [
+            'exam_id' => $exam->id,
+            'student_id' => $outsideStudent->id,
+        ]);
+    }
+
     // ── Helpers ──
 
     private function createExam(array $overrides = []): Exam
@@ -214,5 +406,20 @@ class AdminExamTest extends TestCase
         ]);
 
         return $exam;
+    }
+
+    private function createStudents(int $count)
+    {
+        return User::factory()->count($count)->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+        ])->each(function (User $student): void {
+            StudentProfile::create([
+                'user_id' => $student->id,
+                'school_id' => $this->school->id,
+                'class_id' => $this->class->id,
+            ]);
+        });
     }
 }

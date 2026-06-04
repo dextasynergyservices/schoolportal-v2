@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\GradeExamAttempt;
 use App\Models\Exam;
+use App\Models\ExamAccessReset;
 use App\Models\ExamAnswer;
 use App\Models\ExamAttempt;
 use App\Services\ExamGradingService;
@@ -33,8 +33,15 @@ class ExamController extends Controller
         $classId = $student->studentProfile?->class_id;
         $category = $this->resolveCategory();
 
-        $exams = Exam::with(['subject:id,name,short_name', 'class:id,name', 'attempts' => fn ($q) => $q->where('student_id', $student->id)])
-            ->available()
+        $this->finalizeExpiredAttempts($student->id);
+
+        $exams = Exam::with([
+            'subject:id,name,short_name',
+            'class:id,name',
+            'attempts' => fn ($q) => $q->where('student_id', $student->id)->with('accessReset'),
+            'accessResets' => fn ($q) => $q->where('student_id', $student->id),
+        ])->withCount('questions')
+            ->availableForStudent($student->id)
             ->forClass($classId);
 
         // When category is null (unified view), show all; otherwise filter
@@ -48,7 +55,9 @@ class ExamController extends Controller
         // Upcoming exams (published but not yet open)
         $upcomingQuery = Exam::with(['subject:id,name,short_name', 'class:id,name'])
             ->upcoming()
-            ->forClass($classId);
+            ->forClass($classId)
+            ->whereDoesntHave('accessResets', fn ($q) => $q->where('student_id', $student->id)->active())
+            ->whereDoesntHave('attempts', fn ($q) => $q->where('student_id', $student->id)->where('status', 'in_progress'));
 
         if ($category !== null) {
             $upcomingQuery->forCategory($category);
@@ -58,9 +67,14 @@ class ExamController extends Controller
             ->get();
 
         // Closed exams (deadline has passed) — show results or "Missed" badge
-        $closedQuery = Exam::with(['subject:id,name,short_name', 'attempts' => fn ($q) => $q->where('student_id', $student->id)])
+        $closedQuery = Exam::with([
+            'subject:id,name,short_name',
+            'attempts' => fn ($q) => $q->where('student_id', $student->id)->with('accessReset'),
+        ])
             ->closed()
-            ->forClass($classId);
+            ->forClass($classId)
+            ->whereDoesntHave('accessResets', fn ($q) => $q->where('student_id', $student->id)->active())
+            ->whereDoesntHave('attempts', fn ($q) => $q->where('student_id', $student->id)->where('status', 'in_progress'));
 
         if ($category !== null) {
             $closedQuery->forCategory($category);
@@ -89,10 +103,11 @@ class ExamController extends Controller
         $student = auth()->user();
         $classId = $student->studentProfile?->class_id;
 
-        if ($exam->class_id !== $classId || ! $exam->is_published) {
+        if ((int) $exam->class_id !== (int) $classId || ! $exam->is_published) {
             abort(403);
         }
 
+        $this->finalizeExpiredAttempts($student->id, $exam->id);
         $exam->load(['subject:id,name', 'class:id,name', 'questions']);
 
         $completedAttempts = $exam->completedAttemptsFor($student->id);
@@ -100,16 +115,14 @@ class ExamController extends Controller
         $canAttempt = $exam->canStudentAttempt($student->id);
 
         // If there's an in-progress attempt, offer to resume
-        $inProgressAttempt = $exam->attemptsFor($student->id)
-            ->where('status', 'in_progress')
-            ->first();
+        $inProgressAttempt = $exam->resumableAttemptForStudent($student->id);
 
         $questionTypeCounts = $exam->questions->groupBy('type')->map->count();
         $totalPoints = $exam->questions->sum('points');
         $hasTheoryQuestions = $exam->questions->contains(fn ($q) => in_array($q->type, ['theory', 'short_answer']));
 
         $previousAttempts = $exam->attemptsFor($student->id)
-            ->whereIn('status', ['submitted', 'timed_out', 'grading'])
+            ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded', 'grading_failed'])
             ->orderBy('attempt_number')
             ->get();
 
@@ -126,6 +139,8 @@ class ExamController extends Controller
             'totalPoints' => $totalPoints,
             'hasTheoryQuestions' => $hasTheoryQuestions,
             'previousAttempts' => $previousAttempts,
+            'blockedMessage' => $canAttempt ? null : $this->startBlockedMessage($exam, $student->id),
+            'allowedAttempts' => $exam->allowedAttemptsForStudent($student->id),
         ]);
     }
 
@@ -137,51 +152,35 @@ class ExamController extends Controller
         $student = auth()->user();
         $classId = $student->studentProfile?->class_id;
 
-        if ($exam->class_id !== $classId || ! $exam->canStudentAttempt($student->id)) {
-            abort(403, 'You cannot take this exam.');
+        if ((int) $exam->class_id !== (int) $classId || ! $exam->is_published) {
+            return redirect()->route($this->routePrefix().'.index')
+                ->with('error', __('This :label is not available for your class.', [
+                    'label' => mb_strtolower($this->categoryLabel($exam->category)),
+                ]));
         }
 
-        // Check for in-progress attempt first
-        $existingAttempt = $exam->attemptsFor($student->id)
+        $existingAttempts = $exam->attemptsFor($student->id)
             ->where('status', 'in_progress')
-            ->first();
+            ->with('accessReset')
+            ->get();
 
-        if ($existingAttempt) {
-            // Check timeout
-            if ($existingAttempt->hasTimedOut()) {
+        foreach ($existingAttempts as $existingAttempt) {
+            if ($existingAttempt->hasExpired()) {
                 $this->autoSubmit($existingAttempt);
-
-                return redirect()->route($this->routePrefix().'.results', $existingAttempt);
             }
+        }
 
+        $existingAttempt = $exam->resumableAttemptForStudent($student->id);
+        if ($existingAttempt) {
             return redirect()->route($this->routePrefix().'.take', $existingAttempt);
         }
 
-        $attemptNumber = $exam->completedAttemptsFor($student->id) + 1;
+        if (! $exam->canStudentAttempt($student->id)) {
+            return redirect()->route($this->routePrefix().'.show', $exam)
+                ->with('error', $this->startBlockedMessage($exam, $student->id));
+        }
 
-        $attempt = DB::transaction(function () use ($exam, $student, $attemptNumber) {
-            $attempt = ExamAttempt::create([
-                'exam_id' => $exam->id,
-                'student_id' => $student->id,
-                'school_id' => $student->school_id,
-                'attempt_number' => $attemptNumber,
-                'started_at' => now(),
-                'status' => 'in_progress',
-                'ip_address' => request()->ip(),
-            ]);
-
-            // Pre-create answer slots for all questions
-            $questions = $exam->questions()->get();
-            foreach ($questions as $question) {
-                ExamAnswer::create([
-                    'attempt_id' => $attempt->id,
-                    'question_id' => $question->id,
-                    'school_id' => $student->school_id,
-                ]);
-            }
-
-            return $attempt;
-        });
+        $attempt = $this->createAttempt($exam, $student);
 
         return redirect()->route($this->routePrefix().'.take', $attempt);
     }
@@ -192,9 +191,37 @@ class ExamController extends Controller
     public function take(ExamAttempt $attempt): View|RedirectResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id) {
+        if ((int) $attempt->student_id !== (int) $student->id) {
+            $exam = $attempt->exam;
+
+            if ($exam && (int) $exam->class_id === (int) $classId && $exam->is_published) {
+                $this->finalizeExpiredAttempts($student->id, $exam->id);
+
+                $ownAttempt = $exam->attemptsFor($student->id)
+                    ->where('status', 'in_progress')
+                    ->with('accessReset')
+                    ->get()
+                    ->first(fn (ExamAttempt $candidate): bool => $candidate->isResumable());
+
+                if ($ownAttempt) {
+                    return redirect()->route($this->routePrefix().'.take', $ownAttempt);
+                }
+
+                if ($exam->canStudentAttempt($student->id)) {
+                    return redirect()->route($this->routePrefix().'.take', $this->createAttempt($exam, $student));
+                }
+
+                return redirect()->route($this->routePrefix().'.show', $exam)
+                    ->with('error', $this->startBlockedMessage($exam, $student->id));
+            }
+
             abort(403);
+        }
+
+        if ((int) $attempt->exam->class_id !== (int) $classId) {
+            abort(403, __('This CBT is not assigned to your current class.'));
         }
 
         if (! $attempt->isInProgress()) {
@@ -207,8 +234,7 @@ class ExamController extends Controller
                 ->with('error', __('This exam session is locked to another device. Please contact your teacher.'));
         }
 
-        // Check timeout
-        if ($attempt->hasTimedOut()) {
+        if ($attempt->hasExpired()) {
             $this->autoSubmit($attempt);
 
             return redirect()->route($this->routePrefix().'.results', $attempt);
@@ -253,12 +279,15 @@ class ExamController extends Controller
     public function saveAnswer(Request $request, ExamAttempt $attempt): RedirectResponse|JsonResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id || ! $attempt->isInProgress()) {
+        if ((int) $attempt->student_id !== (int) $student->id
+            || (int) $attempt->exam->class_id !== (int) $classId
+            || ! $attempt->isInProgress()) {
             abort(403);
         }
 
-        if ($attempt->hasTimedOut()) {
+        if ($attempt->hasExpired()) {
             $this->autoSubmit($attempt);
 
             if ($request->wantsJson()) {
@@ -297,9 +326,22 @@ class ExamController extends Controller
     public function tabSwitch(Request $request, ExamAttempt $attempt): JsonResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id || ! $attempt->isInProgress()) {
+        if ((int) $attempt->student_id !== (int) $student->id
+            || (int) $attempt->exam->class_id !== (int) $classId
+            || ! $attempt->isInProgress()) {
             return response()->json(['status' => 'invalid'], 403);
+        }
+
+        if ($attempt->hasExpired()) {
+            $this->autoSubmit($attempt);
+
+            return response()->json([
+                'status' => 'auto_submitted',
+                'redirect' => route($this->routePrefix().'.results', $attempt),
+                'message' => __('Your time has elapsed and your work was submitted automatically.'),
+            ]);
         }
 
         $attempt->increment('tab_switches');
@@ -308,7 +350,7 @@ class ExamController extends Controller
         $exceeded = $maxSwitches > 0 && $attempt->tab_switches >= $maxSwitches;
 
         if ($exceeded) {
-            $this->autoSubmit($attempt);
+            $this->autoSubmit($attempt, 'tab_switch_limit');
 
             return response()->json([
                 'status' => 'auto_submitted',
@@ -331,9 +373,19 @@ class ExamController extends Controller
     public function submit(Request $request, ExamAttempt $attempt): RedirectResponse
     {
         $student = auth()->user();
+        $classId = $student->studentProfile?->class_id;
 
-        if ($attempt->student_id !== $student->id || ! $attempt->isInProgress()) {
+        if ((int) $attempt->student_id !== (int) $student->id
+            || (int) $attempt->exam->class_id !== (int) $classId
+            || ! $attempt->isInProgress()) {
             abort(403);
+        }
+
+        if ($attempt->hasExpired()) {
+            $this->autoSubmit($attempt);
+
+            return redirect()->route($this->routePrefix().'.results', $attempt)
+                ->with('error', __('Your time elapsed before submission, so your saved work was submitted automatically.'));
         }
 
         // Save any final answers bundled with submit
@@ -362,10 +414,11 @@ class ExamController extends Controller
                 'submitted_at' => now(),
                 'time_spent_seconds' => $elapsed,
                 'status' => 'submitted',
+                'completion_reason' => 'submitted',
             ]);
         });
 
-        GradeExamAttempt::dispatch($attempt);
+        $this->gradeSubmittedAttempt($attempt);
 
         return redirect()->route($this->routePrefix().'.results', $attempt);
     }
@@ -377,12 +430,17 @@ class ExamController extends Controller
     {
         $student = auth()->user();
 
-        if ($attempt->student_id !== $student->id) {
+        if ((int) $attempt->student_id !== (int) $student->id) {
             abort(403);
         }
 
         if ($attempt->isInProgress()) {
-            return redirect()->route($this->routePrefix().'.take', $attempt);
+            if ($attempt->hasExpired()) {
+                $this->autoSubmit($attempt);
+                $attempt->refresh();
+            } else {
+                return redirect()->route($this->routePrefix().'.take', $attempt);
+            }
         }
 
         $exam = $attempt->exam;
@@ -409,21 +467,119 @@ class ExamController extends Controller
 
     // ── Private helpers ──
 
-    private function autoSubmit(ExamAttempt $attempt): void
+    private function autoSubmit(ExamAttempt $attempt, string $reason = 'time_elapsed'): void
     {
-        DB::transaction(function () use ($attempt) {
-            $elapsed = $attempt->exam->time_limit_minutes
-                ? $attempt->exam->time_limit_minutes * 60
-                : (int) $attempt->started_at->diffInSeconds(now());
+        DB::transaction(function () use ($attempt, $reason) {
+            $elapsed = (int) $attempt->started_at->diffInSeconds(now());
+            if ($attempt->exam->time_limit_minutes) {
+                $elapsed = min($elapsed, $attempt->exam->time_limit_minutes * 60);
+            }
 
             $attempt->update([
                 'submitted_at' => now(),
                 'time_spent_seconds' => $elapsed,
                 'status' => 'timed_out',
+                'completion_reason' => $reason,
             ]);
         });
 
-        GradeExamAttempt::dispatch($attempt);
+        $this->gradeSubmittedAttempt($attempt);
+    }
+
+    private function createAttempt(Exam $exam, mixed $student): ExamAttempt
+    {
+        return DB::transaction(function () use ($exam, $student): ExamAttempt {
+            $student->newQuery()
+                ->whereKey($student->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $resumableAttempt = ExamAttempt::with('accessReset')
+                ->where('exam_id', $exam->id)
+                ->where('student_id', $student->id)
+                ->where('status', 'in_progress')
+                ->lockForUpdate()
+                ->get()
+                ->first(fn (ExamAttempt $attempt): bool => $attempt->isResumable());
+
+            if ($resumableAttempt) {
+                return $resumableAttempt;
+            }
+
+            $attemptNumber = ((int) ExamAttempt::where('exam_id', $exam->id)
+                ->where('student_id', $student->id)
+                ->lockForUpdate()
+                ->max('attempt_number')) + 1;
+
+            $activeReset = ExamAccessReset::where('exam_id', $exam->id)
+                ->where('student_id', $student->id)
+                ->active()
+                ->oldest('available_until')
+                ->lockForUpdate()
+                ->first();
+
+            $usedResetAttempts = ExamAccessReset::where('exam_id', $exam->id)
+                ->where('student_id', $student->id)
+                ->whereNotNull('used_at')
+                ->count();
+            $baseCapacity = max(1, (int) ($exam->max_attempts ?: 1)) + $usedResetAttempts;
+            $existingAttempts = $attemptNumber - 1;
+            $mustUseReset = ! $exam->isAvailable() || $existingAttempts >= $baseCapacity;
+
+            if ($mustUseReset && ! $activeReset) {
+                abort(403, __('No active reset access is available for this CBT.'));
+            }
+
+            $attempt = ExamAttempt::create([
+                'exam_id' => $exam->id,
+                'student_id' => $student->id,
+                'school_id' => $student->school_id,
+                'attempt_number' => $attemptNumber,
+                'started_at' => now(),
+                'status' => 'in_progress',
+                'ip_address' => request()->ip(),
+            ]);
+
+            $questions = $exam->questions()->get();
+            foreach ($questions as $question) {
+                ExamAnswer::create([
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $question->id,
+                    'school_id' => $student->school_id,
+                ]);
+            }
+
+            if ($mustUseReset && $activeReset) {
+                $activeReset->update([
+                    'attempt_id' => $attempt->id,
+                    'used_at' => now(),
+                ]);
+            }
+
+            return $attempt;
+        });
+    }
+
+    private function gradeSubmittedAttempt(ExamAttempt $attempt): void
+    {
+        $this->gradingService->gradeAttempt($attempt->fresh());
+    }
+
+    private function finalizeExpiredAttempts(int $studentId, ?int $examId = null): void
+    {
+        $query = ExamAttempt::with(['exam', 'accessReset'])
+            ->where('student_id', $studentId)
+            ->where('status', 'in_progress');
+
+        if ($examId !== null) {
+            $query->where('exam_id', $examId);
+        }
+
+        foreach ($query->get() as $attempt) {
+            if ($attempt->hasExpired()) {
+                $this->autoSubmit($attempt);
+            }
+        }
     }
 
     private function resolveCategory(): ?string
@@ -440,7 +596,13 @@ class ExamController extends Controller
             return $exam->category;
         }
 
-        // 3. For the unified index (student.exams.index without ?category), return null = all
+        // 3. Attempt routes do not carry {exam}; infer the label from the attempt's exam.
+        $attempt = request()->route('attempt');
+        if ($attempt instanceof ExamAttempt) {
+            return $attempt->exam?->category ?? 'exam';
+        }
+
+        // 4. For the unified index (student.exams.index without ?category), return null = all
         $routeName = request()->route()?->getName() ?? '';
         if ($routeName === 'student.exams.index' && ! $queryCategory) {
             return null;
@@ -457,6 +619,43 @@ class ExamController extends Controller
             null => __('CBT'),
             default => __('Exam'),
         };
+    }
+
+    private function startBlockedMessage(Exam $exam, int $studentId): string
+    {
+        $label = mb_strtolower($this->categoryLabel($exam->category));
+
+        if ($exam->available_from && $exam->available_from->isFuture()) {
+            return __('This :label is not open yet. It opens on :date.', [
+                'label' => $label,
+                'date' => $exam->available_from->format('M j, Y g:i A'),
+            ]);
+        }
+
+        $activeReset = $exam->activeResetForStudent($studentId);
+        if ($activeReset) {
+            return __('Your reset access is available until :date.', [
+                'date' => $activeReset->available_until->format('M j, Y g:i A'),
+            ]);
+        }
+
+        if ($exam->available_until && $exam->available_until->isPast()) {
+            return __('This :label has closed. It closed on :date.', [
+                'label' => $label,
+                'date' => $exam->available_until->format('M j, Y g:i A'),
+            ]);
+        }
+
+        if ($exam->completedAttemptsFor($studentId) >= $exam->allowedAttemptsForStudent($studentId)) {
+            return __('You have used all :max attempts for this :label.', [
+                'max' => $exam->allowedAttemptsForStudent($studentId),
+                'label' => $label,
+            ]);
+        }
+
+        return __('You cannot start this :label right now. Please contact your teacher or school administrator.', [
+            'label' => $label,
+        ]);
     }
 
     private function routePrefix(): string

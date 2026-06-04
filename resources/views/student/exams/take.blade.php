@@ -105,7 +105,7 @@
             </svg>
             <div>
                 <p class="font-semibold">{{ __("You're offline — submission queued") }}</p>
-                <p class="mt-0.5 text-xs opacity-80">{{ __('Your answers are saved on this device. The exam will submit automatically as soon as your connection is restored.') }}</p>
+                <p class="mt-0.5 text-xs opacity-80">{{ __('Your answers are saved on this device. The :label will submit automatically as soon as your connection is restored.', ['label' => Str::lower($label)]) }}</p>
             </div>
         </div>
 
@@ -354,8 +354,9 @@
                                 <flux:button type="button" variant="ghost">{{ __('Keep Reviewing') }}</flux:button>
                             </flux:modal.close>
                             <flux:button type="button" variant="primary" icon="paper-airplane"
-                                @click="submitExamFinal()">
-                                {{ __('Submit Now') }}
+                                @click="submitExamFinal()" x-bind:disabled="submitting">
+                                <span x-show="!submitting">{{ __('Submit Now') }}</span>
+                                <span x-show="submitting">{{ __('Submitting...') }}</span>
                             </flux:button>
                         </div>
                     </div>
@@ -423,7 +424,7 @@
                                          : 'text-amber-600 dark:text-amber-400'"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
                             </div>
                             <div>
-                                <h2 class="text-base font-bold text-zinc-900 dark:text-white">{{ __('You left the exam tab') }}</h2>
+                                <h2 class="text-base font-bold text-zinc-900 dark:text-white">{{ __('You left the :label tab', ['label' => Str::lower($label)]) }}</h2>
                                 <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                                     {{ __('Switching away from this :label is monitored. Please stay focused.', ['label' => Str::lower($label)]) }}
                                 </p>
@@ -443,7 +444,7 @@
                                 </div>
                                 <template x-if="tabSwitches >= {{ $exam->max_tab_switches }} - 1">
                                     <p class="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
-                                        ⚠️ {{ __('Next violation will auto-submit your exam!') }}
+                                        {{ __('Next violation will auto-submit your :label!', ['label' => Str::lower($label)]) }}
                                     </p>
                                 </template>
                                 <template x-if="tabSwitches < {{ $exam->max_tab_switches }} - 1">
@@ -477,6 +478,8 @@
             const tabSwitchUrl = '{{ route($routePrefix . ".tab-switch", $attempt) }}';
             const csrfToken = '{{ csrf_token() }}';
             const attemptId = '{{ $attempt->id }}';
+            const browserTabId = window.__schoolPortalExamTabId
+                ?? (window.__schoolPortalExamTabId = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
 
             const answeredQuestions = {};
             for (const [qId, answer] of Object.entries(initialAnswers)) {
@@ -512,6 +515,10 @@
                 oneMinuteModalShown: false,
                 questions: {{ $questions->pluck('id') }},
                 offlineSubmitQueued: false,
+                submitting: false,
+                tabDetectionArmed: false,
+                pageWasVisible: !document.hidden,
+                tabDetectionTimer: null,
 
                 get answeredCount() {
                     return Object.values(this.answeredQuestions).filter(a => a !== null && a !== '').length;
@@ -537,13 +544,14 @@
 
                     // --- Anti-cheat: Copy/Cut/Paste prevention ---
                     if (preventCopyPaste) {
-                        document.addEventListener('copy', (e) => e.preventDefault());
-                        document.addEventListener('cut', (e) => e.preventDefault());
-                        document.addEventListener('paste', (e) => e.preventDefault());
+                        this._clipboardHandler = (e) => e.preventDefault();
+                        document.addEventListener('copy', this._clipboardHandler);
+                        document.addEventListener('cut', this._clipboardHandler);
+                        document.addEventListener('paste', this._clipboardHandler);
                     }
 
                     // --- Anti-cheat: Block dev tools & clipboard shortcuts ---
-                    document.addEventListener('keydown', (e) => {
+                    this._keydownHandler = (e) => {
                         // Block F12 (dev tools)
                         if (e.key === 'F12') {
                             e.preventDefault();
@@ -576,10 +584,13 @@
                             e.preventDefault();
                             return;
                         }
-                    });
+                    };
+                    document.addEventListener('keydown', this._keydownHandler);
 
                     // --- Anti-cheat: Prevent accidental navigation ---
                     this._beforeUnloadHandler = (e) => {
+                        if (this.submitting) return;
+
                         e.preventDefault();
                         e.returnValue = '';
                     };
@@ -589,8 +600,10 @@
                     try {
                         this._bc = new BroadcastChannel('exam_attempt_' + attemptId);
                         // Announce this tab
-                        this._bc.postMessage({ type: 'ping', ts: Date.now() });
+                        this._bc.postMessage({ type: 'ping', tabId: browserTabId, ts: Date.now() });
                         this._bc.onmessage = (event) => {
+                            if (event.data?.tabId === browserTabId) return;
+
                             if (event.data.type === 'ping') {
                                 // Another tab opened the same exam — warn and count as tab switch
                                 if (preventTabSwitch && maxTabSwitches !== null) {
@@ -599,7 +612,7 @@
                                     this.notifyTabSwitch();
                                 }
                                 // Reply so the other tab knows we exist
-                                this._bc.postMessage({ type: 'pong', ts: Date.now() });
+                                this._bc.postMessage({ type: 'pong', tabId: browserTabId, ts: Date.now() });
                             }
                         };
                     } catch (e) {
@@ -607,18 +620,22 @@
                     }
 
                     // --- Anti-cheat: Detect right-click ---
-                    document.addEventListener('contextmenu', (e) => {
+                    this._contextMenuHandler = (e) => {
                         e.preventDefault();
-                    });
+                    };
+                    document.addEventListener('contextmenu', this._contextMenuHandler);
 
                     // --- Anti-cheat: Detect print screen (best effort) ---
-                    document.addEventListener('keyup', (e) => {
+                    this._printScreenHandler = (e) => {
                         if (e.key === 'PrintScreen') {
                             if (preventCopyPaste) {
                                 navigator.clipboard.writeText('').catch(() => {});
                             }
                         }
-                    });
+                    };
+                    document.addEventListener('keyup', this._printScreenHandler);
+
+                    this.armTabDetection();
                 },
 
                 startTimer() {
@@ -642,12 +659,55 @@
                     }, 1000);
                 },
 
+                armTabDetection() {
+                    clearTimeout(this.tabDetectionTimer);
+
+                    if (document.hidden) return;
+
+                    this.pageWasVisible = true;
+                    this.tabDetectionTimer = setTimeout(() => {
+                        if (!document.hidden) this.tabDetectionArmed = true;
+                    }, 1200);
+                },
+
                 handleVisibilityChange() {
-                    if (document.hidden && preventTabSwitch && maxTabSwitches !== null) {
-                        this.tabSwitches++;
-                        this.showTabWarning = true;
-                        this.notifyTabSwitch();
+                    if (!preventTabSwitch || maxTabSwitches === null) return;
+
+                    if (!this.tabDetectionArmed) {
+                        this.pageWasVisible = !document.hidden;
+                        if (!document.hidden) this.armTabDetection();
+                        return;
                     }
+
+                    if (!document.hidden) {
+                        this.pageWasVisible = true;
+                        return;
+                    }
+
+                    if (!this.pageWasVisible) return;
+
+                    this.pageWasVisible = false;
+                    this.tabSwitches++;
+                    this.showTabWarning = true;
+                    this.notifyTabSwitch();
+                },
+
+                destroy() {
+                    clearInterval(this.timerInterval);
+                    clearTimeout(this.tabDetectionTimer);
+                    window.removeEventListener('online', this._onlineHandler);
+                    window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+                    document.removeEventListener('keydown', this._keydownHandler);
+                    document.removeEventListener('contextmenu', this._contextMenuHandler);
+                    document.removeEventListener('keyup', this._printScreenHandler);
+
+                    if (this._clipboardHandler) {
+                        document.removeEventListener('copy', this._clipboardHandler);
+                        document.removeEventListener('cut', this._clipboardHandler);
+                        document.removeEventListener('paste', this._clipboardHandler);
+                    }
+
+                    this._bc?.close();
                 },
 
                 notifyTabSwitch() {
@@ -697,6 +757,8 @@
                 },
 
                 submitExamFinal() {
+                    if (this.submitting) return;
+
                     if (!navigator.onLine) {
                         // Queue the submission — _onlineHandler will fire it when back online.
                         // Draft is already saved in localStorage from every selectAnswer().
@@ -707,6 +769,7 @@
                 },
 
                 _doFinalSubmit() {
+                    this.submitting = true;
                     // Remove the anti-cheat beforeunload guard FIRST (synchronously),
                     // then inject answers and call form.submit() directly.
                     // Using form.submit() (not a submit button click) means the browser

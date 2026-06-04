@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DX-SchoolPortal — Parent Guide</title>
+    <style>
+        /* ── Print & PDF Optimization ──────────────────────── */
+        @media print {
+            body { font-size: 11pt; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+            section { page-break-inside: avoid; }
+            h2 { page-break-after: avoid; }
+            a { color: inherit; text-decoration: none; }
+            .cover { page-break-after: always; }
+            .toc details > .sub { display: block; }
+            .toc details summary::before { content: ''; width: 0; }
+        }
+
+        /* ── Base ──────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            line-height: 1.7;
+            color: #1a1a2e;
+            background: #fff;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* ── Cover Page ────────────────────────────────────── */
+        .cover {
+            text-align: center;
+            padding: 4rem 2rem;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .cover-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto;
+        }
+        .cover-icon svg { width: 48px; height: 48px; color: white; }
+        .cover-role-badge {
+            display: inline-block;
+            padding: 0.4rem 1.2rem;
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Typography ────────────────────────────────────── */
+        p { margin-bottom: 0.75rem; }
+        strong { color: #7c3aed; }
+        h1 { font-size: 1.75rem; font-weight: 700; color: #7c3aed; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.4rem; font-weight: 700; color: #7c3aed; margin-top: 2.5rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid #ede9fe; }
+        h3 { font-size: 1.1rem; font-weight: 600; color: #1a1a2e; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        h4 { font-size: 1rem; font-weight: 600; color: #444; margin-top: 1rem; margin-bottom: 0.35rem; }
+
+        .cover h1 { font-size: 2.5rem; font-weight: 800; color: #7c3aed; }
+        .cover .subtitle { font-size: 1.25rem; color: #555; }
+        .cover .meta { font-size: 0.875rem; color: #888; margin-top: 2rem; }
+
+        /* ── Lists ──────────────────────────────────────────── */
+        ol, ul { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        li { margin-bottom: 0.3rem; }
+        ol ol, ul ul { margin-top: 0.3rem; }
+
+        /* ── Section header ────────────────────────────────── */
+        .section-header {
+            padding: 1.25rem 1.5rem;
+            border-radius: 12px;
+            margin: 3rem 0 1.5rem;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+        }
+
+        /* ── Boxes ─────────────────────────────────────────── */
+        .info-box {
+            background: #f5f3ff;
+            border-left: 4px solid #8b5cf6;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .tip-box {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .warning-box {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .important-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        /* ── Tables ────────────────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+        th, td { padding: 0.6rem 0.75rem; text-align: left; border: 1px solid #e5e7eb; }
+        th { background: #f5f3ff; font-weight: 600; color: #374151; }
+        tr:nth-child(even) { background: #fafafa; }
+
+        /* ── Steps ─────────────────────────────────────────── */
+        .steps { counter-reset: step; list-style: none; margin-left: 0; }
+        .steps li {
+            counter-increment: step;
+            padding-left: 2.5rem;
+            position: relative;
+            margin-bottom: 0.75rem;
+        }
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0; top: 0.1rem;
+            width: 1.75rem; height: 1.75rem;
+            background: #7c3aed;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── TOC ───────────────────────────────────────────── */
+        .toc {
+            background: #f5f3ff;
+            border: 1px solid #ede9fe;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+        }
+        .toc h2 { margin-top: 0; border: none; }
+        .toc ol { margin-left: 1.25rem; }
+        .toc li { margin-bottom: 0.3rem; }
+        .toc a { color: #7c3aed; text-decoration: none; }
+        .toc details { margin-bottom: 0.3rem; }
+        .toc details summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 0.4rem; }
+        .toc details summary::-webkit-details-marker { display: none; }
+        .toc details summary::before { content: '▸'; font-size: 0.85rem; color: #7c3aed; transition: transform 0.2s; display: inline-block; width: 1rem; flex-shrink: 0; }
+        .toc ul.sub { margin-left: 1.5rem; list-style: disc; }
+        .toc a:hover { text-decoration: underline; }
+        .toc details > .sub { margin-top: 0.25rem; }
+        .toc details[open] > summary::before { transform: rotate(90deg); }
+
+        /* ── Flow Diagrams ─────────────────────────────────── */
+        .flow {
+            background: #f5f3ff;
+            border: 1px solid #ede9fe;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            margin: 1rem 0;
+            color: #374151;
+        }
+
+        /* ── Sidebar Reference ─────────────────────────────── */
+        .sidebar-ref {
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin: 0.75rem 0;
+            font-size: 0.9rem;
+        }
+        .sidebar-ref strong { color: #5b21b6; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .badge-blue { background: #dbeafe; color: #1d4ed8; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; }
+        .badge-teal { background: #ccfbf1; color: #0f766e; }
+
+        hr { border: none; border-top: 1px solid #ede9fe; margin: 2rem 0; }
+        code { background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.88em; color: #5b21b6; }
+        kbd { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.85em; color: #475569; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════════╗ -->
+<!-- ║                     COVER PAGE                          ║ -->
+<!-- ╚══════════════════════════════════════════════════════════╝ -->
+<div class="cover">
+    <div class="cover-icon">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+        </svg>
+    </div>
+    <span class="cover-role-badge">👨‍👩‍👧‍👦 For Parents &amp; Guardians</span>
+    <h1>DX-SchoolPortal</h1>
+    <p class="subtitle">Parent's Complete Guide</p>
+    <p style="color: #666; max-width: 520px;">Your complete guide to monitoring your child's academic progress — view report cards, track exam and quiz results, check assignments, and stay connected with your school's latest notices.</p>
+    <div class="meta">
+        <p>Version 2.0 &nbsp;·&nbsp; Last Updated: July 2025</p>
+        <p style="margin-top: 0.5rem;">This guide is exclusively for <strong>Parents and Guardians</strong>.</p>
+    </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════╗ -->
+<!-- ║                   TABLE OF CONTENTS                     ║ -->
+<!-- ╚══════════════════════════════════════════════════════════╝ -->
+<div class="toc page-break">
+    <h2>Table of Contents</h2>
+    <ol>
+        <li><a href="#welcome">Welcome to the Parent Portal</a></li>
+        <li><a href="#getting-started">Getting Started</a></li>
+        <li><a href="#login">Logging In</a></li>
+        <li><a href="#navigation">Finding Your Way Around</a></li>
+        <li>
+            <details>
+                <summary><a href="#dashboard">Your Parent Dashboard</a></summary>
+                <ul class="sub">
+                    <li><a href="#dashboard-overview">Dashboard Overview</a></li>
+                    <li><a href="#dashboard-children">Your Children's Cards</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#children-data">Viewing Your Children's Academic Data</a></summary>
+                <ul class="sub">
+                    <li><a href="#child-profile">Child's Profile</a></li>
+                    <li><a href="#report-cards">Report Cards</a></li>
+                    <li><a href="#uploaded-results">Uploaded Results</a></li>
+                    <li><a href="#assignments">Assignments</a></li>
+                    <li><a href="#cbt-results">CBT Exam Results</a></li>
+                    <li><a href="#quiz-scores">Quiz Scores</a></li>
+                    <li><a href="#game-progress">Educational Game Progress</a></li>
+                </ul>
+            </details>
+        </li>
+        <li><a href="#notices">Notices &amp; Announcements</a></li>
+        <li><a href="#profile">Your Profile &amp; Settings</a></li>
+        <li><a href="#security">Account Security</a></li>
+        <li><a href="#faq">Frequently Asked Questions</a></li>
+    </ol>
+</div>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="welcome" class="page-break">
+    <h2>1. Welcome to the Parent Portal</h2>
+
+    <p>DX-SchoolPortal's parent portal gives you direct visibility into your child's education — anytime, anywhere, from any device. No more waiting for end-of-term reports to arrive by mail. Now you can check in on your child's progress whenever you like.</p>
+
+    <p><strong>What you can see and do on the parent portal:</strong></p>
+    <table>
+        <thead><tr><th>What You Can Do</th><th>Where to Find It</th></tr></thead>
+        <tbody>
+            <tr><td>View your child's dashboard and class info</td><td>My Children → Dashboard</td></tr>
+            <tr><td>View term report cards</td><td>My Children → Report Cards</td></tr>
+            <tr><td>View uploaded result PDFs</td><td>My Children → Uploaded Results</td></tr>
+            <tr><td>Check class assignments</td><td>My Children → Assignments</td></tr>
+            <tr><td>See CBT/exam results and scores</td><td>My Children → CBT Results</td></tr>
+            <tr><td>Check quiz performance</td><td>My Children → Quizzes</td></tr>
+            <tr><td>See educational game activity</td><td>My Children → Games</td></tr>
+            <tr><td>Read school notices and announcements</td><td>Communications → Notices</td></tr>
+            <tr><td>Update your profile and change password</td><td>Top-right menu → Settings</td></tr>
+        </tbody>
+    </table>
+
+    <div class="info-box">
+        <strong>Fully read-only view:</strong> As a parent, you can view your child's information but not edit it. All content (grades, results, assignments) is managed by teachers and the school administration.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="getting-started">
+    <h2>2. Getting Started</h2>
+
+    <h3>How Does Your Account Get Created?</h3>
+    <p>Unlike students and teachers, parents don't self-register. Your account is <strong>created by the school administrator</strong> after they link you to your child's records in the system. Here's how it works:</p>
+
+    <div class="flow">1. You provide your details to the school (name, phone, email, relationship to child).
+2. The school admin creates your parent account.
+3. The admin links your account to your child (or children).
+4. The admin gives you your username and temporary password.
+5. You log in and change your password.</div>
+
+    <div class="info-box">
+        <strong>Children linked to your account:</strong> If you have multiple children at the same school, the administrator can link all of them to your single parent account. You'll see all your children from one login.
+    </div>
+
+    <h3>What You'll Need</h3>
+    <ul>
+        <li>Your <strong>username</strong> — provided by the school administrator.</li>
+        <li>Your <strong>password</strong> — an initial password set by the administrator. Change it when you first log in.</li>
+        <li>The <strong>portal URL</strong> — your school's portal web address (e.g., <em>portal.yourschool.com/portal/login</em>).</li>
+        <li>An internet-connected device — a smartphone, tablet, or computer.</li>
+    </ul>
+
+    <h3>Supported Browsers</h3>
+    <p>The portal works on any modern browser: Google Chrome, Mozilla Firefox, Safari, Microsoft Edge. No app download or installation is required.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="login">
+    <h2>3. Logging In</h2>
+
+    <ol class="steps">
+        <li>Open your browser and go to your school's portal URL.</li>
+        <li>Enter your <strong>Username</strong> in the login field (provided by the school).</li>
+        <li>Enter your <strong>Password</strong>.</li>
+        <li>Click <strong>"Log in"</strong>.</li>
+        <li>You'll be taken directly to the Parent Dashboard.</li>
+    </ol>
+
+    <div class="warning-box">
+        <strong>First time logging in?</strong> If the administrator set up your account with a temporary password and required you to change it on first login, you'll be prompted to set a new password before you can access the portal. Choose something secure and memorable.
+    </div>
+
+    <h3>Trouble Logging In?</h3>
+    <ul>
+        <li>Check that your username has no extra spaces at the beginning or end.</li>
+        <li>Passwords are case-sensitive — make sure your caps lock key is off.</li>
+        <li>If you've forgotten your password, contact your school administrator. They will reset it for you.</li>
+        <li>After 5 failed login attempts in quick succession, the portal temporarily locks logins from your device as a security measure. Wait a few minutes and try again.</li>
+    </ul>
+
+    <h3>Logging Out</h3>
+    <p>Click your name or avatar in the <strong>top-right corner</strong> of any page and select <strong>"Log out"</strong>. For your security, always log out when you're done — especially on a shared or public device. The portal will also auto-log you out if you're inactive for a while.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="navigation">
+    <h2>4. Finding Your Way Around</h2>
+
+    <h3>On a Computer or Laptop</h3>
+    <p>You'll see a <strong>sidebar</strong> on the left side. Click any item to navigate:</p>
+    <ul>
+        <li><strong>My Children</strong> — Dashboard (overview) and access to all your children's academic data.</li>
+        <li><strong>Communications</strong> — School notices.</li>
+        <li><strong>Settings</strong> — Password and account preferences.</li>
+    </ul>
+
+    <h3>On a Phone or Tablet</h3>
+    <ol class="steps">
+        <li>Tap the <strong>☰ menu icon</strong> (three lines) in the top-left corner.</li>
+        <li>The navigation menu slides open from the side.</li>
+        <li>Tap any section to go there.</li>
+        <li>Tap anywhere outside the menu to close it.</li>
+    </ol>
+
+    <h3>Switching Between Children</h3>
+    <p>If you have multiple children at the school, you'll see each child on your dashboard as a card. To view data for a specific child, click their card or use the child selector that appears at the top of academic pages.</p>
+
+    <h3>Session and Term Filters</h3>
+    <p>On academic data pages (report cards, results, assignments), you'll see dropdowns to select the <strong>Academic Session</strong> (e.g., "2024/2025") and <strong>Term</strong> (e.g., "First Term"). Use these to view historical records or navigate between periods.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="dashboard" class="page-break">
+    <h2>5. Your Parent Dashboard</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → Dashboard</div>
+
+    <section id="dashboard-overview">
+        <h3>5.1 Dashboard Overview</h3>
+        <p>The dashboard is your home page — a snapshot of your family's activity at a glance. At the top, you'll see summary statistics:</p>
+
+        <table>
+            <thead><tr><th>Statistic</th><th>What It Means</th></tr></thead>
+            <tbody>
+                <tr><td>Children</td><td>How many of your children are linked to your account.</td></tr>
+                <tr><td>Results</td><td>Total uploaded result PDFs available for your children.</td></tr>
+                <tr><td>CBT Results</td><td>Number of CBT exams your children have completed.</td></tr>
+                <tr><td>Quiz Average</td><td>The combined average quiz score across all your children.</td></tr>
+            </tbody>
+        </table>
+
+        <p>Below the statistics, you'll see a <strong>Latest Notices</strong> section showing the most recent school announcements.</p>
+    </section>
+
+    <section id="dashboard-children">
+        <h3>5.2 Your Children's Cards</h3>
+        <p>Each child linked to your account has a card on your dashboard showing:</p>
+        <ul>
+            <li><strong>Child's name and profile photo</strong> (if uploaded by the school).</li>
+            <li><strong>Class and school level</strong> (e.g., "Primary 3", "Nursery 2").</li>
+            <li><strong>Class teacher's name</strong>.</li>
+            <li><strong>Quick action buttons</strong>: View Results, View Assignments, View CBT, View Quizzes, View Games.</li>
+        </ul>
+        <p>You can click any of these quick buttons to jump straight to that child's data.</p>
+
+        <div class="tip-box">
+            <strong>Tip:</strong> If you have two or more children, each gets their own card. Click the buttons on the specific child's card to see data for that child only.
+        </div>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="children-data" class="page-break">
+    <h2>6. Viewing Your Children's Academic Data</h2>
+    <p>All of your children's academic information is accessible through the <strong>My Children</strong> section in the sidebar.</p>
+
+    <section id="child-profile">
+        <h3>6.1 Child's Profile</h3>
+        <div class="sidebar-ref"><strong>Click child's name or photo</strong> → View Profile</div>
+
+        <p>Click on a child's name or photo on the dashboard to open their profile. You'll see:</p>
+        <ul>
+            <li>Full name, username, and admission number</li>
+            <li>Class, school level, and class teacher</li>
+            <li>Gender and date of birth</li>
+            <li>Quick links to their reports, assignments, and exams</li>
+        </ul>
+    </section>
+
+    <section id="report-cards">
+        <h3>6.2 Report Cards</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → Report Cards <em>— or —</em> Child profile → "View Report Cards"</div>
+
+        <p>Term report cards show your child's academic performance across all subjects.</p>
+
+        <ol class="steps">
+            <li>Click <strong>My Children → Report Cards</strong>, or use the quick link button on your child's card.</li>
+            <li>If you have multiple children, select the child you want from the dropdown at the top.</li>
+            <li>Select the <strong>Session</strong> and <strong>Term</strong> from the dropdowns.</li>
+            <li>Click <strong>"View"</strong> to open the report card.</li>
+        </ol>
+
+        <p>The report card shows:</p>
+        <ul>
+            <li>All subjects with component scores (CA1, CA2, Exam, etc.)</li>
+            <li>Total score and grade per subject</li>
+            <li>Class position/ranking (if published by the school)</li>
+            <li>Teacher's comment and principal/head teacher's remark</li>
+            <li>Overall summary of the term's performance</li>
+        </ul>
+
+        <h4>Downloading the Report Card</h4>
+        <ol class="steps">
+            <li>While viewing the report card, click the <strong>"Download"</strong> button.</li>
+            <li>A PDF version of the report card saves to your device.</li>
+            <li>You can print or share this PDF as needed.</li>
+        </ol>
+
+        <div class="info-box">
+            <strong>Report card not available yet?</strong> Report cards must be generated, approved, and published by the school administrator after the end of each term. If the term has recently ended and the report card isn't showing, it may still be in preparation. You can contact the school to inquire.
+        </div>
+    </section>
+
+    <section id="uploaded-results">
+        <h3>6.3 Uploaded Results</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → Uploaded Results</div>
+
+        <p>In addition to structured report cards, the school may upload PDF result sheets — these could be scanned printed results, or additional documents from the school administration.</p>
+
+        <ol class="steps">
+            <li>Click <strong>My Children → Uploaded Results</strong>.</li>
+            <li>Select your child from the dropdown (if you have multiple).</li>
+            <li>Use the Session and Term dropdowns to filter.</li>
+            <li>Click on a result card to open and view the PDF securely in your browser.</li>
+        </ol>
+
+        <div class="info-box">
+            <strong>Secure access:</strong> Each PDF is accessed via a time-limited secure link unique to your session. This ensures that result documents cannot be shared or accessed by unauthorised parties.
+        </div>
+    </section>
+
+    <section id="assignments">
+        <h3>6.4 Assignments</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → Assignments</div>
+
+        <p>See what homework and assignments your child's class has been given.</p>
+
+        <ol class="steps">
+            <li>Click <strong>My Children → Assignments</strong>.</li>
+            <li>Select your child to view assignments for their specific class.</li>
+            <li>Use the Term and Week filters to find specific assignments.</li>
+            <li>Each card shows: assignment title, description, the week it was set, the due date, and a download button for the assignment file.</li>
+        </ol>
+
+        <div class="warning-box">
+            <strong>Due dates:</strong> Assignments past their due date are highlighted in red. Use this to help monitor whether your child is keeping up with their work.
+        </div>
+
+        <div class="tip-box">
+            <strong>Support your child:</strong> Download the assignment file and review it with your child. Knowing what's expected helps you provide better academic support at home.
+        </div>
+    </section>
+
+    <section id="cbt-results" class="page-break">
+        <h3>6.5 CBT Exam Results</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → CBT Results</div>
+
+        <p>View your child's results from online computer-based tests (exams, assessments, and assignments).</p>
+
+        <ol class="steps">
+            <li>Click <strong>My Children → CBT Results</strong>.</li>
+            <li>Select your child.</li>
+            <li>Browse the list of exams/assessments your child has taken.</li>
+        </ol>
+
+        <p>For each CBT result, you'll see:</p>
+        <table>
+            <thead><tr><th>Column</th><th>What It Shows</th></tr></thead>
+            <tbody>
+                <tr><td>Exam Title</td><td>The name of the test (e.g., "First Term Mathematics Assessment")</td></tr>
+                <tr><td>Score</td><td>The number of marks your child achieved out of the total</td></tr>
+                <tr><td>Percentage</td><td>Your child's score as a percentage (e.g., 75%)</td></tr>
+                <tr><td>Status</td><td><span class="badge badge-green">Passed</span> or <span class="badge badge-red">Failed</span> based on the pass mark</td></tr>
+                <tr><td>Date Taken</td><td>When your child completed the exam</td></tr>
+                <tr><td>Attempts</td><td>How many times the exam was attempted</td></tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <strong>Understanding CBT types:</strong> The results are organised into tabs — <strong>Exams</strong> (formal tests), <strong>Assessments</strong> (class tests), and <strong>Assignments</strong> (homework turned in digitally). Check each tab for a complete picture.
+        </div>
+    </section>
+
+    <section id="quiz-scores">
+        <h3>6.6 Quiz Scores</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → Quizzes</div>
+
+        <p>Quizzes are practice tests created by your child's teacher to reinforce what's being taught in class. Unlike formal exams, quizzes are lighter and may allow multiple attempts.</p>
+
+        <ol class="steps">
+            <li>Click <strong>My Children → Quizzes</strong>.</li>
+            <li>Select your child.</li>
+            <li>Browse all quizzes they've been assigned.</li>
+        </ol>
+
+        <p>For each quiz, you'll see:</p>
+        <ul>
+            <li><strong>Quiz title</strong> — e.g., "Photosynthesis Quiz"</li>
+            <li><strong>Their best score</strong> — shown as a percentage</li>
+            <li><strong>Attempts taken</strong> — how many times they've tried (and how many are allowed)</li>
+            <li><strong>Pass/Fail status</strong></li>
+            <li><strong>Date last taken</strong></li>
+        </ul>
+
+        <div class="tip-box">
+            <strong>Low quiz score?</strong> A quiz score below the pass mark is a useful early signal. It means your child may need extra help with that topic before the formal exam. Talk to their teacher about what extra support is available.
+        </div>
+    </section>
+
+    <section id="game-progress">
+        <h3>6.7 Educational Game Progress</h3>
+        <div class="sidebar-ref"><strong>Sidebar:</strong> My Children → Games</div>
+
+        <p>The portal includes educational games that your child's teacher assigns to make learning more engaging. These games cover vocabulary, subject knowledge, and revision.</p>
+
+        <ol class="steps">
+            <li>Click <strong>My Children → Games</strong>.</li>
+            <li>Select your child.</li>
+            <li>Browse the games assigned to their class.</li>
+        </ol>
+
+        <p>For each game, you'll see your child's activity:</p>
+        <ul>
+            <li><strong>Game title and type</strong> — Memory Match, Word Scramble, Quiz Race, or Flashcard Study</li>
+            <li><strong>Number of times played</strong></li>
+            <li><strong>Their best score</strong></li>
+            <li><strong>Completion status</strong></li>
+        </ul>
+
+        <p>A brief description of each game type:</p>
+        <table>
+            <thead><tr><th>Game Type</th><th>What It Does</th></tr></thead>
+            <tbody>
+                <tr><td>Memory Match</td><td>Match terms to their definitions by flipping cards. Builds vocabulary and recall.</td></tr>
+                <tr><td>Word Scramble</td><td>Unscramble letters to form key subject words. Improves spelling and vocabulary.</td></tr>
+                <tr><td>Quiz Race</td><td>Answer rapid-fire questions as fast as possible. Great for exam revision.</td></tr>
+                <tr><td>Flashcard Study</td><td>Self-paced study with digital flip cards. Builds deep understanding.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="tip-box">
+            <strong>Encourage game play!</strong> Educational games are not just fun — they're designed to reinforce what your child has learnt in class. A child who plays the games regularly is actively revising.
+        </div>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="notices" class="page-break">
+    <h2>7. Notices &amp; Announcements</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Communications → Notices</div>
+
+    <p>Notices keep you informed about what's happening at the school — upcoming events, term dates, important reminders, policy changes, and more.</p>
+
+    <ol class="steps">
+        <li>Click <strong>Communications → Notices</strong>.</li>
+        <li>Browse the list of notices. The most recent appears first.</li>
+        <li>Click on any notice card to read its full content, including any images or attachments.</li>
+    </ol>
+
+    <p>Notices can be targeted to specific groups:</p>
+    <ul>
+        <li><strong>All users</strong> — Everyone at the school sees this notice.</li>
+        <li><strong>Parents only</strong> — Notices specifically for parents.</li>
+        <li><strong>Specific school levels</strong> — e.g., a notice targeted only to parents of Nursery students.</li>
+    </ul>
+
+    <div class="info-box">
+        <strong>Important notices</strong> may also appear as banners at the top of your dashboard. The school uses these for time-sensitive announcements that need immediate attention.
+    </div>
+
+    <div class="tip-box">
+        <strong>Check notices regularly!</strong> The school communicates exam schedules, PTA meetings, holiday dates, and fee reminders through the notices board. Checking it regularly ensures you don't miss important information.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="profile">
+    <h2>8. Your Profile &amp; Settings</h2>
+    <div class="sidebar-ref"><strong>Top-right corner:</strong> Your name/avatar → Settings</div>
+
+    <h3>Viewing and Updating Your Profile</h3>
+    <ol class="steps">
+        <li>Click your <strong>name or avatar</strong> in the top-right corner.</li>
+        <li>Select <strong>"Settings"</strong>.</li>
+        <li>The <strong>Profile</strong> tab shows your name, email address, phone number, and relationship to your children.</li>
+        <li>Click <strong>"Edit"</strong> to update your name or email address, then save your changes.</li>
+    </ol>
+
+    <div class="info-box">
+        <strong>Keeping your contact info current:</strong> Make sure your email address is correct. If the school sends notifications by email (e.g., when a new report card is available), they'll go to the address on file here.
+    </div>
+
+    <h3>Changing Your Password</h3>
+    <ol class="steps">
+        <li>Click your name in the top-right corner and select <strong>"Settings"</strong>.</li>
+        <li>Click the <strong>"Security"</strong> tab.</li>
+        <li>In the "Change Password" section:
+            <ul>
+                <li>Enter your <strong>current password</strong>.</li>
+                <li>Enter your <strong>new password</strong>.</li>
+                <li>Enter the new password again to <strong>confirm</strong>.</li>
+            </ul>
+        </li>
+        <li>Click <strong>"Update Password"</strong>.</li>
+    </ol>
+
+    <div class="tip-box">
+        <strong>Strong password tips:</strong>
+        <ul>
+            <li>Use at least 8 characters.</li>
+            <li>Include a mix of uppercase letters, lowercase letters, and numbers.</li>
+            <li>Avoid using your name, child's name, or obvious dates.</li>
+            <li>Use a different password for the school portal than you use for other services.</li>
+        </ul>
+    </div>
+
+    <h3>Two-Factor Authentication (2FA)</h3>
+    <p>Two-factor authentication adds an extra layer of security. Even if someone knows your password, they can't log in without also having access to your phone. Setting up 2FA is strongly recommended.</p>
+
+    <ol class="steps">
+        <li>Go to <strong>Settings → Security tab</strong>.</li>
+        <li>Click <strong>"Enable Two-Factor Authentication"</strong>.</li>
+        <li>Open an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, or Authy — all free to download).</li>
+        <li>Scan the QR code shown on the screen with the authenticator app.</li>
+        <li>Enter the 6-digit code from the app to confirm setup.</li>
+        <li><strong>Save your recovery codes</strong> somewhere safe (print them or store them in a secure place). You'll need these if you ever lose access to your phone.</li>
+    </ol>
+
+    <p>Once enabled, every login will ask for a 6-digit code from your authenticator app in addition to your password.</p>
+
+    <h3>Appearance: Light Mode / Dark Mode</h3>
+    <p>Go to <strong>Settings → Appearance tab</strong> and choose your preferred theme. Light mode (white background) is the default. Dark mode (dark grey background) may be easier on the eyes in low-light conditions.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="security" class="page-break">
+    <h2>9. Account Security</h2>
+
+    <h3>Keeping Your Account Safe</h3>
+    <ul>
+        <li><strong>Never share your password</strong> — Not with anyone, including friends or people claiming to be from the school.</li>
+        <li><strong>Always log out</strong> when you're done, especially on shared computers or public devices.</li>
+        <li><strong>Don't use public Wi-Fi</strong> without a VPN to access the portal, if possible.</li>
+        <li>The portal <strong>automatically logs you out</strong> after a period of inactivity to protect your account.</li>
+        <li><strong>Enable 2FA</strong> (see Section 8) for the strongest protection.</li>
+    </ul>
+
+    <h3>Forgot Your Password?</h3>
+    <p>Contact your school administrator. They will reset your password and provide a new temporary one. You can then log in and change it to something you'll remember.</p>
+
+    <h3>Suspicious Activity</h3>
+    <p>If you believe your account is being accessed without your knowledge:</p>
+    <ol class="steps">
+        <li>Log in immediately and change your password from <em>Settings → Security</em>.</li>
+        <li>Contact your school administrator and inform them.</li>
+    </ol>
+
+    <h3>Privacy of Your Child's Data</h3>
+    <p>All academic records are stored securely. Result PDFs use time-limited secure links so they cannot be shared beyond your viewing session. Your child's information is only accessible to you, their teachers, and the school admin.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="faq" class="page-break">
+    <h2>10. Frequently Asked Questions</h2>
+
+    <h4>Q: I can't log in. What should I do?</h4>
+    <p>First, double-check your username and password — passwords are case-sensitive. If you're certain they're correct but still can't log in, contact your school administrator and ask them to verify or reset your account.</p>
+
+    <h4>Q: I can't see my child on my account. Why?</h4>
+    <p>Your child must be linked to your parent account by the school administrator. If you've just registered or if your child is new at the school, ask the admin to link your account to your child's record. This is done by the school, not something you can do yourself.</p>
+
+    <h4>Q: My child's report card isn't available yet. When will it be ready?</h4>
+    <p>Report cards are prepared after the end of each term. The school must generate, review, and publish them before they appear on the portal. The timeline varies by school. If it's been a while since the term ended, contact the school to inquire.</p>
+
+    <h4>Q: Can I print my child's report card?</h4>
+    <p>Yes! Open the report card and click the <strong>"Download"</strong> button to save it as a PDF. You can then print it from any computer or device.</p>
+
+    <h4>Q: Can I see my child's upcoming assignments?</h4>
+    <p>You can view all assignments that have been posted for your child's class. Assignments must first be uploaded by the teacher and approved by the admin before they appear. Check the Assignments page regularly to stay current.</p>
+
+    <h4>Q: My child failed a CBT exam. Can they retake it?</h4>
+    <p>That decision is made by the teacher when they create the exam. If the teacher allowed multiple attempts, your child will see a "Retake" option. If not, they will need to speak to their teacher about additional support or remediation.</p>
+
+    <h4>Q: Can I see my child's game scores compared to their classmates?</h4>
+    <p>Quiz Race games have a class leaderboard that your child can view on their own student account. As a parent, you see your child's individual scores and play counts. Full class-wide rankings are only visible on the student side.</p>
+
+    <h4>Q: Can I message my child's teacher through the portal?</h4>
+    <p>Messaging between parents and teachers is not yet available in the current version of the portal. To contact your child's teacher, please use the school's existing communication channels (phone, in-person, etc.). The portal team plans to add messaging in a future update.</p>
+
+    <h4>Q: I have two children at the school. Can I have one parent account for both?</h4>
+    <p>Yes! One parent account can be linked to multiple children. Ask your school administrator to link all your children to your account. You'll see each child on your dashboard and can easily switch between their records.</p>
+
+    <h4>Q: My child changed class (was promoted). Will I still see their old records?</h4>
+    <p>Yes. All historical records (report cards, results, assignments) from previous sessions and terms are preserved. Use the Session and Term dropdowns on each page to view records from earlier periods.</p>
+
+    <h4>Q: I see a wrong grade or score on my child's report card. What should I do?</h4>
+    <p>Contact your school administrator or class teacher directly. Parents cannot edit academic records on the portal — corrections must be made by the school staff.</p>
+
+    <h4>Q: The portal looks different on my phone vs. my computer. Is something wrong?</h4>
+    <p>No — the portal is designed to be "mobile-first" which means the layout adjusts based on your screen size. On phones, the sidebar becomes a slide-out menu, and content stacks vertically. Everything still works the same way.</p>
+
+    <h4>Q: Can I change my child's profile information on the portal?</h4>
+    <p>No. Student profile information (name, class, date of birth, etc.) is managed entirely by the school administrator. If there is an error, contact your school administrator to have it corrected.</p>
+</section>
+
+
+<hr>
+<div style="text-align: center; padding: 2rem 0; color: #888; font-size: 0.85rem;">
+    <p><strong>DX-SchoolPortal — Parent's Guide</strong> &nbsp;·&nbsp; Version 2.0 &nbsp;·&nbsp; © 2025 DX-SchoolPortal</p>
+    <p class="no-print" style="margin-top: 1rem;">
+        <strong>To save as PDF:</strong> Press <kbd>Ctrl</kbd>+<kbd>P</kbd> (or <kbd>Cmd</kbd>+<kbd>P</kbd> on Mac) → select <strong>"Save as PDF"</strong>.
+    </p>
+</div>
+
+</body>
+</html>

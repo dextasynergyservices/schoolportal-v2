@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DX-SchoolPortal — Student Guide</title>
+    <style>
+        /* ── Print & PDF Optimization ──────────────────────── */
+        @media print {
+            body { font-size: 11pt; }
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+            section { page-break-inside: avoid; }
+            h2 { page-break-after: avoid; }
+            a { color: inherit; text-decoration: none; }
+            .cover { page-break-after: always; }
+            .toc details > .sub { display: block; }
+            .toc details summary::before { content: ''; width: 0; }
+        }
+
+        /* ── Base ──────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            line-height: 1.7;
+            color: #1a1a2e;
+            background: #fff;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* ── Cover Page ────────────────────────────────────── */
+        .cover {
+            text-align: center;
+            padding: 4rem 2rem;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .cover-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto;
+        }
+        .cover-icon svg { width: 48px; height: 48px; color: white; }
+        .cover-role-badge {
+            display: inline-block;
+            padding: 0.4rem 1.2rem;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Typography ────────────────────────────────────── */
+        p { margin-bottom: 0.75rem; }
+        strong { color: #2563eb; }
+        h1 { font-size: 1.75rem; font-weight: 700; color: #2563eb; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.4rem; font-weight: 700; color: #2563eb; margin-top: 2.5rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid #dbeafe; }
+        h3 { font-size: 1.1rem; font-weight: 600; color: #1a1a2e; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        h4 { font-size: 1rem; font-weight: 600; color: #444; margin-top: 1rem; margin-bottom: 0.35rem; }
+
+        .cover h1 { font-size: 2.5rem; font-weight: 800; color: #2563eb; }
+        .cover .subtitle { font-size: 1.25rem; color: #555; }
+        .cover .meta { font-size: 0.875rem; color: #888; margin-top: 2rem; }
+
+        /* ── Lists ──────────────────────────────────────────── */
+        ol, ul { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        li { margin-bottom: 0.3rem; }
+        ol ol, ul ul { margin-top: 0.3rem; }
+
+        /* ── Section header ────────────────────────────────── */
+        .section-header {
+            padding: 1.25rem 1.5rem;
+            border-radius: 12px;
+            margin: 3rem 0 1.5rem;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+        }
+
+        /* ── Boxes ─────────────────────────────────────────── */
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .tip-box {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .warning-box {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        .important-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        /* ── Tables ────────────────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+        th, td { padding: 0.6rem 0.75rem; text-align: left; border: 1px solid #e5e7eb; }
+        th { background: #eff6ff; font-weight: 600; color: #374151; }
+        tr:nth-child(even) { background: #fafafa; }
+
+        /* ── Steps ─────────────────────────────────────────── */
+        .steps { counter-reset: step; list-style: none; margin-left: 0; }
+        .steps li {
+            counter-increment: step;
+            padding-left: 2.5rem;
+            position: relative;
+            margin-bottom: 0.75rem;
+        }
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0; top: 0.1rem;
+            width: 1.75rem; height: 1.75rem;
+            background: #2563eb;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── TOC ───────────────────────────────────────────── */
+        .toc {
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin: 2rem 0;
+        }
+        .toc h2 { margin-top: 0; border: none; }
+        .toc ol { margin-left: 1.25rem; }
+        .toc li { margin-bottom: 0.3rem; }
+        .toc a { color: #2563eb; text-decoration: none; }
+        .toc details { margin-bottom: 0.3rem; }
+        .toc details summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 0.4rem; }
+        .toc details summary::-webkit-details-marker { display: none; }
+        .toc details summary::before { content: '▸'; font-size: 0.85rem; color: #2563eb; transition: transform 0.2s; display: inline-block; width: 1rem; flex-shrink: 0; }
+        .toc ul.sub { margin-left: 1.5rem; list-style: disc; }
+        .toc a:hover { text-decoration: underline; }
+        .toc details > .sub { margin-top: 0.25rem; }
+        .toc details[open] > summary::before { transform: rotate(90deg); }
+
+        /* ── Flow Diagrams ─────────────────────────────────── */
+        .flow {
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            margin: 1rem 0;
+            color: #374151;
+        }
+
+        /* ── Sidebar Reference ─────────────────────────────── */
+        .sidebar-ref {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin: 0.75rem 0;
+            font-size: 0.9rem;
+        }
+        .sidebar-ref strong { color: #1d4ed8; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .badge-blue { background: #dbeafe; color: #1d4ed8; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; }
+        .badge-teal { background: #ccfbf1; color: #0f766e; }
+
+        hr { border: none; border-top: 1px solid #dbeafe; margin: 2rem 0; }
+        code { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.88em; color: #1d4ed8; }
+        kbd { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.85em; color: #475569; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════════╗ -->
+<!-- ║                     COVER PAGE                          ║ -->
+<!-- ╚══════════════════════════════════════════════════════════╝ -->
+<div class="cover">
+    <div class="cover-icon">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 3.741-7.342m-7.482 7.342a3 3 0 0 0 6 0m-6 0a3 3 0 1 1 6 0m-6 0H9" />
+        </svg>
+    </div>
+    <span class="cover-role-badge">🎓 For Students</span>
+    <h1>DX-SchoolPortal</h1>
+    <p class="subtitle">Student's Complete Guide</p>
+    <p style="color: #666; max-width: 520px;">Your complete guide to using the school portal — view your report cards, take CBT exams and quizzes, play educational games, access assignments, and stay updated with school notices.</p>
+    <div class="meta">
+        <p>Version 2.0 &nbsp;·&nbsp; Last Updated: July 2025</p>
+        <p style="margin-top: 0.5rem;">This guide is exclusively for <strong>Students</strong>.</p>
+    </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════╗ -->
+<!-- ║                   TABLE OF CONTENTS                     ║ -->
+<!-- ╚══════════════════════════════════════════════════════════╝ -->
+<div class="toc page-break">
+    <h2>Table of Contents</h2>
+    <ol>
+        <li><a href="#welcome">Welcome to Your School Portal</a></li>
+        <li><a href="#login">Logging In</a></li>
+        <li><a href="#navigation">Finding Your Way Around</a></li>
+        <li><a href="#dashboard">Your Dashboard</a></li>
+        <li>
+            <details>
+                <summary><a href="#report-cards">Report Cards</a></summary>
+                <ul class="sub">
+                    <li><a href="#rc-view">Viewing Your Report Card</a></li>
+                    <li><a href="#rc-download">Downloading as PDF</a></li>
+                    <li><a href="#rc-cbt">CBT Results Tab</a></li>
+                </ul>
+            </details>
+        </li>
+        <li><a href="#results">Uploaded Results</a></li>
+        <li><a href="#assignments">Assignments</a></li>
+        <li>
+            <details>
+                <summary><a href="#cbt">CBT Exams &amp; Assessments</a></summary>
+                <ul class="sub">
+                    <li><a href="#cbt-find">Finding Your Exams</a></li>
+                    <li><a href="#cbt-before">Before Starting</a></li>
+                    <li><a href="#cbt-during">During the Exam</a></li>
+                    <li><a href="#cbt-submit">Submitting</a></li>
+                    <li><a href="#cbt-results">Viewing Your Results</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#quizzes">Taking Quizzes</a></summary>
+                <ul class="sub">
+                    <li><a href="#quizzes-start">Starting a Quiz</a></li>
+                    <li><a href="#quizzes-results">Viewing Your Results</a></li>
+                    <li><a href="#quizzes-retake">Retaking a Quiz</a></li>
+                </ul>
+            </details>
+        </li>
+        <li>
+            <details>
+                <summary><a href="#games">Playing Educational Games</a></summary>
+                <ul class="sub">
+                    <li><a href="#games-memory">Memory Match</a></li>
+                    <li><a href="#games-scramble">Word Scramble</a></li>
+                    <li><a href="#games-race">Quiz Race</a></li>
+                    <li><a href="#games-flashcard">Flashcard Study</a></li>
+                </ul>
+            </details>
+        </li>
+        <li><a href="#notices">Notices &amp; Announcements</a></li>
+        <li><a href="#profile">Your Profile &amp; Settings</a></li>
+        <li><a href="#security">Account Security</a></li>
+        <li><a href="#faq">Frequently Asked Questions</a></li>
+    </ol>
+</div>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="welcome" class="page-break">
+    <h2>1. Welcome to Your School Portal</h2>
+    <p>DX-SchoolPortal is your school's digital home. From here, you can:</p>
+
+    <table>
+        <thead>
+            <tr><th>What You Can Do</th><th>Where to Find It</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>View your report cards and grades</td><td>Academics → Report Cards</td></tr>
+            <tr><td>View uploaded result PDFs</td><td>Academics → Uploaded Results</td></tr>
+            <tr><td>Download class assignments</td><td>Academics → Assignments</td></tr>
+            <tr><td>Take CBT exams and assessments</td><td>CBT &amp; Interactive → CBT</td></tr>
+            <tr><td>Take quizzes</td><td>CBT &amp; Interactive → Quizzes</td></tr>
+            <tr><td>Play educational games</td><td>CBT &amp; Interactive → Games</td></tr>
+            <tr><td>Read school notices</td><td>Communications → Notices</td></tr>
+            <tr><td>View your profile</td><td>My Portal → My Profile</td></tr>
+            <tr><td>Change your password</td><td>Top-right menu → Settings → Security</td></tr>
+        </tbody>
+    </table>
+
+    <div class="info-box">
+        <strong>Works on any device:</strong> The portal is fully responsive — it works perfectly on your phone, tablet, or computer using any modern browser (Chrome, Firefox, Safari, Edge).
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="login">
+    <h2>2. Logging In</h2>
+    <p>Open your school's portal URL in any web browser.</p>
+
+    <ol class="steps">
+        <li>Go to your school's portal address — your school will provide this (e.g., <em>portal.yourschool.com/portal/login</em>).</li>
+        <li>Enter your <strong>Username</strong> — given to you by your teacher or school administrator.</li>
+        <li>Enter your <strong>Password</strong> — given to you by your school administrator. You can change it later.</li>
+        <li>Click <strong>"Log in"</strong>. You'll go to your dashboard.</li>
+    </ol>
+
+    <div class="info-box">
+        <strong>First time logging in?</strong> Your administrator may have set a temporary password for you and required you to change it on first login. Just follow the on-screen instructions to set your own password.
+    </div>
+
+    <h3>Can't Log In?</h3>
+    <ul>
+        <li>Double-check that you're entering your username correctly (no extra spaces).</li>
+        <li>Passwords are case-sensitive — check your caps lock key.</li>
+        <li>If you've forgotten your password, ask your teacher or school administrator to reset it for you.</li>
+        <li>If you see <em>"Account deactivated"</em>, contact your school administrator.</li>
+    </ul>
+
+    <h3>Logging Out</h3>
+    <p>Click your name/avatar in the top-right corner of the page and select <strong>"Log out"</strong>. Always log out when you've finished, especially on a shared or school computer. The portal also logs you out automatically if you haven't done anything for a while.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="navigation">
+    <h2>3. Finding Your Way Around</h2>
+
+    <h3>On a Computer or Laptop</h3>
+    <p>You'll see a <strong>sidebar</strong> on the left side of the screen. Click any item in the sidebar to go to that page. The sidebar is organised into sections:</p>
+    <ul>
+        <li><strong>My Portal</strong> — Dashboard and your profile</li>
+        <li><strong>Academics</strong> — Report cards, uploaded results, assignments</li>
+        <li><strong>CBT &amp; Interactive</strong> — Exams, quizzes, and games</li>
+        <li><strong>Communications</strong> — School notices</li>
+        <li><strong>Settings</strong> — Password, appearance, account settings</li>
+    </ul>
+
+    <h3>On a Phone or Tablet</h3>
+    <ol class="steps">
+        <li>Tap the <strong>☰ menu icon</strong> in the top-left corner of the screen.</li>
+        <li>The sidebar slides open. Tap any section to navigate.</li>
+        <li>Tap anywhere outside the menu to close it.</li>
+    </ol>
+
+    <h3>The Top Bar</h3>
+    <ul>
+        <li><strong>School logo</strong> — Click to go back to your dashboard.</li>
+        <li><strong>🔔 Bell icon</strong> — Any important notifications will appear here.</li>
+        <li><strong>Your name/avatar (top-right)</strong> — Click to access Settings and Log out.</li>
+    </ul>
+
+    <h3>Session &amp; Term Filter</h3>
+    <p>On pages that show academic data (report cards, assignments, results), you'll see <strong>Session</strong> and <strong>Term</strong> dropdowns. Use these to switch between different periods, e.g., to view last term's report card.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="dashboard">
+    <h2>4. Your Dashboard</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> My Portal → Dashboard</div>
+
+    <p>Your dashboard is the first page you see after logging in. It gives you a quick overview of everything:</p>
+
+    <ul>
+        <li><strong>Welcome banner</strong> — "Welcome back, [your name]!" with the current session and term.</li>
+        <li><strong>Your class info card</strong> — Your class name, school level, class teacher's name, and your admission number.</li>
+        <li><strong>Statistics cards:</strong>
+            <ul>
+                <li>How many report cards you have</li>
+                <li>Uploaded results available</li>
+                <li>CBT exams you've taken</li>
+                <li>Your quiz average score</li>
+                <li>Games you've played</li>
+                <li>Assignments available for your class</li>
+            </ul>
+        </li>
+        <li><strong>Quick links</strong> — Shortcut buttons to your most important pages.</li>
+        <li><strong>Achievements</strong> — Earn badges for milestones like taking your first quiz or getting a perfect score!</li>
+    </ul>
+
+    <div class="tip-box">
+        <strong>Tip:</strong> Check your dashboard when you log in. If your teacher has posted new assignments or quizzes, you'll see the count change here.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="report-cards" class="page-break">
+    <h2>5. Report Cards</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Academics → Report Cards</div>
+
+    <section id="rc-view">
+        <h3>5.1 Viewing Your Report Card</h3>
+        <ol class="steps">
+            <li>Click <strong>Academics → Report Cards</strong> in the sidebar.</li>
+            <li>You'll see your report cards organised by academic session (e.g., "2024/2025"). Click a session to expand and see its terms.</li>
+            <li>Click <strong>"View"</strong> on the term you want (e.g., "First Term").</li>
+            <li>Your full report card opens, showing:
+                <ul>
+                    <li>All subjects and your scores for each score component (e.g., CA1, CA2, Exam)</li>
+                    <li>Total score and grade for each subject</li>
+                    <li>Your class position/ranking (if enabled by your school)</li>
+                    <li>Your class teacher's comment</li>
+                    <li>Overall term summary</li>
+                </ul>
+            </li>
+        </ol>
+
+        <div class="info-box">
+            <strong>Can't see your report card?</strong> Report cards must be generated, approved, and published by your school administrator before they appear here. If you believe it should be available, ask your teacher.
+        </div>
+    </section>
+
+    <section id="rc-download">
+        <h3>5.2 Downloading Your Report Card as PDF</h3>
+        <ol class="steps">
+            <li>Open your report card by clicking "View".</li>
+            <li>Click the <strong>"Download"</strong> button (or the printer/download icon).</li>
+            <li>A printable PDF version of your report card will download to your device.</li>
+        </ol>
+        <p>You can print this PDF or share it with your parents.</p>
+    </section>
+
+    <section id="rc-cbt">
+        <h3>5.3 CBT Results Tab</h3>
+        <p>On the Report Cards page, click the <strong>"CBT Results"</strong> tab to see your results from computer-based exams and assessments separately. This shows each CBT exam you've taken, your score, and whether you passed.</p>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="results">
+    <h2>6. Uploaded Results</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Academics → Uploaded Results</div>
+
+    <p>Your school may upload PDF result files for you (scanned result sheets or traditional reports). To view them:</p>
+
+    <ol class="steps">
+        <li>Click <strong>Academics → Uploaded Results</strong>.</li>
+        <li>Use the <strong>Session</strong> and <strong>Term</strong> dropdowns to filter by the period you want.</li>
+        <li>Click on a result card to open and view the PDF.</li>
+    </ol>
+
+    <div class="info-box">
+        <strong>Secure viewing:</strong> These PDFs are stored securely. Each time you open one, a time-limited secure link is generated so only you can view it.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="assignments">
+    <h2>7. Assignments</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Academics → Assignments</div>
+
+    <p>Your teacher uploads weekly homework and assignments that you can access and download here.</p>
+
+    <ol class="steps">
+        <li>Click <strong>Academics → Assignments</strong>.</li>
+        <li>You'll see assignments for your class. Use the <strong>Term</strong> and <strong>Week</strong> dropdowns to find specific assignments.</li>
+        <li>Each assignment card shows: title, description, week number, and due date.</li>
+        <li>Click the <strong>download button</strong> (or the file attachment) to download the assignment file to your device.</li>
+        <li>Complete the assignment according to your teacher's instructions.</li>
+    </ol>
+
+    <div class="warning-box">
+        <strong>Watch the due date!</strong> Assignments that are past their due date are shown with a red marker. Always download and check your assignments early.
+    </div>
+
+    <div class="tip-box">
+        <strong>Missing an assignment?</strong> Assignments only appear after your teacher uploads them and the admin approves them. If your classmates have it but you don't see it, try refreshing the page. If it's still not there, ask your teacher.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="cbt" class="page-break">
+    <h2>8. CBT Exams &amp; Assessments</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> CBT &amp; Interactive → CBT</div>
+
+    <p>CBT (Computer-Based Testing) is how you take online exams, class tests (assessments), and assignments on the portal. Questions are shown one at a time and your answers are saved automatically.</p>
+    <p>The CBT page has three tabs: <strong>Exams</strong>, <strong>Assessments</strong>, and <strong>Assignments</strong>.</p>
+
+    <section id="cbt-find">
+        <h3>8.1 Finding Your Exams</h3>
+        <p>Click the relevant tab (Exams, Assessments, or Assignments). You'll see sections:</p>
+        <ul>
+            <li><span class="badge badge-green">Available</span> — Ready for you to take now.</li>
+            <li><span class="badge badge-blue">Completed</span> — You've already submitted. You can view your results.</li>
+            <li><span class="badge badge-amber">Upcoming</span> — Scheduled for a future date. Not yet open.</li>
+        </ul>
+    </section>
+
+    <section id="cbt-before">
+        <h3>8.2 Before Starting an Exam</h3>
+        <ol class="steps">
+            <li>Click <strong>"View Details"</strong> on an available exam.</li>
+            <li>Read the exam information:
+                <ul>
+                    <li>Number of questions and total points</li>
+                    <li>Time limit (if any)</li>
+                    <li>Pass mark percentage</li>
+                    <li>How many attempts you have left</li>
+                    <li>Exam rules</li>
+                </ul>
+            </li>
+            <li>Make sure you are ready — once you start, the timer begins.</li>
+            <li>Click <strong>"Start Exam"</strong> and confirm in the pop-up.</li>
+        </ol>
+
+        <div class="warning-box">
+            <strong>Get ready before you start!</strong> Once you click "Start Exam":
+            <ul>
+                <li>The timer starts immediately (if the exam has a time limit).</li>
+                <li>The exam may go fullscreen on your device.</li>
+                <li>Do not close the browser tab or window during the exam.</li>
+            </ul>
+        </div>
+    </section>
+
+    <section id="cbt-during">
+        <h3>8.3 During the Exam</h3>
+
+        <h4>Reading Questions</h4>
+        <p>Questions appear on screen with the question number and your progress shown at the top. Read each question carefully before answering.</p>
+
+        <h4>Answering Questions</h4>
+        <table>
+            <thead><tr><th>Question Type</th><th>How to Answer</th></tr></thead>
+            <tbody>
+                <tr><td>Multiple Choice (MCQ)</td><td>Click on the option you think is correct. Your selection turns blue.</td></tr>
+                <tr><td>True / False</td><td>Click "True" or "False".</td></tr>
+                <tr><td>Fill in the Blank</td><td>Type your answer in the text box.</td></tr>
+                <tr><td>Short Answer</td><td>Type your answer in the text area (1–2 sentences).</td></tr>
+                <tr><td>Theory / Essay</td><td>Type your full answer in the large text area.</td></tr>
+                <tr><td>Matching</td><td>Click items in the left column and match them to items in the right column.</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Navigating Between Questions</h4>
+        <ul>
+            <li>Click <strong>"Next →"</strong> to go to the next question.</li>
+            <li>Click <strong>"← Previous"</strong> to go back.</li>
+            <li>Click any <strong>numbered dot</strong> at the bottom to jump directly to that question.
+                <ul>
+                    <li>🟢 Green dot = you've answered this question.</li>
+                    <li>⚪ Grey dot = not yet answered.</li>
+                    <li>🟠 Orange dot = you flagged this question for review.</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h4>Flagging Questions for Review</h4>
+        <p>If you're unsure about a question, click the <strong>🚩 flag icon</strong> to mark it for review. You can come back to flagged questions before submitting.</p>
+
+        <h4>Auto-Save</h4>
+        <p>Your answers are saved automatically as you go. Even if your internet connection briefly drops, your answered questions are stored. You won't lose work if you accidentally navigate away.</p>
+
+        <h4>The Timer</h4>
+        <ul>
+            <li>If the exam has a time limit, a <strong>countdown timer</strong> is shown at the top.</li>
+            <li>At <strong>5 minutes remaining</strong>, the timer turns amber as a warning.</li>
+            <li>At <strong>1 minute remaining</strong>, the timer turns red.</li>
+            <li>When time is up, the exam is <strong>automatically submitted</strong>.</li>
+        </ul>
+    </section>
+
+    <section id="cbt-submit">
+        <h3>8.4 Submitting the Exam</h3>
+        <ol class="steps">
+            <li>When you've answered all the questions you want to, click <strong>"Submit Exam"</strong>.</li>
+            <li>A confirmation box appears showing: how many questions you answered and how many are unanswered. Review this before confirming.</li>
+            <li>If you want to go back and answer more questions, click <strong>"Cancel"</strong> and continue.</li>
+            <li>When ready, click <strong>"Confirm Submit"</strong>.</li>
+        </ol>
+
+        <div class="info-box">
+            <strong>If time runs out:</strong> Don't worry — the exam auto-submits with all your saved answers included. You won't lose any of your work.
+        </div>
+    </section>
+
+    <section id="cbt-results">
+        <h3>8.5 Viewing Your Results</h3>
+        <p>After submitting, your results page appears immediately (for auto-scored questions). For exams with theory/short-answer questions, your teacher must grade those manually first — you'll see partial results until grading is complete.</p>
+
+        <p>Your results show:</p>
+        <ul>
+            <li>Your total score and percentage</li>
+            <li>Pass / Fail status</li>
+            <li>Time taken</li>
+            <li>If enabled by your teacher: the correct answers with explanations</li>
+        </ul>
+
+        <p>You can always return to view your results later from the <strong>Completed</strong> tab on the CBT page.</p>
+    </section>
+
+    <div class="info-box">
+        <strong>Anti-cheating notice:</strong> The exam may monitor if you switch to another browser tab or window. Right-click and text-selection may be disabled. The exam may go fullscreen. This is to ensure fairness for everyone.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="quizzes" class="page-break">
+    <h2>9. Taking Quizzes</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> CBT &amp; Interactive → Quizzes</div>
+
+    <p>Quizzes are shorter, lighter tests — great for revision and practice. They work similarly to CBT exams but are quicker and usually allow multiple attempts.</p>
+
+    <section id="quizzes-start">
+        <h3>9.1 Starting a Quiz</h3>
+        <ol class="steps">
+            <li>Click <strong>CBT &amp; Interactive → Quizzes</strong>.</li>
+            <li>Browse the <strong>Available Quizzes</strong> list. Each card shows: title, number of questions, time limit (if any), due date, and how many attempts you have remaining.</li>
+            <li>Click <strong>"Start Quiz"</strong> on the quiz you want to take.</li>
+            <li>Confirm in the pop-up to begin.</li>
+            <li>Answer each question by clicking your chosen option.</li>
+            <li>Navigate using the Previous/Next buttons or the numbered dots.</li>
+            <li>Click <strong>"Submit"</strong> when done and confirm.</li>
+        </ol>
+    </section>
+
+    <section id="quizzes-results">
+        <h3>9.2 Viewing Your Quiz Results</h3>
+        <p>After submitting, you'll immediately see:</p>
+        <ul>
+            <li>Your score out of the total</li>
+            <li>Your percentage and pass/fail status</li>
+            <li>A review of each question — your answer, the correct answer, and the explanation (if your teacher enabled this)</li>
+        </ul>
+        <p>You can return to view quiz results anytime from the <strong>Completed Quizzes</strong> section.</p>
+    </section>
+
+    <section id="quizzes-retake">
+        <h3>9.3 Retaking a Quiz</h3>
+        <p>If the quiz allows multiple attempts, you'll see a <strong>"Retake Quiz"</strong> button in the completed section. The number of attempts remaining is shown on the quiz card.</p>
+        <div class="tip-box">
+            <strong>Use retakes wisely!</strong> Review your incorrect answers from your first attempt before retaking. Understanding <em>why</em> you got something wrong helps you do better next time.
+        </div>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="games" class="page-break">
+    <h2>10. Playing Educational Games</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> CBT &amp; Interactive → Games</div>
+
+    <p>Your teacher creates fun educational games to help you learn through play. Games are a great way to revise and practice what you've been taught in class.</p>
+
+    <p>To find and play a game:</p>
+    <ol class="steps">
+        <li>Click <strong>CBT &amp; Interactive → Games</strong>.</li>
+        <li>Browse the available games. Each card shows: game title, type, difficulty, your play count, and your best score.</li>
+        <li>Click <strong>"Play Now"</strong> to start a game.</li>
+    </ol>
+
+    <section id="games-memory">
+        <h3>10.1 Memory Match</h3>
+        <p>A card-flipping game where you match terms with their definitions.</p>
+
+        <div class="flow">How to play:
+  1. A grid of face-down cards is shown.
+  2. Click a card to flip it and reveal what's on it.
+  3. Click a second card. If the two cards match (term + definition), they stay face-up. ✅
+  4. If they don't match, both cards flip back face-down. Try again.
+  5. Match all pairs to complete the game!
+
+Scoring: Fewer moves and faster time = higher score.</div>
+
+        <p><strong>Tips:</strong> Use your memory to remember where cards are. Click cards in a pattern (e.g., row by row) to expose all content first, then match from memory.</p>
+    </section>
+
+    <section id="games-scramble">
+        <h3>10.2 Word Scramble</h3>
+        <p>Unscramble jumbled letters to spell important vocabulary words from your lessons.</p>
+
+        <div class="flow">How to play:
+  1. You see a jumbled set of letters (e.g., SISNHETYHSPOT).
+  2. Rearrange the letters to form the correct word (PHOTOSYNTHESIS).
+  3. Type your answer in the box and press Enter or click "Submit".
+  4. Correct = next word. Wrong = try again (you have limited attempts per word).
+  5. Use the 💡 Hint button if you're stuck (up to 3 hints per game).</div>
+
+        <p><strong>Tips:</strong> Start by identifying common letters (vowels, prefixes). Use hints wisely — save them for the hardest words.</p>
+    </section>
+
+    <section id="games-race">
+        <h3>10.3 Quiz Race</h3>
+        <p>A fast-paced, timed quiz where speed and accuracy both count. Compete with your classmates for the top spot on the leaderboard!</p>
+
+        <div class="flow">How to play:
+  1. A question appears with 4 answer options.
+  2. You have 10 SECONDS to answer each question.
+  3. Click the correct answer as quickly as possible.
+  4. Faster correct answers = more points.
+  5. Get 3 correct in a row = STREAK BONUS 🔥 (extra points!)
+  6. A wrong answer or timeout = 0 points for that question.
+  7. Complete all questions to see your final score.</div>
+
+        <div class="tip-box">
+            <strong>Leaderboard:</strong> After playing, click "View Leaderboard" to see how you rank compared to your classmates. Play again to improve your position!
+        </div>
+
+        <p><strong>Tips:</strong> Don't overthink — trust your first instinct. For questions you know well, answer fast to maximise your score. Building streaks gives bonus points.</p>
+    </section>
+
+    <section id="games-flashcard">
+        <h3>10.4 Flashcard Study</h3>
+        <p>A self-paced study tool with swipeable cards — perfect for reviewing before an exam.</p>
+
+        <div class="flow">How to play:
+  1. A flashcard appears with a question, term, or concept on the front.
+  2. Think about the answer, then click the card (or press Space) to flip it.
+  3. The answer appears on the back.
+  4. Rate yourself honestly:
+     ✅ "Got it!" — You knew the answer. Card is marked as mastered.
+     🔄 "Review again" — You weren't sure. Card comes back later.
+  5. Keep going until all cards are marked "Got it!"</div>
+
+        <p><strong>Tips:</strong> Be honest with yourself when rating. Cards you mark "Review again" will come back, so don't mark "Got it" unless you truly understood it. The goal is real understanding, not just finishing quickly.</p>
+    </section>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="notices">
+    <h2>11. Notices &amp; Announcements</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> Communications → Notices</div>
+
+    <p>Your school and teachers use the Notices page to share important information — event announcements, reminders, schedule changes, etc.</p>
+
+    <ol class="steps">
+        <li>Click <strong>Communications → Notices</strong>.</li>
+        <li>Browse the list of notices. The most recent notices appear first.</li>
+        <li>Click any notice card to read its full content (including any images).</li>
+    </ol>
+
+    <div class="info-box">
+        <strong>School-wide announcements</strong> may appear as a banner at the top of your dashboard page. These are important messages from your school that the admin wants everyone to see immediately.
+    </div>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="profile">
+    <h2>12. Your Profile &amp; Settings</h2>
+    <div class="sidebar-ref"><strong>Sidebar:</strong> My Portal → My Profile | Top-right → Settings</div>
+
+    <h3>Viewing Your Profile</h3>
+    <p>Go to <em>My Portal → My Profile</em> to view your information:</p>
+    <ul>
+        <li>Full name and username</li>
+        <li>Class, level, and class teacher</li>
+        <li>Admission number</li>
+        <li>Gender and date of birth</li>
+        <li>Profile photo (if uploaded by your admin)</li>
+    </ul>
+
+    <h3>Changing Your Password</h3>
+    <ol class="steps">
+        <li>Click your <strong>name/avatar</strong> in the top-right corner of any page.</li>
+        <li>Select <strong>"Settings"</strong>.</li>
+        <li>Click on the <strong>"Security"</strong> tab.</li>
+        <li>Enter your <strong>current password</strong> in the first field.</li>
+        <li>Enter your <strong>new password</strong> in the second field.</li>
+        <li>Enter your new password again to <strong>confirm</strong> it.</li>
+        <li>Click <strong>"Update Password"</strong>.</li>
+    </ol>
+
+    <div class="tip-box">
+        <strong>Good password tips:</strong>
+        <ul>
+            <li>Use at least 8 characters.</li>
+            <li>Mix uppercase letters, lowercase letters, and numbers.</li>
+            <li>Don't use your name, username, or birthdate.</li>
+            <li>Don't share your password with anyone — not even your friends.</li>
+        </ul>
+    </div>
+
+    <h3>Dark Mode / Light Mode</h3>
+    <p>From Settings, click the <strong>"Appearance"</strong> tab to switch between the light (white) theme and dark (dark grey) theme. Choose whichever is more comfortable for your eyes.</p>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="security" class="page-break">
+    <h2>13. Account Security</h2>
+
+    <h3>Keep Your Account Safe</h3>
+    <ul>
+        <li><strong>Never share your password</strong> with anyone — not your friends, and not people pretending to be from the school.</li>
+        <li><strong>Always log out</strong> when you're done, especially on school computers or shared devices.</li>
+        <li><strong>Change your password</strong> regularly and if you think someone else might know it.</li>
+        <li>The portal <strong>auto-logs you out</strong> after a period of inactivity to protect your account.</li>
+    </ul>
+
+    <h3>If Your Account Is Compromised</h3>
+    <p>If you believe someone else is accessing your account without permission:</p>
+    <ol class="steps">
+        <li>Log in and immediately change your password from <em>Settings → Security</em>.</li>
+        <li>Tell your teacher or school administrator right away.</li>
+    </ol>
+
+    <h3>Passwords and Privacy</h3>
+    <ul>
+        <li>All passwords are securely encrypted. No one — not even your teacher or the administrator — can see your actual password.</li>
+        <li>If you forget your password, ask your administrator to reset it. They will set a new temporary password that you can change when you next log in.</li>
+    </ul>
+</section>
+
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<section id="faq" class="page-break">
+    <h2>14. Frequently Asked Questions</h2>
+
+    <h4>Q: I can't see my report card. Why?</h4>
+    <p>Report cards must be generated, approved, and published by your school administrator before they appear. The process takes some time after the end of term. Ask your teacher if you think it should be available.</p>
+
+    <h4>Q: My exam timer ran out while I was still answering. What happens?</h4>
+    <p>The exam is automatically submitted with all the answers you've provided up to that point. All auto-saved answers are included — you won't lose any work you completed.</p>
+
+    <h4>Q: Can I retake an exam?</h4>
+    <p>Only if your teacher set the exam to allow multiple attempts. Check the "Attempts Remaining" shown on the exam card before starting. If it shows "0 remaining", you cannot retake it.</p>
+
+    <h4>Q: Can I pause an exam and come back to it later?</h4>
+    <p>No — once an exam is started, it must be completed in one session. If you close the browser, the timer keeps running and the exam may be submitted when time expires. Always make sure you have enough time before starting.</p>
+
+    <h4>Q: I accidentally clicked "Submit" before I was done. Can I undo it?</h4>
+    <p>Unfortunately, no — once submitted, your exam is final. Always review the confirmation box before confirming your submission. It shows how many questions are unanswered as a reminder.</p>
+
+    <h4>Q: My quiz says I have 0 attempts remaining. Can I still take it?</h4>
+    <p>No. When you've used all allowed attempts, the quiz is locked. Your best score is shown in the completed section.</p>
+
+    <h4>Q: I can't see any games or quizzes. Why?</h4>
+    <p>Games and quizzes must be created by your teacher, approved by the admin, and then published. If none are showing, your teacher may not have published any yet. Check back later.</p>
+
+    <h4>Q: An assignment file won't download. What should I do?</h4>
+    <p>Try refreshing the page and clicking the download button again. If it still doesn't work, try on a different browser or device. You can also ask your teacher to re-upload the file.</p>
+
+    <h4>Q: Can I change my username?</h4>
+    <p>No — your username is set by your school administrator and cannot be changed by you. Only your password can be changed.</p>
+
+    <h4>Q: The portal is slow or not loading properly. What do I do?</h4>
+    <p>Check your internet connection first. Try refreshing the page (Ctrl+R or Cmd+R). If the problem continues, try clearing your browser cache or using a different browser. If it persists, let your teacher know.</p>
+
+    <h4>Q: What do the Quiz Race leaderboard scores mean?</h4>
+    <p>Quiz Race scores are based on both speed and accuracy. The faster you answer a question correctly, the more points you earn. Getting 3 correct answers in a row gives a streak bonus. The leaderboard shows your best score for that game — play again to improve your ranking!</p>
+</section>
+
+
+<hr>
+<div style="text-align: center; padding: 2rem 0; color: #888; font-size: 0.85rem;">
+    <p><strong>DX-SchoolPortal — Student's Guide</strong> &nbsp;·&nbsp; Version 2.0 &nbsp;·&nbsp; © 2025 DX-SchoolPortal</p>
+    <p class="no-print" style="margin-top: 1rem;">
+        <strong>To save as PDF:</strong> Press <kbd>Ctrl</kbd>+<kbd>P</kbd> (or <kbd>Cmd</kbd>+<kbd>P</kbd> on Mac) → select <strong>"Save as PDF"</strong>.
+    </p>
+</div>
+
+</body>
+</html>

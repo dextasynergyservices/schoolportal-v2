@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Subject extends Model
@@ -17,6 +18,7 @@ class Subject extends Model
 
     protected $fillable = [
         'school_id',
+        'created_by',
         'name',
         'slug',
         'short_name',
@@ -30,7 +32,13 @@ class Subject extends Model
         return [
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'created_by' => 'integer',
         ];
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function classes(): BelongsToMany

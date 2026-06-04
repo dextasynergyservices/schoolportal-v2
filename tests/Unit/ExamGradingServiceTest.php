@@ -130,8 +130,7 @@ class ExamGradingServiceTest extends TestCase
         $this->assertEquals(10, $graded->score);
         $this->assertEquals(50.0, $graded->percentage);
         $this->assertTrue($graded->passed);
-        // gradeAttempt doesn't change status — controller handles submission status
-        $this->assertNotEquals('grading', $graded->status);
+        $this->assertEquals('graded', $graded->status);
     }
 
     public function test_grade_attempt_is_case_insensitive(): void
@@ -198,6 +197,48 @@ class ExamGradingServiceTest extends TestCase
         $graded = $this->service->gradeAttempt($attempt);
 
         $this->assertEquals(10, $graded->score);
+    }
+
+    public function test_grade_attempt_auto_grades_matching_with_partial_credit(): void
+    {
+        $q = ExamQuestion::create([
+            'exam_id' => $this->exam->id,
+            'school_id' => $this->school->id,
+            'type' => 'matching',
+            'question_text' => 'Match each country to its capital',
+            'options' => [
+                ['left' => 'Nigeria', 'right' => 'Abuja'],
+                ['left' => 'Ghana', 'right' => 'Accra'],
+                ['left' => 'Kenya', 'right' => 'Nairobi'],
+                ['left' => 'Egypt', 'right' => 'Cairo'],
+            ],
+            'correct_answer' => null,
+            'points' => 4,
+            'sort_order' => 1,
+        ]);
+
+        $attempt = $this->createAttempt();
+
+        $answer = ExamAnswer::create([
+            'attempt_id' => $attempt->id,
+            'question_id' => $q->id,
+            'school_id' => $this->school->id,
+            'selected_answer' => json_encode([
+                0 => 'Abuja',
+                1 => 'Kumasi',
+                2 => 'Nairobi',
+                3 => 'Alexandria',
+            ]),
+            'answered_at' => now(),
+        ]);
+
+        $graded = $this->service->gradeAttempt($attempt);
+
+        $this->assertEquals('graded', $graded->status);
+        $this->assertEquals(2, $graded->score);
+        $this->assertEquals(50.0, $graded->percentage);
+        $this->assertFalse($answer->fresh()->is_correct);
+        $this->assertEquals(2, $answer->fresh()->points_earned);
     }
 
     // ── gradeAttempt — with theory ──

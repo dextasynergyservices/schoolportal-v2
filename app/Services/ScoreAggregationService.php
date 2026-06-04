@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AcademicSession;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\GradingScale;
@@ -11,9 +12,11 @@ use App\Models\GradingScaleItem;
 use App\Models\ReportCardConfig;
 use App\Models\SchoolClass;
 use App\Models\ScoreComponent;
+use App\Models\StudentProfile;
 use App\Models\StudentSubjectScore;
 use App\Models\StudentTermReport;
 use App\Models\Term;
+use Illuminate\Validation\ValidationException;
 
 class ScoreAggregationService
 {
@@ -26,7 +29,17 @@ class ScoreAggregationService
         $exam = $attempt->exam;
 
         // Exam must be linked to a score component and subject
-        if (! $exam->score_component_id || ! $exam->subject_id) {
+        if (! $exam->score_component_id || ! $exam->subject_id || ! $exam->term_id) {
+            return;
+        }
+
+        $term = Term::withoutGlobalScopes()
+            ->with(['session' => fn ($query) => $query->withoutGlobalScopes()])
+            ->find($exam->term_id);
+        if (! $term || ! StudentProfile::withoutGlobalScopes()
+            ->where('user_id', $attempt->student_id)
+            ->enrolledByTerm($term)
+            ->exists()) {
             return;
         }
 
@@ -460,6 +473,11 @@ class ScoreAggregationService
      */
     public function generateTermReport(int $studentId, int $classId, int $sessionId, int $termId, int $schoolId, string $reportType = 'full_term'): StudentTermReport
     {
+        $term = Term::withoutGlobalScopes()
+            ->with(['session' => fn ($query) => $query->withoutGlobalScopes()])
+            ->findOrFail($termId);
+        $this->ensureStudentEnrolledByTerm($studentId, $classId, $term);
+
         $midtermOnly = $reportType === 'midterm';
 
         $snapshot = $this->buildSubjectScoresSnapshot($studentId, $classId, $termId, $schoolId, $midtermOnly);
@@ -501,7 +519,10 @@ class ScoreAggregationService
     public function generateClassReports(int $classId, int $sessionId, int $termId, int $schoolId, string $reportType = 'full_term'): int
     {
         $class = SchoolClass::withoutGlobalScopes()->findOrFail($classId);
-        $studentIds = $class->students()->pluck('user_id')->toArray();
+        $term = Term::withoutGlobalScopes()
+            ->with(['session' => fn ($query) => $query->withoutGlobalScopes()])
+            ->findOrFail($termId);
+        $studentIds = $class->students()->enrolledByTerm($term)->pluck('user_id')->toArray();
 
         $count = 0;
         foreach ($studentIds as $studentId) {
@@ -517,6 +538,9 @@ class ScoreAggregationService
      */
     public function generateSessionReport(int $studentId, int $classId, int $sessionId, int $schoolId): StudentTermReport
     {
+        $session = AcademicSession::withoutGlobalScopes()->findOrFail($sessionId);
+        $this->ensureStudentEnrolledBySession($studentId, $classId, $session);
+
         // Fetch all full_term reports for this student in this session
         $termReports = StudentTermReport::withoutGlobalScopes()
             ->where('student_id', $studentId)
@@ -622,7 +646,8 @@ class ScoreAggregationService
     public function generateClassSessionReports(int $classId, int $sessionId, int $schoolId): int
     {
         $class = SchoolClass::withoutGlobalScopes()->findOrFail($classId);
-        $studentIds = $class->students()->pluck('user_id')->toArray();
+        $session = AcademicSession::withoutGlobalScopes()->findOrFail($sessionId);
+        $studentIds = $class->students()->enrolledBySession($session)->pluck('user_id')->toArray();
 
         // Generate session reports (without positions)
         $reports = [];
@@ -814,6 +839,9 @@ class ScoreAggregationService
     public function getClassScoreGrid(int $classId, int $termId, int $schoolId): array
     {
         $class = SchoolClass::withoutGlobalScopes()->with(['subjects' => fn ($q) => $q->withoutGlobalScopes()])->findOrFail($classId);
+        $term = Term::withoutGlobalScopes()
+            ->with(['session' => fn ($query) => $query->withoutGlobalScopes()])
+            ->findOrFail($termId);
         $subjects = $class->subjects()->withoutGlobalScopes()->orderBy('name')->get();
         $components = ScoreComponent::withoutGlobalScopes()
             ->where('school_id', $schoolId)
@@ -822,6 +850,7 @@ class ScoreAggregationService
             ->get();
 
         $students = $class->students()
+            ->enrolledByTerm($term)
             ->with('user')
             ->get()
             ->sortBy(fn ($sp) => $sp->user->name ?? '');
@@ -883,5 +912,35 @@ class ScoreAggregationService
             'subjects' => $subjects,
             'components' => $components,
         ];
+    }
+
+    private function ensureStudentEnrolledByTerm(int $studentId, int $classId, Term $term): void
+    {
+        $eligible = StudentProfile::withoutGlobalScopes()
+            ->where('user_id', $studentId)
+            ->where('class_id', $classId)
+            ->enrolledByTerm($term)
+            ->exists();
+
+        if (! $eligible) {
+            throw ValidationException::withMessages([
+                'student_id' => __('This student was enrolled after the selected term.'),
+            ]);
+        }
+    }
+
+    private function ensureStudentEnrolledBySession(int $studentId, int $classId, AcademicSession $session): void
+    {
+        $eligible = StudentProfile::withoutGlobalScopes()
+            ->where('user_id', $studentId)
+            ->where('class_id', $classId)
+            ->enrolledBySession($session)
+            ->exists();
+
+        if (! $eligible) {
+            throw ValidationException::withMessages([
+                'student_id' => __('This student was enrolled after the selected session.'),
+            ]);
+        }
     }
 }

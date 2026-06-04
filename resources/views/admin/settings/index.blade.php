@@ -210,7 +210,10 @@
                             'enable_teacher_approval'          => __('Require Teacher Approval'),
                             'enable_cbt_results_for_parents'   => __('CBT Results for Parents'),
                         ] as $flagKey => $flagLabel)
-                            @php $lock = $school->featureLock($flagKey); @endphp
+                            @php
+                                $lock = $school->featureLock($flagKey);
+                                $checked = old($flagKey, $school->featureEnabled($flagKey));
+                            @endphp
                             @if ($lock !== null)
                                 <input type="hidden" name="{{ $flagKey }}" value="{{ $lock ? '1' : '0' }}">
                                 <div class="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-700/40 px-3 py-2">
@@ -221,7 +224,7 @@
                                     </div>
                                 </div>
                             @else
-                                <flux:switch name="{{ $flagKey }}" :label="$flagLabel" :checked="old($flagKey, $portalSettings[$flagKey] ?? true)" value="1" />
+                                <flux:switch name="{{ $flagKey }}" :label="$flagLabel" :checked="$checked" value="1" />
                             @endif
                         @endforeach
 
@@ -231,7 +234,10 @@
                             'enable_assessment'      => __('Enable Assessments'),
                             'enable_cbt_assignment'  => __('Enable CBT Assignments'),
                         ] as $flagKey => $flagLabel)
-                            @php $lock = $school->featureLock($flagKey); @endphp
+                            @php
+                                $lock = $school->featureLock($flagKey);
+                                $checked = old($flagKey, $school->featureEnabled($flagKey));
+                            @endphp
                             @if ($lock !== null)
                                 <input type="hidden" name="{{ $flagKey }}" value="{{ $lock ? '1' : '0' }}">
                                 <div class="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-700/40 px-3 py-2">
@@ -242,7 +248,7 @@
                                     </div>
                                 </div>
                             @else
-                                <flux:switch name="{{ $flagKey }}" :label="$flagLabel" :checked="old($flagKey, $portalSettings[$flagKey] ?? true)" value="1" />
+                                <flux:switch name="{{ $flagKey }}" :label="$flagLabel" :checked="$checked" value="1" />
                             @endif
                         @endforeach
                     </div>

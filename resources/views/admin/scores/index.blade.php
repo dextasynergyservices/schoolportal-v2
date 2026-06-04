@@ -441,6 +441,7 @@
             return {
                 showModal: false,
                 selectedClassId: '{{ $selectedClassId ?? '' }}',
+                selectedTermId: '{{ $selectedTermId ?? '' }}',
                 reportType: 'full_term',
                 scope: 'bulk',
                 students: [],
@@ -469,9 +470,11 @@
                 },
 
                 async fetchStudents() {
-                    this.loadingStudents = true;
-                    try {
-                        const response = await fetch(classStudentsBaseUrl + this.selectedClassId);
+                this.loadingStudents = true;
+                try {
+                        const params = new URLSearchParams();
+                        if (this.selectedTermId) params.set('term_id', this.selectedTermId);
+                        const response = await fetch(classStudentsBaseUrl + this.selectedClassId + '?' + params.toString());
                         this.students = await response.json();
                         this.filteredStudents = this.students;
                     } catch (e) {

@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\AiCreditUsageLog;
 use App\Models\AuditLog;
+use App\Models\SchoolClass;
 use App\Models\StudentProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,6 +106,73 @@ class DataExportTest extends TestCase
     }
 
     // ── Teacher: Student List Export ──────────────────────────────────────────
+
+    public function test_teacher_students_page_shows_students_from_all_assigned_classes_by_default(): void
+    {
+        $secondClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'teacher_id' => $this->teacher->id,
+            'name' => 'Second Assigned Class',
+            'slug' => 'second-assigned-class',
+            'is_active' => true,
+        ]);
+
+        $secondStudent = User::factory()->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+            'name' => 'Second Class Student',
+            'username' => 'secondclassstudent',
+            'is_active' => true,
+        ]);
+        StudentProfile::create([
+            'user_id' => $secondStudent->id,
+            'school_id' => $this->school->id,
+            'class_id' => $secondClass->id,
+        ]);
+
+        $this->actingAs($this->teacher)
+            ->get(route('teacher.students.index'))
+            ->assertOk()
+            ->assertSee('All Classes')
+            ->assertSee('Test Student')
+            ->assertSee('Second Class Student')
+            ->assertViewHas('selectedClassId', null);
+    }
+
+    public function test_teacher_students_page_still_filters_to_a_selected_assigned_class(): void
+    {
+        $secondClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $this->level->id,
+            'teacher_id' => $this->teacher->id,
+            'name' => 'Second Assigned Class',
+            'slug' => 'second-assigned-class',
+            'is_active' => true,
+        ]);
+
+        $secondStudent = User::factory()->create([
+            'school_id' => $this->school->id,
+            'role' => 'student',
+            'level_id' => $this->level->id,
+            'name' => 'Second Class Student',
+            'username' => 'secondclassstudent',
+            'is_active' => true,
+        ]);
+        StudentProfile::create([
+            'user_id' => $secondStudent->id,
+            'school_id' => $this->school->id,
+            'class_id' => $secondClass->id,
+        ]);
+
+        $this->actingAs($this->teacher)
+            ->get(route('teacher.students.index', ['class_id' => $this->class->id]))
+            ->assertOk()
+            ->assertSee('Test Student')
+            ->assertDontSee('Second Class Student')
+            ->assertViewHas('selectedClassId', $this->class->id);
+    }
 
     public function test_teacher_can_export_their_class_students_as_csv(): void
     {

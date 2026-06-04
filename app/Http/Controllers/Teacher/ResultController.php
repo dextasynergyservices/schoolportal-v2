@@ -7,7 +7,9 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Result;
 use App\Models\SchoolClass;
+use App\Models\StudentProfile;
 use App\Models\TeacherAction;
+use App\Models\Term;
 use App\Services\FileUploadService;
 use App\Traits\NotifiesAdminsOnSubmission;
 use Illuminate\Http\RedirectResponse;
@@ -83,6 +85,18 @@ class ResultController extends Controller
         // Ensure teacher can only upload to their assigned classes
         if (! in_array((int) $validated['class_id'], $classIds, true)) {
             abort(403, 'You can only upload results for your assigned classes.');
+        }
+
+        $term = Term::with('session')->findOrFail($validated['term_id']);
+        $eligible = StudentProfile::where('user_id', $validated['student_id'])
+            ->where('class_id', $validated['class_id'])
+            ->enrolledByTerm($term)
+            ->exists();
+
+        if (! $eligible) {
+            return redirect()->back()->withInput()->withErrors([
+                'student_id' => __('Results cannot be uploaded for a student before their enrollment term.'),
+            ]);
         }
 
         $school = app('current.school');

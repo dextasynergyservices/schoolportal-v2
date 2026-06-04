@@ -8,6 +8,7 @@ use App\Models\AiCreditAllocation;
 use App\Models\AiCreditPurchase;
 use App\Models\AiCreditUsageLog;
 use App\Models\School;
+use App\Models\SchoolClass;
 use App\Models\User;
 use App\Notifications\CreditPurchaseConfirmation;
 use Illuminate\Support\Facades\DB;
@@ -27,17 +28,43 @@ class AiCreditService
      */
     public function getAvailableCredits(School $school, ?int $levelId = null): int
     {
+        $schoolBalance = $this->getSchoolBalance($school);
+
         if ($levelId) {
             $allocation = AiCreditAllocation::where('school_id', $school->id)
                 ->where('level_id', $levelId)
                 ->first();
 
             if ($allocation) {
-                return $allocation->remainingCredits();
+                return min(max(0, $allocation->remainingCredits()), $schoolBalance);
             }
         }
 
-        return $this->getSchoolBalance($school);
+        return $schoolBalance;
+    }
+
+    public function resolveTeacherLevelId(User $teacher, ?int $classId = null): ?int
+    {
+        if ($classId) {
+            $class = $this->teacherClassesQuery($teacher)
+                ->whereKey($classId)
+                ->first(['id', 'level_id']);
+
+            return $class?->level_id ? (int) $class->level_id : null;
+        }
+
+        if ($teacher->level_id) {
+            return (int) $teacher->level_id;
+        }
+
+        $levelIds = $this->teacherClassesQuery($teacher)
+            ->whereNotNull('level_id')
+            ->distinct()
+            ->pluck('level_id')
+            ->filter()
+            ->values();
+
+        return $levelIds->count() === 1 ? (int) $levelIds->first() : null;
     }
 
     /**
@@ -183,5 +210,17 @@ class AiCreditService
             'games' => (int) ($usage['game'] ?? 0),
             'total' => array_sum($usage),
         ];
+    }
+
+    private function teacherClassesQuery(User $teacher)
+    {
+        return SchoolClass::query()
+            ->where('school_id', $teacher->school_id)
+            ->where(function ($query) use ($teacher): void {
+                $query->where('teacher_id', $teacher->id)
+                    ->orWhereHas('subjects', function ($subjectQuery) use ($teacher): void {
+                        $subjectQuery->where('class_subject.teacher_id', $teacher->id);
+                    });
+            });
     }
 }

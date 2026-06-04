@@ -155,8 +155,8 @@
                     <div class="range-tabs">
                         @foreach(['3m' => '3M', '6m' => '6M', '12m' => '12M'] as $val => $label)
                             <a href="{{ route('super-admin.analytics', array_filter(['range' => $val, 'geo_location' => $geoLocation ?: null])) }}"
-                               wire:navigate
-                               class="range-tab {{ $range === $val && $mode !== 'custom' ? 'active' : '' }}">
+                               class="range-tab {{ $range === $val && $mode !== 'custom' ? 'active' : '' }}"
+                               wire:navigate>
                                 {{ $label }}
                             </a>
                         @endforeach
@@ -505,8 +505,9 @@
 
         {{-- ── Back ────────────────────────────────────────────────────── --}}
         <div class="flex justify-start">
-            <a href="{{ route('super-admin.dashboard') }}" wire:navigate
-               class="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
+            <a href="{{ route('super-admin.dashboard') }}"
+               class="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+               wire:navigate>
                 <flux:icon.arrow-left class="w-4 h-4" />
                 {{ __('Back to Dashboard') }}
             </a>

@@ -162,12 +162,15 @@
 
 {{-- Teacher Navigation --}}
 @if ($role === 'teacher')
-    <flux:sidebar.group expandable :heading="__('Teaching')" icon="academic-cap" class="grid">
+    <flux:sidebar.group expandable :heading="__('Overview')" icon="academic-cap" :expanded="request()->routeIs('teacher.dashboard', 'teacher.students.*', 'teacher.help')" class="grid">
         <flux:sidebar.item icon="home" :href="route('teacher.dashboard')" :current="request()->routeIs('teacher.dashboard')" wire:navigate>
             {{ __('Dashboard') }}
         </flux:sidebar.item>
         <flux:sidebar.item icon="academic-cap" :href="route('teacher.students.index')" :current="request()->routeIs('teacher.students.*')" wire:navigate>
             {{ __('My Students') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="question-mark-circle" :href="route('teacher.help')" :current="request()->routeIs('teacher.help')" wire:navigate>
+            {{ __('Help Guide') }}
         </flux:sidebar.item>
     </flux:sidebar.group>
 
@@ -180,7 +183,10 @@
         </flux:sidebar.item>
     </flux:sidebar.group>
 
-    <flux:sidebar.group expandable :heading="__('Content')" icon="document-text" :expanded="request()->routeIs('teacher.results.*', 'teacher.assignments.*')" class="grid">
+    <flux:sidebar.group expandable :heading="__('Content')" icon="document-text" :expanded="request()->routeIs('teacher.results.*', 'teacher.assignments.*', 'teacher.subjects.*')" class="grid">
+        <flux:sidebar.item icon="book-open" :href="route('teacher.subjects.index')" :current="request()->routeIs('teacher.subjects.*')" wire:navigate>
+            {{ __('Subjects') }}
+        </flux:sidebar.item>
         <flux:sidebar.item icon="document-text" :href="route('teacher.results.index')" :current="request()->routeIs('teacher.results.*')" wire:navigate>
             {{ __('Uploaded Results') }}
         </flux:sidebar.item>
@@ -222,12 +228,15 @@
 
 {{-- Student Navigation --}}
 @if ($role === 'student')
-    <flux:sidebar.group expandable :heading="__('My Portal')" icon="academic-cap" class="grid">
+    <flux:sidebar.group expandable :heading="__('My Portal')" icon="academic-cap" :expanded="request()->routeIs('student.dashboard', 'student.profile', 'student.help')" class="grid">
         <flux:sidebar.item icon="home" :href="route('student.dashboard')" :current="request()->routeIs('student.dashboard')" wire:navigate>
             {{ __('Dashboard') }}
         </flux:sidebar.item>
         <flux:sidebar.item icon="user-circle" :href="route('student.profile')" :current="request()->routeIs('student.profile')" wire:navigate>
             {{ __('My Profile') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="question-mark-circle" :href="route('student.help')" :current="request()->routeIs('student.help')" wire:navigate>
+            {{ __('Help Guide') }}
         </flux:sidebar.item>
     </flux:sidebar.group>
 
@@ -264,9 +273,12 @@
 
 {{-- Parent Navigation --}}
 @if ($role === 'parent')
-    <flux:sidebar.group expandable :heading="__('My Children')" icon="heart" class="grid">
+    <flux:sidebar.group expandable :heading="__('My Children')" icon="heart" :expanded="request()->routeIs('parent.dashboard', 'parent.help')" class="grid">
         <flux:sidebar.item icon="home" :href="route('parent.dashboard')" :current="request()->routeIs('parent.dashboard')" wire:navigate>
             {{ __('Dashboard') }}
+        </flux:sidebar.item>
+        <flux:sidebar.item icon="question-mark-circle" :href="route('parent.help')" :current="request()->routeIs('parent.help')" wire:navigate>
+            {{ __('Help Guide') }}
         </flux:sidebar.item>
     </flux:sidebar.group>
 
@@ -283,7 +295,7 @@
     </flux:sidebar.group>
 
     <flux:sidebar.group expandable :heading="__('CBT & Interactive')" icon="computer-desktop" :expanded="request()->routeIs('parent.cbt*', 'parent.children.cbt*', 'parent.quizzes*', 'parent.children.quizzes*', 'parent.games*', 'parent.children.games*')" class="grid">
-        @if ($user->school?->setting('portal.enable_cbt_results_for_parents', true))
+        @if ($user->school?->featureEnabled('enable_cbt_results_for_parents'))
             <flux:sidebar.item icon="computer-desktop" :href="route('parent.cbt.index')" :current="request()->routeIs('parent.cbt*', 'parent.children.cbt*')" wire:navigate>
                 {{ __('CBT Results') }}
             </flux:sidebar.item>

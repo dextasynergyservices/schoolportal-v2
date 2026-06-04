@@ -10,6 +10,7 @@ use App\Models\GradingScale;
 use App\Models\ReportCardConfig;
 use App\Models\SchoolClass;
 use App\Models\ScoreComponent;
+use App\Models\StudentProfile;
 use App\Models\StudentSubjectScore;
 use App\Models\StudentTermReport;
 use App\Models\TeacherAction;
@@ -99,6 +100,16 @@ class ScoreController extends Controller
             ->findOrFail($request->class_id);
 
         $term = Term::findOrFail($request->term_id);
+        $eligibleStudentIds = StudentProfile::where('class_id', $class->id)
+            ->enrolledByTerm($term->loadMissing('session'))
+            ->pluck('user_id')
+            ->map(fn ($id) => (string) $id);
+
+        if (collect(array_keys($request->scores))->map(fn ($id) => (string) $id)->diff($eligibleStudentIds)->isNotEmpty()) {
+            return redirect()->back()->withErrors([
+                'scores' => __('Scores cannot be entered for a student before their enrollment term.'),
+            ]);
+        }
 
         $updated = 0;
         $userId = $teacher->id;

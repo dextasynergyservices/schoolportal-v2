@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use Illuminate\Contracts\View\View;
-use Livewire\Attributes\Lazy;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
-#[Lazy]
 class NotificationBell extends Component
 {
     public int $unreadCount = 0;
@@ -27,6 +26,9 @@ class NotificationBell extends Component
     {
         $user = auth()->user();
         if (! $user) {
+            $this->unreadCount = 0;
+            $this->recentNotifications = [];
+
             return;
         }
 
@@ -38,7 +40,7 @@ class NotificationBell extends Component
             ->get()
             ->map(fn ($n) => [
                 'id' => $n->id,
-                'message' => $n->data['message'] ?? '',
+                'message' => $n->data['message'] ?? $n->data['title'] ?? $n->data['body'] ?? __('New notification'),
                 'icon' => $n->data['icon'] ?? 'bell',
                 'action_url' => $n->data['action_url'] ?? '#',
                 'type_label' => $n->data['type_label'] ?? '',
@@ -46,6 +48,12 @@ class NotificationBell extends Component
                 'time' => $n->created_at->diffForHumans(),
             ])
             ->toArray();
+    }
+
+    #[On('refresh-notifications')]
+    public function refreshNotifications(): void
+    {
+        $this->loadNotifications();
     }
 
     public function toggleDropdown(): void

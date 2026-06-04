@@ -29,6 +29,14 @@ class AdminSubjectTest extends TestCase
             ->assertViewIs('admin.subjects.index');
     }
 
+    public function test_admin_create_page_links_to_existing_subject_assignment(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.subjects.create'))
+            ->assertOk()
+            ->assertSee('Assign Existing Subject');
+    }
+
     public function test_admin_can_create_subject(): void
     {
         $this->actingAs($this->admin)
@@ -53,6 +61,22 @@ class AdminSubjectTest extends TestCase
                 'short_name' => 'MTH',
             ])
             ->assertSessionHasErrors('name');
+    }
+
+    public function test_admin_is_told_to_assign_subject_when_name_already_exists(): void
+    {
+        Subject::create([
+            'school_id' => $this->school->id,
+            'name' => 'Mathematics',
+            'slug' => 'mathematics',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.subjects.store'), ['name' => 'Mathematics'])
+            ->assertSessionHasErrors('name');
+
+        $this->assertSame(1, Subject::where('slug', 'mathematics')->count());
     }
 
     public function test_admin_can_update_subject(): void
@@ -93,6 +117,29 @@ class AdminSubjectTest extends TestCase
             ->assertRedirect(route('admin.subjects.index'));
 
         $this->assertDatabaseMissing('subjects', ['id' => $subject->id]);
+    }
+
+    public function test_admin_can_delete_assigned_subject_without_academic_history(): void
+    {
+        $subject = Subject::create([
+            'school_id' => $this->school->id,
+            'name' => 'Temporary Assigned Subject',
+            'slug' => 'temporary-assigned-subject',
+            'is_active' => true,
+        ]);
+
+        ClassSubject::create([
+            'school_id' => $this->school->id,
+            'class_id' => $this->class->id,
+            'subject_id' => $subject->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.subjects.destroy', $subject))
+            ->assertRedirect(route('admin.subjects.index'));
+
+        $this->assertDatabaseMissing('subjects', ['id' => $subject->id]);
+        $this->assertDatabaseMissing('class_subject', ['subject_id' => $subject->id]);
     }
 
     // ── Subject-Class assignments ──

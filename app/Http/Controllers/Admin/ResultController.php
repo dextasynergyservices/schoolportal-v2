@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Result;
 use App\Models\SchoolClass;
+use App\Models\StudentProfile;
 use App\Models\Term;
 use App\Services\FileUploadService;
 use App\Services\NotificationService;
@@ -70,6 +71,17 @@ class ResultController extends Controller
         ]);
 
         $school = app('current.school');
+        $term = Term::with('session')->findOrFail($validated['term_id']);
+        $eligible = StudentProfile::where('user_id', $validated['student_id'])
+            ->where('class_id', $validated['class_id'])
+            ->enrolledByTerm($term)
+            ->exists();
+
+        if (! $eligible) {
+            return redirect()->back()->withInput()->withErrors([
+                'student_id' => __('Results cannot be uploaded for a student before their enrollment term.'),
+            ]);
+        }
 
         // Check for duplicate before uploading — saves a wasted Cloudinary call.
         $alreadyExists = Result::where('student_id', $validated['student_id'])

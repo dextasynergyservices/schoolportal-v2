@@ -663,11 +663,11 @@
                 action="{{ route('super-admin.schools.update-settings', $school) }}"
                 x-data="{
                     portal: {
-                        enable_parent_portal:             {{ $school->setting('portal.enable_parent_portal', true) ? 'true' : 'false' }},
-                        enable_quiz_generator:            {{ $school->setting('portal.enable_quiz_generator', true) ? 'true' : 'false' }},
-                        enable_game_generator:            {{ $school->setting('portal.enable_game_generator', true) ? 'true' : 'false' }},
-                        enable_teacher_approval:          {{ $school->setting('portal.enable_teacher_approval', true) ? 'true' : 'false' }},
-                        enable_cbt_results_for_parents:   {{ $school->setting('portal.enable_cbt_results_for_parents', true) ? 'true' : 'false' }},
+                        enable_parent_portal:             {{ $school->featureEnabled('enable_parent_portal') ? 'true' : 'false' }},
+                        enable_quiz_generator:            {{ $school->featureEnabled('enable_quiz_generator') ? 'true' : 'false' }},
+                        enable_game_generator:            {{ $school->featureEnabled('enable_game_generator') ? 'true' : 'false' }},
+                        enable_teacher_approval:          {{ $school->featureEnabled('enable_teacher_approval') ? 'true' : 'false' }},
+                        enable_cbt_results_for_parents:   {{ $school->featureEnabled('enable_cbt_results_for_parents') ? 'true' : 'false' }},
                     },
                     notifications: {
                         email_enabled:           {{ $school->setting('notifications.email_enabled', true) ? 'true' : 'false' }},
@@ -949,15 +949,14 @@
                 <flux:heading size="lg">{{ __('Portal Settings') }}</flux:heading>
             </div>
             @php
-                $portal = $school->settings['portal'] ?? [];
                 $portalItems = [
-                    ['label' => __('Session Timeout'),       'value' => ($portal['session_timeout_minutes'] ?? 30) . ' min'],
-                    ['label' => __('Max File Upload'),        'value' => ($portal['max_file_upload_mb'] ?? 10) . ' MB'],
-                    ['label' => __('Parent Portal'),          'value' => ($portal['enable_parent_portal'] ?? true) ? __('Enabled') : __('Disabled'), 'bool' => ($portal['enable_parent_portal'] ?? true)],
-                    ['label' => __('Teacher Approval'),       'value' => ($portal['enable_teacher_approval'] ?? true) ? __('Required') : __('Disabled'), 'bool' => ($portal['enable_teacher_approval'] ?? true)],
-                    ['label' => __('AI Quiz Generator'),      'value' => ($portal['enable_quiz_generator'] ?? true) ? __('Enabled') : __('Disabled'), 'bool' => ($portal['enable_quiz_generator'] ?? true)],
-                    ['label' => __('AI Game Generator'),      'value' => ($portal['enable_game_generator'] ?? true) ? __('Enabled') : __('Disabled'), 'bool' => ($portal['enable_game_generator'] ?? true)],
-                    ['label' => __('CBT Results (Parents)'),  'value' => ($portal['enable_cbt_results_for_parents'] ?? true) ? __('Visible') : __('Hidden'), 'bool' => ($portal['enable_cbt_results_for_parents'] ?? true)],
+                    ['label' => __('Session Timeout'),       'value' => $school->setting('portal.session_timeout_minutes', 30) . ' min'],
+                    ['label' => __('Max File Upload'),        'value' => $school->setting('portal.max_file_upload_mb', 10) . ' MB'],
+                    ['label' => __('Parent Portal'),          'value' => $school->featureEnabled('enable_parent_portal') ? __('Enabled') : __('Disabled'), 'bool' => $school->featureEnabled('enable_parent_portal')],
+                    ['label' => __('Teacher Approval'),       'value' => $school->featureEnabled('enable_teacher_approval') ? __('Required') : __('Disabled'), 'bool' => $school->featureEnabled('enable_teacher_approval')],
+                    ['label' => __('AI Quiz Generator'),      'value' => $school->featureEnabled('enable_quiz_generator') ? __('Enabled') : __('Disabled'), 'bool' => $school->featureEnabled('enable_quiz_generator')],
+                    ['label' => __('AI Game Generator'),      'value' => $school->featureEnabled('enable_game_generator') ? __('Enabled') : __('Disabled'), 'bool' => $school->featureEnabled('enable_game_generator')],
+                    ['label' => __('CBT Results (Parents)'),  'value' => $school->featureEnabled('enable_cbt_results_for_parents') ? __('Visible') : __('Hidden'), 'bool' => $school->featureEnabled('enable_cbt_results_for_parents')],
                 ];
             @endphp
             <div class="grid grid-cols-2 divide-x divide-y divide-zinc-100 sm:grid-cols-3 lg:grid-cols-4 dark:divide-zinc-800">

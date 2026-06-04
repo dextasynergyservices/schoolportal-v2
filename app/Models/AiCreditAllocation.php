@@ -27,6 +27,8 @@ class AiCreditAllocation extends Model
         return [
             'school_id' => 'integer',
             'level_id' => 'integer',
+            'allocated_credits' => 'integer',
+            'used_credits' => 'integer',
             'allocated_by' => 'integer',
         ];
     }

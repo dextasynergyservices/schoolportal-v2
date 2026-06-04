@@ -24,8 +24,9 @@
             'sourceDocumentUrl' => $sourceDocumentUrl,
             'sourceDocumentPublicId' => $sourceDocumentPublicId,
             'difficulty' => $difficulty,
-            'storeRoute' => route($routePrefix . '.store'),
-            'indexRoute' => route($routePrefix . '.index'),
+            'category' => $category,
+            'storeRoute' => route($routePrefix . '.store', ['category' => $category]),
+            'indexRoute' => route($routePrefix . '.index', $category ? ['category' => $category] : []),
             'routePrefix' => $routePrefix,
         ])
     </div>

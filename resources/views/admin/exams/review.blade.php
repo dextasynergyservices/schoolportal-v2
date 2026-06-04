@@ -24,6 +24,10 @@
             'sourceDocumentUrl' => $sourceDocumentUrl,
             'sourceDocumentPublicId' => $sourceDocumentPublicId,
             'difficulty' => $difficulty,
+            'category' => $category,
+            'storeRoute' => route($routePrefix . '.store', ['category' => $category]),
+            'indexRoute' => route($routePrefix . '.index', $category ? ['category' => $category] : []),
+            'routePrefix' => $routePrefix,
         ])
     </div>
 </x-layouts::app>

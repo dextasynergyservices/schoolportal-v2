@@ -75,4 +75,37 @@ class LevelController extends Controller
         return redirect()->route('admin.levels.index')
             ->with('success', __('School level deleted.'));
     }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'level_ids' => ['required', 'array', 'min:1'],
+            'level_ids.*' => ['integer', 'exists:school_levels,id'],
+        ]);
+
+        $levels = SchoolLevel::withCount('classes')
+            ->whereIn('id', $validated['level_ids'])
+            ->get();
+
+        $deletable = $levels->where('classes_count', 0);
+        $skipped = $levels->count() - $deletable->count();
+
+        foreach ($deletable as $level) {
+            $level->delete();
+        }
+
+        if ($deletable->isEmpty()) {
+            return redirect()->route('admin.levels.index')
+                ->with('error', __('No levels were deleted. Remove classes from selected levels first.'));
+        }
+
+        $message = trans_choice(':count level deleted.|:count levels deleted.', $deletable->count(), ['count' => $deletable->count()]);
+
+        if ($skipped > 0) {
+            $message .= ' '.__(':count selected level(s) with classes were skipped.', ['count' => $skipped]);
+        }
+
+        return redirect()->route('admin.levels.index')
+            ->with('success', $message);
+    }
 }

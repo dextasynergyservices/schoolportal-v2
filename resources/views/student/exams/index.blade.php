@@ -48,7 +48,11 @@
                         @php
                             $attemptsDone = $exam->completedAttemptsFor($studentId);
                             $bestAttempt = $exam->bestAttemptForStudent($studentId);
-                            $inProgress = $exam->attemptsFor($studentId)->where('status', 'in_progress')->first();
+                            $inProgress = $exam->resumableAttemptForStudent($studentId);
+                            $activeReset = $exam->activeResetForStudent($studentId);
+                            $effectiveDeadline = $inProgress?->accessReset?->available_until
+                                ?? $activeReset?->available_until
+                                ?? $exam->available_until;
                             $hasTaken = $attemptsDone > 0;
                             $examRoutePrefix = 'student.exams';
                             $typeColors = ['assessment' => 'sky', 'assignment' => 'amber', 'exam' => 'indigo'];
@@ -66,11 +70,14 @@
                                         <p class="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{{ $exam->subject->name }}</p>
                                     @endif
                                 </div>
-                                <div class="flex items-center gap-1.5 shrink-0">
+                                <div class="flex max-w-[55%] shrink-0 flex-wrap items-center justify-end gap-1.5">
                                     @if ($hasTaken)
                                         <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                                             ✓ {{ __('Taken') }}
                                         </span>
+                                    @endif
+                                    @if ($activeReset || $inProgress?->accessReset)
+                                        <flux:badge color="purple" size="sm">{{ __('Reset access') }}</flux:badge>
                                     @endif
                                     <flux:badge :color="$typeColors[$exam->category] ?? 'zinc'" size="sm">{{ $examTypeLabel }}</flux:badge>
                                 </div>
@@ -81,13 +88,13 @@
                                 @if ($exam->time_limit_minutes)
                                     &middot; {{ $exam->time_limit_minutes }} {{ __('min') }}
                                 @endif
-                                @if ($exam->available_until)
-                                    &middot; {{ __('Due:') }} {{ $exam->available_until->format('M j, g:i A') }}
+                                @if ($effectiveDeadline)
+                                    &middot; {{ __('Closes:') }} {{ $effectiveDeadline->format('M j, g:i A') }}
                                 @endif
                             </p>
 
                             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                {{ __('Attempts:') }} {{ $attemptsDone }}/{{ $exam->max_attempts }}
+                                {{ __('Completed attempts:') }} {{ $attemptsDone }}
                                 @if ($bestAttempt)
                                     &middot; {{ __('Best:') }} {{ number_format($bestAttempt->percentage, 0) }}%
                                 @endif
@@ -95,12 +102,19 @@
 
                             <div class="mt-3">
                                 @if ($inProgress)
-                                    <flux:button variant="primary" size="sm" icon="play" href="{{ route($examRoutePrefix . '.take', $inProgress) }}" wire:navigate>
-                                        {{ __('Resume') }}
-                                    </flux:button>
+                                    <form method="POST" action="{{ route($examRoutePrefix . '.start', $exam) }}">
+                                        @csrf
+                                        <flux:button type="submit" variant="primary" size="sm" icon="play">
+                                            {{ __('Resume') }}
+                                        </flux:button>
+                                    </form>
                                 @else
                                     <flux:button variant="primary" size="sm" icon="play" href="{{ route($examRoutePrefix . '.show', $exam) }}" wire:navigate>
-                                        {{ $attemptsDone > 0 ? __('Retake') : __('View Details') }}
+                                        @if ($activeReset)
+                                            {{ __('Start Again') }}
+                                        @else
+                                            {{ $attemptsDone > 0 ? __('Retake') : __('View Details') }}
+                                        @endif
                                     </flux:button>
                                 @endif
                             </div>
@@ -118,6 +132,7 @@
                     @foreach ($completed as $exam)
                         @php
                             $bestAttempt = $exam->bestAttemptForStudent($studentId);
+                            $latestAttempt = $exam->latestAttemptFor($studentId);
                             $examRoutePrefix = 'student.exams';
                         @endphp
                         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
@@ -143,6 +158,14 @@
                                             <flux:badge color="amber" size="sm" class="mt-1">{{ __('Awaiting Grading') }}</flux:badge>
                                         @elseif ($bestAttempt->status === 'graded')
                                             <flux:badge color="blue" size="sm" class="mt-1">{{ __('Graded') }}</flux:badge>
+                                        @elseif ($latestAttempt?->wasTimeElapsed())
+                                            <flux:badge color="red" size="sm" class="mt-1">{{ __('Time Elapsed') }}</flux:badge>
+                                        @elseif (in_array($latestAttempt?->completion_reason, ['reset_by_admin', 'force_ended_by_admin'], true))
+                                            <flux:badge color="purple" size="sm" class="mt-1">{{ __('Ended by School') }}</flux:badge>
+                                        @elseif ($latestAttempt?->completion_reason === 'tab_switch_limit')
+                                            <flux:badge color="amber" size="sm" class="mt-1">{{ __('Auto-submitted') }}</flux:badge>
+                                        @elseif ($latestAttempt?->status === 'grading_failed')
+                                            <flux:badge color="red" size="sm" class="mt-1">{{ __('Grading Issue') }}</flux:badge>
                                         @endif
                                     </div>
                                 @endif
@@ -211,6 +234,7 @@
                     @foreach ($closed as $exam)
                         @php
                             $bestAttempt  = $exam->bestAttemptForStudent($studentId);
+                            $latestAttempt = $exam->latestAttemptFor($studentId);
                             $attemptsDone = $exam->completedAttemptsFor($studentId);
                             $typeColors   = ['assessment' => 'sky', 'assignment' => 'amber', 'exam' => 'indigo'];
                             $examTypeLabel = match ($exam->category) {
@@ -230,7 +254,15 @@
                                 <div class="flex shrink-0 flex-col items-end gap-1">
                                     <flux:badge :color="$typeColors[$exam->category] ?? 'zinc'" size="sm">{{ $examTypeLabel }}</flux:badge>
                                     @if ($attemptsDone === 0)
-                                        <flux:badge color="red" size="sm">{{ __('Missed') }}</flux:badge>
+                                        <flux:badge color="red" size="sm">{{ __('Missed :type', ['type' => $examTypeLabel]) }}</flux:badge>
+                                    @elseif ($latestAttempt?->wasTimeElapsed())
+                                        <flux:badge color="red" size="sm">{{ __('Time Elapsed') }}</flux:badge>
+                                    @elseif (in_array($latestAttempt?->completion_reason, ['reset_by_admin', 'force_ended_by_admin'], true))
+                                        <flux:badge color="purple" size="sm">{{ __('Ended by School') }}</flux:badge>
+                                    @elseif ($latestAttempt?->completion_reason === 'tab_switch_limit')
+                                        <flux:badge color="amber" size="sm">{{ __('Auto-submitted') }}</flux:badge>
+                                    @elseif ($latestAttempt?->status === 'grading_failed')
+                                        <flux:badge color="red" size="sm">{{ __('Grading Issue') }}</flux:badge>
                                     @endif
                                 </div>
                             </div>
@@ -258,8 +290,13 @@
                                 </div>
                             @else
                                 <p class="mt-3 text-sm text-zinc-400 dark:text-zinc-500 italic">
-                                    {{ __('You did not attempt this item.') }}
+                                    {{ __('You missed this :type.', ['type' => Str::lower($examTypeLabel)]) }}
                                 </p>
+                                <div class="mt-3">
+                                    <flux:button variant="subtle" size="sm" href="{{ route($routePrefix . '.show', $exam) }}" wire:navigate>
+                                        {{ __('View Details') }}
+                                    </flux:button>
+                                </div>
                             @endif
                         </div>
                     @endforeach

@@ -115,7 +115,7 @@
                 <flux:table.column class="text-center">{{ __('Questions') }}</flux:table.column>
                 <flux:table.column>{{ __('Status') }}</flux:table.column>
                 <flux:table.column>{{ __('Created By') }}</flux:table.column>
-                <flux:table.column class="w-40" />
+                <flux:table.column class="w-48" />
             </flux:table.columns>
             <flux:table.rows>
                 @forelse ($exams as $exam)
@@ -155,6 +155,9 @@
                                 <flux:button variant="subtle" size="xs" icon="eye" href="{{ route($examRoutePrefix . '.show', $exam) }}" wire:navigate aria-label="{{ __('View') }}" />
                                 @if ($exam->is_published)
                                     <flux:button variant="subtle" size="xs" icon="chart-bar" href="{{ route($examRoutePrefix . '.results', $exam) }}" wire:navigate aria-label="{{ __('Results') }}" />
+                                @endif
+                                @if ($exam->status === 'approved' && $exam->is_published)
+                                    <flux:button variant="subtle" size="xs" icon="arrow-path" href="{{ route($examRoutePrefix . '.reset-access', $exam) }}" wire:navigate aria-label="{{ __('Reset student access') }}" />
                                 @endif
                                 <flux:button variant="subtle" size="xs" icon="pencil-square" href="{{ route($examRoutePrefix . '.edit', $exam) }}" wire:navigate aria-label="{{ __('Edit') }}" />
                                 @if ($exam->status === 'approved' && ! $exam->is_published)

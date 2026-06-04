@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class CreditPurchaseNotification extends DatabaseNotification implements ShouldQueue
+class CreditPurchaseNotification extends DatabaseNotification
 {
     public function __construct(
         private readonly string $schoolName,

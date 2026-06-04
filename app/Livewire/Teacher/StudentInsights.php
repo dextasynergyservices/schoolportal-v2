@@ -225,6 +225,7 @@ class StudentInsights extends Component
                     'avatar_url' => $student->avatarTableUrl(),
                     'initials' => $student->initials(),
                     'class_id' => $student->studentProfile?->class_id,
+                    'class' => $student->studentProfile?->class?->name ?? __('Unassigned'),
                     'concerns' => $concerns,
                     'severity' => $severity,
                     'quiz_avg' => $quiz ? (int) round((float) $quiz->avg_score) : null,

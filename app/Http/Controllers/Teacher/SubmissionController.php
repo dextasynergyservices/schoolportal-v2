@@ -39,7 +39,7 @@ class SubmissionController extends Controller
             ->toArray();
 
         $examEntities = $examIds
-            ? Exam::whereIn('id', $examIds)->get(['id', 'category', 'slug'])->keyBy('id')
+            ? Exam::whereIn('id', $examIds)->get(['id', 'category'])->keyBy('id')
             : collect();
 
         // Counts per status

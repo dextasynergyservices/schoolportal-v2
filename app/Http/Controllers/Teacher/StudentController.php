@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
-use App\Models\SchoolClass;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,17 +15,21 @@ class StudentController extends Controller
     public function index(Request $request): View
     {
         $teacher = auth()->user();
-        $classIds = $teacher->assignedClasses()->pluck('id');
-
-        $classes = SchoolClass::whereIn('id', $classIds)
+        $classes = $teacher->assignedClasses()
             ->where('is_active', true)
             ->withCount('students')
             ->with('level:id,name')
             ->orderBy('name')
             ->get();
+        $classIds = $classes->pluck('id');
 
-        // Default to first class if none selected
-        $selectedClassId = $request->input('class_id', $classes->first()?->id);
+        $selectedClassId = $request->filled('class_id')
+            ? $request->integer('class_id')
+            : null;
+
+        if ($selectedClassId && ! $classIds->contains($selectedClassId)) {
+            abort(403);
+        }
 
         $query = User::where('role', 'student')
             ->where('is_active', true)
@@ -52,15 +55,23 @@ class StudentController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $teacher = auth()->user();
-        $classIds = $teacher->assignedClasses()->pluck('id');
+        $classIds = $teacher->assignedClasses()
+            ->where('is_active', true)
+            ->pluck('id');
 
-        $selectedClassId = $request->input('class_id');
+        $selectedClassId = $request->filled('class_id')
+            ? $request->integer('class_id')
+            : null;
+
+        if ($selectedClassId && ! $classIds->contains($selectedClassId)) {
+            abort(403);
+        }
 
         $query = User::where('role', 'student')
             ->where('is_active', true)
             ->whereHas('studentProfile', fn ($q) => $q->whereIn('class_id', $classIds));
 
-        if ($selectedClassId && $classIds->contains((int) $selectedClassId)) {
+        if ($selectedClassId) {
             $query->whereHas('studentProfile', fn ($q) => $q->where('class_id', $selectedClassId));
         }
 
