@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SchoolLevel extends Model
@@ -34,5 +35,11 @@ class SchoolLevel extends Model
     public function classes(): HasMany
     {
         return $this->hasMany(SchoolClass::class, 'level_id')->orderBy('sort_order');
+    }
+
+    public function gradingScales(): BelongsToMany
+    {
+        return $this->belongsToMany(GradingScale::class, 'grading_scale_level', 'level_id', 'grading_scale_id')
+            ->withPivot('school_id');
     }
 }

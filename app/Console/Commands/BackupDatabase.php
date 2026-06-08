@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
+use Sentry\Severity;
+use Sentry\State\Scope;
 
 class BackupDatabase extends Command
 {
@@ -56,6 +58,10 @@ class BackupDatabase extends Command
         if (! $result->successful()) {
             $this->error('Backup failed: '.$result->errorOutput());
             Log::error('Database backup failed', ['error' => $result->errorOutput()]);
+            $this->reportToSentry('Database backup dump failed', [
+                'database' => $database,
+                'error' => $result->errorOutput(),
+            ]);
             $this->notifyFailure($result->errorOutput(), $database);
 
             return self::FAILURE;
@@ -83,8 +89,10 @@ class BackupDatabase extends Command
         }
 
         // Step 3: Upload to Google Drive
+        $uploadFailed = false;
+
         if (! $this->option('skip-upload') && config('services.google_drive_backup.enabled')) {
-            $this->uploadToGoogleDrive($uploadFile, $uploadFilename);
+            $uploadFailed = ! $this->uploadToGoogleDrive($uploadFile, $uploadFilename);
         } elseif (! config('services.google_drive_backup.enabled')) {
             $this->warn('Google Drive backup is disabled. Set GOOGLE_DRIVE_BACKUP_ENABLED=true to enable.');
         }
@@ -92,39 +100,58 @@ class BackupDatabase extends Command
         // Step 4: Clean up old local backups (configurable retention)
         $this->cleanOldBackups($directory, (int) config('services.backup.keep_local', 7));
 
+        if ($uploadFailed) {
+            $this->error('Local backup was created, but Google Drive upload failed.');
+            Log::warning('Database backup created locally, but Google Drive upload failed', [
+                'file' => $uploadFilename,
+                'path' => $uploadFile,
+                'size' => filesize($uploadFile),
+            ]);
+            $this->reportToSentry('Database backup created locally, but Google Drive upload failed', [
+                'database' => $database,
+                'file' => $uploadFilename,
+                'path' => $uploadFile,
+                'size' => filesize($uploadFile),
+            ]);
+
+            return self::FAILURE;
+        }
+
         $this->info('Backup completed successfully.');
         Log::info('Database backup completed', ['file' => $uploadFilename, 'size' => filesize($uploadFile)]);
 
         return self::SUCCESS;
     }
 
-    protected function uploadToGoogleDrive(string $filePath, string $filename): void
+    protected function uploadToGoogleDrive(string $filePath, string $filename): bool
     {
-        $credentialsPath = config('services.google_drive_backup.credentials_path');
+        $authMode = strtolower((string) config('services.google_drive_backup.auth', 'service_account'));
+        $credentialsPath = $this->resolveGoogleDriveCredentialsPath();
         $folderId = config('services.google_drive_backup.folder_id');
         $retentionDays = (int) config('services.google_drive_backup.retention_days', 14);
 
-        // Resolve relative path to storage/app
-        if (! str_starts_with($credentialsPath, '/') && ! str_starts_with($credentialsPath, 'C:')) {
-            $credentialsPath = storage_path('app/'.$credentialsPath);
-        }
-
-        if (! file_exists($credentialsPath)) {
+        if ($authMode === 'service_account' && ! file_exists($credentialsPath)) {
             $this->error("Google Drive credentials file not found: {$credentialsPath}");
             Log::error('Google Drive backup failed: credentials file not found', ['path' => $credentialsPath]);
+            $this->reportToSentry('Google Drive backup credentials file not found', [
+                'path' => $credentialsPath,
+            ]);
+            $this->notifyFailure("Google Drive credentials file not found: {$credentialsPath}", config('database.connections.mysql.database', 'unknown'));
 
-            return;
+            return false;
         }
 
         if (! $folderId) {
             $this->error('GOOGLE_DRIVE_BACKUP_FOLDER_ID is not set.');
             Log::error('Google Drive backup failed: folder ID not configured');
+            $this->reportToSentry('Google Drive backup folder ID is not configured');
+            $this->notifyFailure('GOOGLE_DRIVE_BACKUP_FOLDER_ID is not set.', config('database.connections.mysql.database', 'unknown'));
 
-            return;
+            return false;
         }
 
         try {
-            $accessToken = $this->getAccessToken($credentialsPath);
+            $accessToken = $this->getAccessToken();
 
             $mimeType = str_ends_with($filename, '.gz') ? 'application/gzip' : 'application/sql';
 
@@ -144,40 +171,73 @@ class BackupDatabase extends Command
                 ."--{$boundary}--";
 
             $response = Http::withToken($accessToken)
-                ->withHeaders(['Content-Type' => "multipart/related; boundary={$boundary}"])
-                ->withBody($body)
+                ->withBody($body, "multipart/related; boundary={$boundary}")
                 ->timeout(300)
-                ->post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size');
+                ->post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,size,mimeType');
 
             if (! $response->successful()) {
                 throw new \RuntimeException('Upload failed: '.$response->body());
             }
 
             $driveFile = $response->json();
+
+            if (($driveFile['name'] ?? null) !== $filename) {
+                throw new \RuntimeException(sprintf(
+                    'Upload completed, but Google Drive saved the file as "%s" instead of "%s".',
+                    $driveFile['name'] ?? 'unknown',
+                    $filename,
+                ));
+            }
+
             $this->info(sprintf('Uploaded to Google Drive: %s (ID: %s)', $driveFile['name'], $driveFile['id']));
             Log::info('Database backup uploaded to Google Drive', [
                 'file' => $driveFile['name'],
                 'drive_id' => $driveFile['id'],
                 'size' => $driveFile['size'] ?? null,
+                'mime_type' => $driveFile['mimeType'] ?? null,
             ]);
 
             // Clean up old backups on Google Drive
             $this->cleanOldDriveBackups($accessToken, $folderId, $retentionDays);
 
+            return true;
         } catch (\Throwable $e) {
             $this->error('Google Drive upload failed: '.$e->getMessage());
             Log::error('Google Drive backup upload failed', [
                 'error' => $e->getMessage(),
                 'file' => $filename,
             ]);
+            $this->reportToSentry('Google Drive backup upload failed', [
+                'file' => $filename,
+            ], $e);
             $this->notifyFailure('Google Drive upload failed: '.$e->getMessage(), config('database.connections.mysql.database', 'unknown'));
+
+            return false;
         }
+    }
+
+    /**
+     * Generate a Google OAuth2 access token for the configured backup auth mode.
+     */
+    protected function getAccessToken(): string
+    {
+        $authMode = strtolower((string) config('services.google_drive_backup.auth', 'service_account'));
+
+        if ($authMode === 'oauth') {
+            return $this->getOAuthAccessToken();
+        }
+
+        if ($authMode !== 'service_account') {
+            throw new \RuntimeException("Unsupported Google Drive backup auth mode: {$authMode}");
+        }
+
+        return $this->getServiceAccountAccessToken($this->resolveGoogleDriveCredentialsPath());
     }
 
     /**
      * Generate a Google OAuth2 access token from service account credentials using JWT.
      */
-    protected function getAccessToken(string $credentialsPath): string
+    protected function getServiceAccountAccessToken(string $credentialsPath): string
     {
         $creds = json_decode(file_get_contents($credentialsPath), true);
 
@@ -216,6 +276,44 @@ class BackupDatabase extends Command
         return $response->json('access_token');
     }
 
+    /**
+     * Generate a Google OAuth2 access token from a personal Google account refresh token.
+     */
+    protected function getOAuthAccessToken(): string
+    {
+        $clientId = config('services.google_drive_backup.oauth_client_id');
+        $clientSecret = config('services.google_drive_backup.oauth_client_secret');
+        $refreshToken = config('services.google_drive_backup.oauth_refresh_token');
+
+        if (! $clientId || ! $clientSecret || ! $refreshToken) {
+            throw new \RuntimeException('Google Drive OAuth is missing GOOGLE_DRIVE_OAUTH_CLIENT_ID, GOOGLE_DRIVE_OAUTH_CLIENT_SECRET, or GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN.');
+        }
+
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+            'grant_type' => 'refresh_token',
+        ]);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException('Failed to refresh Google Drive OAuth access token: '.$response->body());
+        }
+
+        return $response->json('access_token');
+    }
+
+    private function resolveGoogleDriveCredentialsPath(): string
+    {
+        $credentialsPath = (string) config('services.google_drive_backup.credentials_path');
+
+        if (! str_starts_with($credentialsPath, '/') && ! str_contains($credentialsPath, ':')) {
+            return storage_path('app/'.$credentialsPath);
+        }
+
+        return $credentialsPath;
+    }
+
     protected function cleanOldDriveBackups(string $accessToken, string $folderId, int $retentionDays): void
     {
         try {
@@ -223,7 +321,7 @@ class BackupDatabase extends Command
 
             $query = urlencode("'{$folderId}' in parents and trashed = false and createdTime < '{$cutoffDate}'");
             $response = Http::withToken($accessToken)
-                ->get("https://www.googleapis.com/drive/v3/files?q={$query}&fields=files(id,name,createdTime)&orderBy=createdTime asc");
+                ->get("https://www.googleapis.com/drive/v3/files?q={$query}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id,name,createdTime)&orderBy=createdTime asc");
 
             if (! $response->successful()) {
                 $this->warn('Could not list old Drive backups: '.$response->body());
@@ -236,7 +334,7 @@ class BackupDatabase extends Command
 
             foreach ($files as $file) {
                 $deleteResponse = Http::withToken($accessToken)
-                    ->delete("https://www.googleapis.com/drive/v3/files/{$file['id']}");
+                    ->delete("https://www.googleapis.com/drive/v3/files/{$file['id']}?supportsAllDrives=true");
 
                 if ($deleteResponse->successful()) {
                     $this->line('  Removed old Drive backup: '.$file['name']);
@@ -294,6 +392,40 @@ class BackupDatabase extends Command
                 ->notify(new BackupFailedNotification($reason, $database));
         } catch (\Throwable $e) {
             Log::error('Failed to send backup failure notification', ['error' => $e->getMessage()]);
+            $this->reportToSentry('Failed to send backup failure notification', [
+                'database' => $database,
+                'reason' => $reason,
+            ], $e);
+        }
+    }
+
+    /**
+     * Report handled backup failures to Sentry when the SDK is available.
+     */
+    private function reportToSentry(string $message, array $context = [], ?\Throwable $exception = null): void
+    {
+        if (! function_exists('Sentry\captureMessage')) {
+            return;
+        }
+
+        try {
+            \Sentry\configureScope(function (Scope $scope) use ($context): void {
+                $scope->setTag('area', 'database_backup');
+                $scope->setContext('backup', $context);
+            });
+
+            if ($exception && function_exists('Sentry\captureException')) {
+                \Sentry\captureException($exception);
+
+                return;
+            }
+
+            \Sentry\captureMessage($message, Severity::error());
+        } catch (\Throwable $sentryError) {
+            Log::debug('Could not report backup failure to Sentry', [
+                'error' => $sentryError->getMessage(),
+                'message' => $message,
+            ]);
         }
     }
 }

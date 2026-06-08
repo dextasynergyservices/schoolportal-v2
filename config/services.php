@@ -55,7 +55,12 @@ return [
 
     'google_drive_backup' => [
         'enabled' => env('GOOGLE_DRIVE_BACKUP_ENABLED', false),
+        'auth' => env('GOOGLE_DRIVE_BACKUP_AUTH', 'service_account'),
         'credentials_path' => env('GOOGLE_DRIVE_CREDENTIALS_PATH', 'google-drive-backup.json'),
+        'oauth_client_id' => env('GOOGLE_DRIVE_OAUTH_CLIENT_ID'),
+        'oauth_client_secret' => env('GOOGLE_DRIVE_OAUTH_CLIENT_SECRET'),
+        'oauth_refresh_token' => env('GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN'),
+        'oauth_redirect_uri' => env('GOOGLE_DRIVE_OAUTH_REDIRECT_URI', 'http://localhost'),
         'folder_id' => env('GOOGLE_DRIVE_BACKUP_FOLDER_ID'),
         'retention_days' => env('GOOGLE_DRIVE_BACKUP_RETENTION_DAYS', 14),
     ],

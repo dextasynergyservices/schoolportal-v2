@@ -28,7 +28,8 @@
                     'published' => 'green',
                     default => 'zinc',
                 };
-                $overallGradeItem = $gradingScale?->items->first(fn ($item) => $item->min_score <= ($report->average_weighted_score ?? 0) && $item->max_score >= ($report->average_weighted_score ?? 0));
+                $overallGradeItem = $report->resolvedOverallGradeItem($gradingScale);
+                $gradingItems = $report->resolvedGradingItems($gradingScale);
             @endphp
             <flux:badge size="sm" :color="$statusColor">{{ ucfirst(str_replace('_', ' ', $report->status)) }}</flux:badge>
             @if ($config?->show_position && $report->position)
@@ -127,11 +128,11 @@
             @endif
 
             {{-- Grading Key --}}
-            @if ($gradingScale && $gradingScale->items->isNotEmpty())
+            @if ($gradingItems->isNotEmpty())
                 <div class="px-6 py-3 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30">
                     <p class="text-xs font-medium text-zinc-500 mb-1">{{ __('Grading Key') }}</p>
                     <div class="flex flex-wrap gap-3 text-xs">
-                        @foreach ($gradingScale->items as $item)
+                        @foreach ($gradingItems as $item)
                             <span class="text-zinc-600 dark:text-zinc-400"><strong>{{ $item->grade }}</strong> = {{ $item->label }} ({{ $item->min_score }}–{{ $item->max_score }}%)</span>
                         @endforeach
                     </div>

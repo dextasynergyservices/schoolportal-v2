@@ -19,6 +19,7 @@ class ChildCbtResultController extends Controller
     public function index(User $child): View
     {
         $parent = auth()->user();
+        $child->loadMissing('studentProfile.class');
 
         // Verify parent-child link
         if (! $parent->children()->where('student_id', $child->id)->exists()) {
@@ -27,7 +28,7 @@ class ChildCbtResultController extends Controller
 
         $attempts = ExamAttempt::with([
             'exam:id,title,category,class_id,subject_id,passing_score,max_score',
-            'exam.class:id,name',
+            'exam.class:id,name,level_id',
             'exam.subject:id,name',
         ])
             ->where('student_id', $child->id)
@@ -38,7 +39,7 @@ class ChildCbtResultController extends Controller
         // Build grade map for each attempt
         $grades = $attempts->getCollection()->mapWithKeys(fn (ExamAttempt $a) => [
             $a->id => $a->percentage !== null
-                ? $this->scoreService->getGrade($parent->school_id, (float) $a->percentage)
+                ? $this->scoreService->getGrade($parent->school_id, (float) $a->percentage, $a->exam?->class?->level_id)
                 : null,
         ]);
 

@@ -6,11 +6,12 @@ namespace App\Http\Controllers\Parent;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
-use App\Models\GradingScale;
 use App\Models\ReportCardConfig;
 use App\Models\StudentTermReport;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\GradingScaleResolver;
+use App\Services\ScoreAggregationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -83,11 +84,9 @@ class ChildReportCardController extends Controller
         $report->load(['student.studentProfile', 'class', 'session', 'term', 'teacher']);
 
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($report->class?->level_id, $school->id)
+            ?->load('items');
 
         $child->load('studentProfile.class:id,name');
 
@@ -113,11 +112,11 @@ class ChildReportCardController extends Controller
         $report->load(['student.studentProfile', 'class', 'session', 'term', 'teacher', 'approvedByUser']);
 
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($report->class?->level_id, $school->id)
+            ?->load('items');
+        app(ScoreAggregationService::class)->finalizeReportGradeSnapshot($report);
+        $report->refresh()->load(['student.studentProfile', 'class', 'session', 'term', 'teacher', 'approvedByUser']);
 
         $pdf = Pdf::loadView('admin.scores.report-pdf', compact(
             'report', 'school', 'config', 'gradingScale'

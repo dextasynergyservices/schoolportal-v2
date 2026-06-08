@@ -8,7 +8,6 @@ use App\Models\AcademicSession;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\GradingScale;
-use App\Models\GradingScaleItem;
 use App\Models\ReportCardConfig;
 use App\Models\SchoolClass;
 use App\Models\ScoreComponent;
@@ -20,6 +19,10 @@ use Illuminate\Validation\ValidationException;
 
 class ScoreAggregationService
 {
+    public function __construct(
+        private readonly GradingScaleResolver $gradingScaleResolver,
+    ) {}
+
     /**
      * Update a student's subject score from a graded CBT exam attempt.
      * Called automatically when an exam attempt is graded/submitted.
@@ -180,33 +183,11 @@ class ScoreAggregationService
     }
 
     /**
-     * Get grade letter and label from school's default grading scale.
+     * Get grade letter and label from the level grading scale, falling back to the school default.
      */
-    public function getGrade(int $schoolId, float $percentage): ?array
+    public function getGrade(int $schoolId, float $percentage, ?int $levelId = null): ?array
     {
-        $scale = GradingScale::withoutGlobalScopes()
-            ->where('school_id', $schoolId)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->first();
-
-        if (! $scale) {
-            return null;
-        }
-
-        $item = GradingScaleItem::where('grading_scale_id', $scale->id)
-            ->where('min_score', '<=', $percentage)
-            ->where('max_score', '>=', $percentage)
-            ->first();
-
-        if (! $item) {
-            return null;
-        }
-
-        return [
-            'grade' => $item->grade,
-            'label' => $item->label,
-        ];
+        return $this->gradingScaleResolver->getGrade($schoolId, $percentage, $levelId);
     }
 
     /**
@@ -349,6 +330,7 @@ class ScoreAggregationService
      */
     public function buildSubjectScoresSnapshot(int $studentId, int $classId, int $termId, int $schoolId, bool $midtermOnly = false): array
     {
+        $levelId = $this->levelIdForClass($classId);
         $scores = StudentSubjectScore::withoutGlobalScopes()
             ->where('student_id', $studentId)
             ->where('term_id', $termId)
@@ -406,7 +388,7 @@ class ScoreAggregationService
                 ? round($rawWeightedTotal * (100 / $sumOfIncludedWeights), 2)
                 : round($rawWeightedTotal, 2);
 
-            $grade = $this->getGrade($schoolId, $weightedTotal);
+            $grade = $this->getGrade($schoolId, $weightedTotal, $levelId);
 
             $snapshot[] = [
                 'subject_id' => $subjectId,
@@ -482,6 +464,7 @@ class ScoreAggregationService
 
         $snapshot = $this->buildSubjectScoresSnapshot($studentId, $classId, $termId, $schoolId, $midtermOnly);
         $overallPositions = $this->computeOverallPositions($classId, $termId, $schoolId, $midtermOnly);
+        $levelId = $this->levelIdForClass($classId);
 
         $studentData = $overallPositions[$studentId] ?? [
             'total' => 0,
@@ -489,6 +472,7 @@ class ScoreAggregationService
             'subjects_count' => 0,
             'position' => null,
         ];
+        $gradeSnapshot = $this->buildReportGradeSnapshot($schoolId, $levelId, (float) $studentData['average']);
 
         return StudentTermReport::withoutGlobalScopes()->updateOrCreate(
             [
@@ -503,6 +487,10 @@ class ScoreAggregationService
                 'subject_scores_snapshot' => $snapshot,
                 'total_weighted_score' => $studentData['total'],
                 'average_weighted_score' => $studentData['average'],
+                'grading_scale_id' => $gradeSnapshot['grading_scale_id'],
+                'grading_scale_snapshot' => $gradeSnapshot['grading_scale_snapshot'],
+                'overall_grade' => $gradeSnapshot['overall_grade'],
+                'overall_grade_label' => $gradeSnapshot['overall_grade_label'],
                 'subjects_count' => $studentData['subjects_count'],
                 'position' => $studentData['position'],
                 'out_of' => count($overallPositions),
@@ -540,6 +528,7 @@ class ScoreAggregationService
     {
         $session = AcademicSession::withoutGlobalScopes()->findOrFail($sessionId);
         $this->ensureStudentEnrolledBySession($studentId, $classId, $session);
+        $levelId = $this->levelIdForClass($classId);
 
         // Fetch all full_term reports for this student in this session
         $termReports = StudentTermReport::withoutGlobalScopes()
@@ -596,7 +585,7 @@ class ScoreAggregationService
             $scores = array_column($termScores, 'score');
             $sessionTotal = $this->computeSessionScore($scores, $method, $midtermWeight, $fulltermWeight);
 
-            $grade = $this->getGrade($schoolId, $sessionTotal);
+            $grade = $this->getGrade($schoolId, $sessionTotal, $levelId);
 
             $sessionSnapshot[] = [
                 'subject_id' => $subjectId,
@@ -618,6 +607,7 @@ class ScoreAggregationService
         $totalScore = round(array_sum($sessionTotals), 2);
         $subjectsCount = count($sessionTotals);
         $average = $subjectsCount > 0 ? round($totalScore / $subjectsCount, 2) : 0.0;
+        $gradeSnapshot = $this->buildReportGradeSnapshot($schoolId, $levelId, (float) $average);
 
         return StudentTermReport::withoutGlobalScopes()->updateOrCreate(
             [
@@ -632,6 +622,10 @@ class ScoreAggregationService
                 'subject_scores_snapshot' => $sessionSnapshot,
                 'total_weighted_score' => $totalScore,
                 'average_weighted_score' => $average,
+                'grading_scale_id' => $gradeSnapshot['grading_scale_id'],
+                'grading_scale_snapshot' => $gradeSnapshot['grading_scale_snapshot'],
+                'overall_grade' => $gradeSnapshot['overall_grade'],
+                'overall_grade_label' => $gradeSnapshot['overall_grade_label'],
                 'subjects_count' => $subjectsCount,
                 'position' => null, // updated by generateClassSessionReports
                 'out_of' => null,
@@ -833,12 +827,74 @@ class ScoreAggregationService
         }
     }
 
+    public function finalizeReportGradeSnapshot(StudentTermReport $report): void
+    {
+        if ($report->isFinalized()) {
+            return;
+        }
+
+        $report->loadMissing(['class' => fn ($query) => $query->withoutGlobalScopes()]);
+
+        $gradeSnapshot = $this->buildReportGradeSnapshot(
+            (int) $report->school_id,
+            $report->class?->level_id ? (int) $report->class->level_id : null,
+            (float) ($report->average_weighted_score ?? 0)
+        );
+
+        $report->forceFill(array_merge($gradeSnapshot, [
+            'finalized_at' => now(),
+        ]))->save();
+    }
+
+    /**
+     * @return array{grading_scale_id: int|null, grading_scale_snapshot: array<string, mixed>|null, overall_grade: string|null, overall_grade_label: string|null}
+     */
+    private function buildReportGradeSnapshot(int $schoolId, ?int $levelId, float $average): array
+    {
+        $scale = $this->gradingScaleResolver->resolveForLevel($levelId, $schoolId);
+        $scale?->loadMissing('items');
+
+        $grade = $this->getGrade($schoolId, $average, $levelId);
+
+        return [
+            'grading_scale_id' => $scale?->id,
+            'grading_scale_snapshot' => $scale ? $this->snapshotGradingScale($scale) : null,
+            'overall_grade' => $grade['grade'] ?? null,
+            'overall_grade_label' => $grade['label'] ?? null,
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, is_default: bool, is_active: bool, items: array<int, array{grade: string, label: string, min_score: int, max_score: int, sort_order: int}>}
+     */
+    private function snapshotGradingScale(GradingScale $scale): array
+    {
+        return [
+            'id' => (int) $scale->id,
+            'name' => (string) $scale->name,
+            'is_default' => (bool) $scale->is_default,
+            'is_active' => (bool) $scale->is_active,
+            'items' => $scale->items
+                ->sortByDesc('min_score')
+                ->map(fn ($item): array => [
+                    'grade' => (string) $item->grade,
+                    'label' => (string) $item->label,
+                    'min_score' => (int) $item->min_score,
+                    'max_score' => (int) $item->max_score,
+                    'sort_order' => (int) $item->sort_order,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
     /**
      * Get the score grid for a class: all students × all subjects × all components.
      */
     public function getClassScoreGrid(int $classId, int $termId, int $schoolId): array
     {
         $class = SchoolClass::withoutGlobalScopes()->with(['subjects' => fn ($q) => $q->withoutGlobalScopes()])->findOrFail($classId);
+        $levelId = $class->level_id;
         $term = Term::withoutGlobalScopes()
             ->with(['session' => fn ($query) => $query->withoutGlobalScopes()])
             ->findOrFail($termId);
@@ -897,7 +953,7 @@ class ScoreAggregationService
                 }
 
                 $subjectData['weighted_total'] = round($subjectData['weighted_total'], 2);
-                $grade = $this->getGrade($schoolId, $subjectData['weighted_total']);
+                $grade = $this->getGrade($schoolId, $subjectData['weighted_total'], $levelId);
                 $subjectData['grade'] = $grade['grade'] ?? null;
                 $subjectData['grade_label'] = $grade['label'] ?? null;
 
@@ -927,6 +983,15 @@ class ScoreAggregationService
                 'student_id' => __('This student was enrolled after the selected term.'),
             ]);
         }
+    }
+
+    private function levelIdForClass(int $classId): ?int
+    {
+        $levelId = SchoolClass::withoutGlobalScopes()
+            ->whereKey($classId)
+            ->value('level_id');
+
+        return $levelId !== null ? (int) $levelId : null;
     }
 
     private function ensureStudentEnrolledBySession(int $studentId, int $classId, AcademicSession $session): void

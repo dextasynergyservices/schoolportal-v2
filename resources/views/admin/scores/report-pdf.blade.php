@@ -144,9 +144,8 @@
 
         {{-- Summary Bar --}}
         @php
-            $overallGrade = $gradingScale
-                ? $gradingScale->items->first(fn ($item) => $item->min_score <= ($report->average_weighted_score ?? 0) && $item->max_score >= ($report->average_weighted_score ?? 0))
-                : null;
+            $overallGrade = $report->resolvedOverallGradeItem($gradingScale);
+            $gradingItems = $report->resolvedGradingItems($gradingScale);
         @endphp
         <div class="summary-bar">
             <div class="summary-item">
@@ -286,10 +285,10 @@
         @endif
 
         {{-- Grading Key --}}
-        @if (isset($gradingScale) && $gradingScale && $gradingScale->items->isNotEmpty())
+        @if ($gradingItems->isNotEmpty())
             <div class="grading-key">
                 <strong>Grading Key:</strong>
-                @foreach ($gradingScale->items as $item)
+                @foreach ($gradingItems as $item)
                     <strong>{{ $item->grade }}</strong> = {{ $item->label }} ({{ $item->min_score }}–{{ $item->max_score }}%){{ !$loop->last ? ' | ' : '' }}
                 @endforeach
             </div>

@@ -7,10 +7,10 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\ExamAttempt;
-use App\Models\GradingScale;
 use App\Models\ReportCardConfig;
 use App\Models\StudentTermReport;
 use App\Models\Term;
+use App\Services\GradingScaleResolver;
 use App\Services\ScoreAggregationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -76,7 +76,7 @@ class ReportCardController extends Controller
 
             $cbtQuery = ExamAttempt::where('student_id', $student->id)
                 ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
-                ->with(['exam.subject:id,name,short_name', 'exam.class:id,name'])
+                ->with(['exam.subject:id,name,short_name', 'exam.class:id,name,level_id'])
                 ->orderByDesc('submitted_at');
 
             if ($selectedCategory !== 'all') {
@@ -88,7 +88,7 @@ class ReportCardController extends Controller
             $scoreService = app(ScoreAggregationService::class);
             $grades = $attempts->getCollection()->mapWithKeys(fn (ExamAttempt $a) => [
                 $a->id => $a->percentage !== null
-                    ? $scoreService->getGrade($student->school_id, (float) $a->percentage)
+                    ? $scoreService->getGrade($student->school_id, (float) $a->percentage, $a->exam?->class?->level_id)
                     : null,
             ]);
         }
@@ -118,11 +118,9 @@ class ReportCardController extends Controller
         $report->load(['student.studentProfile', 'class', 'session', 'term', 'teacher']);
 
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($report->class?->level_id, $school->id)
+            ?->load('items');
 
         return view('student.report-cards.show', compact('report', 'school', 'config', 'gradingScale'));
     }
@@ -143,11 +141,11 @@ class ReportCardController extends Controller
         $report->load(['student.studentProfile', 'class', 'session', 'term', 'teacher', 'approvedByUser']);
 
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($report->class?->level_id, $school->id)
+            ?->load('items');
+        app(ScoreAggregationService::class)->finalizeReportGradeSnapshot($report);
+        $report->refresh()->load(['student.studentProfile', 'class', 'session', 'term', 'teacher', 'approvedByUser']);
 
         $pdf = Pdf::loadView('admin.scores.report-pdf', compact(
             'report', 'school', 'config', 'gradingScale'

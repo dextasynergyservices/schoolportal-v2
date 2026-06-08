@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
-use App\Models\GradingScale;
 use App\Models\ReportCardConfig;
 use App\Models\SchoolClass;
 use App\Models\SchoolLevel;
@@ -17,6 +16,7 @@ use App\Models\StudentTermReport;
 use App\Models\Subject;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\GradingScaleResolver;
 use App\Services\NotificationService;
 use App\Services\ScoreAggregationService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -380,11 +380,9 @@ class ScoreController extends Controller
         $school = auth()->user()->school;
 
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($report->class?->level_id, $school->id)
+            ?->load('items');
 
         return view('admin.scores.show-report', compact('report', 'school', 'config', 'gradingScale'));
     }
@@ -454,16 +452,15 @@ class ScoreController extends Controller
         $count = $reports->count();
 
         if ($count > 0) {
-            StudentTermReport::whereIn('id', $reports->pluck('id'))
-                ->update([
+            // Notify students and parents
+            $notificationService = app(NotificationService::class);
+            foreach ($reports as $report) {
+                $this->scoreService->finalizeReportGradeSnapshot($report);
+                $report->update([
                     'status' => 'published',
                     'published_at' => now(),
                 ]);
 
-            // Notify students and parents
-            $notificationService = app(NotificationService::class);
-            foreach ($reports as $report) {
-                $report->status = 'published'; // reflect updated status
                 $notificationService->notifyReportCardPublished($report);
             }
         }
@@ -621,11 +618,11 @@ class ScoreController extends Controller
         $school = auth()->user()->school;
 
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($report->class?->level_id, $school->id)
+            ?->load('items');
+        $this->scoreService->finalizeReportGradeSnapshot($report);
+        $report->refresh()->load(['student', 'class', 'session', 'term', 'teacher', 'approvedByUser']);
 
         $pdf = Pdf::loadView('admin.scores.report-pdf', compact(
             'report', 'school', 'config', 'gradingScale'
@@ -856,11 +853,9 @@ class ScoreController extends Controller
         $school = auth()->user()->school;
         $class = SchoolClass::findOrFail($request->class_id);
         $config = $school->reportCardConfig;
-        $gradingScale = GradingScale::where('school_id', $school->id)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->with('items')
-            ->first();
+        $gradingScale = app(GradingScaleResolver::class)
+            ->resolveForLevel($class->level_id, $school->id)
+            ?->load('items');
 
         $query = StudentTermReport::where('class_id', $request->class_id)
             ->with(['student.studentProfile', 'class', 'session', 'term']);
@@ -881,6 +876,9 @@ class ScoreController extends Controller
 
         $html = '';
         foreach ($reports as $index => $report) {
+            $this->scoreService->finalizeReportGradeSnapshot($report);
+            $report->refresh()->load(['student.studentProfile', 'class', 'session', 'term']);
+
             $html .= view('admin.scores.report-pdf', compact(
                 'report', 'school', 'config', 'gradingScale'
             ))->render();

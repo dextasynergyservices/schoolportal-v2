@@ -7,11 +7,10 @@ namespace App\Livewire\Admin;
 use App\Models\AcademicSession;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
-use App\Models\GradingScale;
-use App\Models\GradingScaleItem;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Term;
+use App\Services\GradingScaleResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -161,17 +160,15 @@ class SubjectPerformanceTrends extends Component
             }
         }
 
-        // Load grading scale items for grade display
-        $gradingItems = collect();
-        $defaultScale = GradingScale::where('school_id', $schoolId)
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->first();
-        if ($defaultScale) {
-            $gradingItems = GradingScaleItem::where('grading_scale_id', $defaultScale->id)
-                ->orderByDesc('min_score')
-                ->get(['grade', 'label', 'min_score', 'max_score']);
-        }
+        $levelId = $this->classId
+            ? SchoolClass::where('school_id', $schoolId)->whereKey($this->classId)->value('level_id')
+            : null;
+        $gradingItems = app(GradingScaleResolver::class)
+            ->resolveForLevel($levelId ? (int) $levelId : null, $schoolId)
+            ?->items()
+            ->orderByDesc('min_score')
+            ->get(['grade', 'label', 'min_score', 'max_score'])
+            ?? collect();
 
         return view('livewire.admin.subject-performance-trends', compact(
             'classes',

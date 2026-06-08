@@ -782,7 +782,7 @@ class ExamController extends Controller
         $teacher = auth()->user();
         $this->authorizeTeacherAccess($exam, $teacher);
 
-        $exam->load(['class:id,name', 'subject:id,name', 'session:id,name', 'term:id,name']);
+        $exam->load(['class:id,name,level_id', 'subject:id,name', 'session:id,name', 'term:id,name']);
 
         $attempts = ExamAttempt::where('exam_id', $exam->id)
             ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
@@ -807,9 +807,10 @@ class ExamController extends Controller
         ];
 
         // Build grade map for each attempt
+        $levelId = $exam->class?->level_id;
         $grades = $attempts->mapWithKeys(fn (ExamAttempt $a) => [
             $a->id => $a->percentage !== null
-                ? $this->scoreService->getGrade($teacher->school_id, (float) $a->percentage)
+                ? $this->scoreService->getGrade($teacher->school_id, (float) $a->percentage, $levelId)
                 : null,
         ]);
 
@@ -1075,9 +1076,10 @@ class ExamController extends Controller
         $teacher = auth()->user();
         $this->authorizeTeacherAccess($exam, $teacher);
 
-        $exam->load(['class:id,name', 'subject:id,name']);
+        $exam->load(['class:id,name,level_id', 'subject:id,name']);
 
         $schoolId = $teacher->school_id;
+        $levelId = $exam->class?->level_id;
         $attempts = ExamAttempt::where('exam_id', $exam->id)
             ->whereIn('status', ['submitted', 'timed_out', 'grading', 'graded'])
             ->with('student:id,name,username')
@@ -1089,7 +1091,7 @@ class ExamController extends Controller
 
         foreach ($attempts as $attempt) {
             $grade = $attempt->percentage !== null
-                ? $this->scoreService->getGrade($schoolId, (float) $attempt->percentage)
+                ? $this->scoreService->getGrade($schoolId, (float) $attempt->percentage, $levelId)
                 : null;
 
             $rows[] = [

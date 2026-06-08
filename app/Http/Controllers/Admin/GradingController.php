@@ -8,11 +8,15 @@ use App\Http\Controllers\Controller;
 use App\Models\GradingScale;
 use App\Models\GradingScaleItem;
 use App\Models\ReportCardConfig;
+use App\Models\SchoolLevel;
 use App\Models\ScoreComponent;
 use App\Services\FileUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class GradingController extends Controller
@@ -24,7 +28,14 @@ class GradingController extends Controller
     {
         $school = app('current.school');
 
-        $gradingScales = GradingScale::with('items')->orderBy('name')->get();
+        $gradingScales = GradingScale::with(['items', 'levels'])->orderBy('name')->get();
+        $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
+        $levelAssignments = DB::table('grading_scale_level')
+            ->join('grading_scales', 'grading_scale_level.grading_scale_id', '=', 'grading_scales.id')
+            ->where('grading_scale_level.school_id', $school->id)
+            ->select('grading_scale_level.level_id', 'grading_scale_level.grading_scale_id', 'grading_scales.name as scale_name')
+            ->get()
+            ->keyBy('level_id');
         $scoreComponents = ScoreComponent::orderBy('sort_order')->get();
         $reportCardConfig = ReportCardConfig::firstOrCreate(
             ['school_id' => $school->id],
@@ -49,40 +60,40 @@ class GradingController extends Controller
 
         $totalWeight = $scoreComponents->sum('weight');
 
-        return view('admin.grading.index', compact('gradingScales', 'scoreComponents', 'reportCardConfig', 'totalWeight'));
+        return view('admin.grading.index', compact('gradingScales', 'levels', 'levelAssignments', 'scoreComponents', 'reportCardConfig', 'totalWeight'));
     }
 
     // ── Grading Scales ──
 
     public function createScale(): View
     {
-        return view('admin.grading.scales.create');
+        $school = app('current.school');
+        $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
+        $levelAssignments = $this->levelAssignmentMap($school->id);
+
+        return view('admin.grading.scales.create', compact('levels', 'levelAssignments'));
     }
 
     public function storeScale(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'is_default' => ['boolean'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.grade' => ['required', 'string', 'max:5'],
-            'items.*.label' => ['required', 'string', 'max:50'],
-            'items.*.min_score' => ['required', 'integer', 'min:0', 'max:100'],
-            'items.*.max_score' => ['required', 'integer', 'min:0', 'max:100'],
-        ]);
-
         $school = app('current.school');
+        $validated = $this->validateScalePayload($request, $school->id);
 
         DB::transaction(function () use ($validated, $school) {
+            $makeDefault = ! empty($validated['is_default'])
+                || ! GradingScale::where('school_id', $school->id)->where('is_default', true)->exists();
+
             // If setting as default, unset other defaults
-            if (! empty($validated['is_default'])) {
-                GradingScale::where('is_default', true)->update(['is_default' => false]);
+            if ($makeDefault) {
+                GradingScale::where('school_id', $school->id)
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
             }
 
             $scale = GradingScale::create([
                 'school_id' => $school->id,
                 'name' => $validated['name'],
-                'is_default' => $validated['is_default'] ?? false,
+                'is_default' => $makeDefault,
             ]);
 
             foreach ($validated['items'] as $index => $item) {
@@ -96,6 +107,8 @@ class GradingController extends Controller
                     'sort_order' => $index,
                 ]);
             }
+
+            $this->syncScaleLevels($scale, $validated['level_ids'] ?? [], $school->id);
         });
 
         return redirect()->route('admin.grading.index')
@@ -104,33 +117,37 @@ class GradingController extends Controller
 
     public function editScale(GradingScale $scale): View
     {
-        $scale->load('items');
+        $school = app('current.school');
+        $scale->load(['items', 'levels']);
+        $levels = SchoolLevel::where('is_active', true)->orderBy('sort_order')->get();
+        $levelAssignments = $this->levelAssignmentMap($school->id);
+        $selectedLevelIds = $scale->levels->pluck('id')->all();
 
-        return view('admin.grading.scales.edit', compact('scale'));
+        return view('admin.grading.scales.edit', compact('scale', 'levels', 'levelAssignments', 'selectedLevelIds'));
     }
 
     public function updateScale(Request $request, GradingScale $scale): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'is_default' => ['boolean'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.grade' => ['required', 'string', 'max:5'],
-            'items.*.label' => ['required', 'string', 'max:50'],
-            'items.*.min_score' => ['required', 'integer', 'min:0', 'max:100'],
-            'items.*.max_score' => ['required', 'integer', 'min:0', 'max:100'],
-        ]);
-
         $school = app('current.school');
+        $validated = $this->validateScalePayload($request, $school->id);
 
         DB::transaction(function () use ($validated, $scale, $school) {
-            if (! empty($validated['is_default'])) {
-                GradingScale::where('is_default', true)->where('id', '!=', $scale->id)->update(['is_default' => false]);
+            $makeDefault = $scale->is_default || ! empty($validated['is_default'])
+                || ! GradingScale::where('school_id', $school->id)
+                    ->where('is_default', true)
+                    ->where('id', '!=', $scale->id)
+                    ->exists();
+
+            if ($makeDefault) {
+                GradingScale::where('school_id', $school->id)
+                    ->where('is_default', true)
+                    ->where('id', '!=', $scale->id)
+                    ->update(['is_default' => false]);
             }
 
             $scale->update([
                 'name' => $validated['name'],
-                'is_default' => $validated['is_default'] ?? false,
+                'is_default' => $makeDefault,
             ]);
 
             // Replace all items
@@ -146,6 +163,8 @@ class GradingController extends Controller
                     'sort_order' => $index,
                 ]);
             }
+
+            $this->syncScaleLevels($scale, $validated['level_ids'] ?? [], $school->id);
         });
 
         return redirect()->route('admin.grading.index')
@@ -154,10 +173,55 @@ class GradingController extends Controller
 
     public function destroyScale(GradingScale $scale): RedirectResponse
     {
+        if ($scale->is_default) {
+            return redirect()->route('admin.grading.index', ['tab' => 'scales'])
+                ->with('error', __('The default grading scale cannot be deleted.'));
+        }
+
+        if ($scale->levels()->exists()) {
+            return redirect()->route('admin.grading.index', ['tab' => 'scales'])
+                ->with('error', __('Remove assigned levels from this grading scale before deleting it.'));
+        }
+
         $scale->delete();
 
         return redirect()->route('admin.grading.index')
             ->with('success', __('Grading scale deleted.'));
+    }
+
+    public function makeDefaultScale(GradingScale $scale): RedirectResponse
+    {
+        DB::transaction(function () use ($scale) {
+            GradingScale::where('school_id', $scale->school_id)
+                ->where('is_default', true)
+                ->where('id', '!=', $scale->id)
+                ->update(['is_default' => false]);
+
+            $scale->update([
+                'is_default' => true,
+                'is_active' => true,
+            ]);
+        });
+
+        return redirect()->route('admin.grading.index', ['tab' => 'scales'])
+            ->with('success', __('":name" is now the school default grading scale.', ['name' => $scale->name]));
+    }
+
+    public function assignScaleLevels(Request $request, GradingScale $scale): RedirectResponse
+    {
+        $school = app('current.school');
+
+        $validated = $request->validate([
+            'level_ids' => ['nullable', 'array'],
+            'level_ids.*' => ['integer', 'distinct', Rule::exists('school_levels', 'id')->where('school_id', $school->id)],
+        ]);
+
+        DB::transaction(function () use ($scale, $validated, $school) {
+            $this->syncScaleLevels($scale, $validated['level_ids'] ?? [], $school->id);
+        });
+
+        return redirect()->route('admin.grading.index', ['tab' => 'scales'])
+            ->with('success', __('Level assignments saved for ":name".', ['name' => $scale->name]));
     }
 
     // ── Score Components ──
@@ -323,5 +387,144 @@ class GradingController extends Controller
 
         return redirect()->route('admin.grading.index')
             ->with('success', __('Report card configuration saved.'));
+    }
+
+    /**
+     * @param  array<int|string>  $levelIds
+     */
+    private function syncScaleLevels(GradingScale $scale, array $levelIds, int $schoolId): void
+    {
+        $levelIds = SchoolLevel::where('school_id', $schoolId)
+            ->whereIn('id', array_unique(array_map('intval', $levelIds)))
+            ->pluck('id')
+            ->all();
+
+        DB::table('grading_scale_level')
+            ->where('school_id', $schoolId)
+            ->where('grading_scale_id', $scale->id)
+            ->delete();
+
+        if ($levelIds === []) {
+            return;
+        }
+
+        DB::table('grading_scale_level')
+            ->where('school_id', $schoolId)
+            ->whereIn('level_id', $levelIds)
+            ->delete();
+
+        DB::table('grading_scale_level')->insert(
+            collect($levelIds)
+                ->map(fn (int $levelId): array => [
+                    'school_id' => $schoolId,
+                    'grading_scale_id' => $scale->id,
+                    'level_id' => $levelId,
+                    'created_at' => now(),
+                ])
+                ->all()
+        );
+    }
+
+    private function levelAssignmentMap(int $schoolId): Collection
+    {
+        return DB::table('grading_scale_level')
+            ->join('grading_scales', 'grading_scale_level.grading_scale_id', '=', 'grading_scales.id')
+            ->where('grading_scale_level.school_id', $schoolId)
+            ->select('grading_scale_level.level_id', 'grading_scale_level.grading_scale_id', 'grading_scales.name as scale_name')
+            ->get()
+            ->keyBy('level_id');
+    }
+
+    /**
+     * @return array{name: string, is_default?: bool, items: array<int, array{grade: string, label: string, min_score: int, max_score: int}>, level_ids?: array<int|string>}
+     */
+    private function validateScalePayload(Request $request, int $schoolId): array
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'is_default' => ['boolean'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.grade' => ['required', 'string', 'max:5'],
+            'items.*.label' => ['required', 'string', 'max:50'],
+            'items.*.min_score' => ['required', 'integer', 'min:0', 'max:100'],
+            'items.*.max_score' => ['required', 'integer', 'min:0', 'max:100'],
+            'level_ids' => ['nullable', 'array'],
+            'level_ids.*' => ['integer', 'distinct', Rule::exists('school_levels', 'id')->where('school_id', $schoolId)],
+        ]);
+
+        $this->validateGradeBands($validated['items']);
+
+        return $validated;
+    }
+
+    /**
+     * @param  array<int, array{grade: string, label: string, min_score: int, max_score: int}>  $items
+     *
+     * @throws ValidationException
+     */
+    private function validateGradeBands(array $items): void
+    {
+        $errors = [];
+        $seenGrades = [];
+        $bands = [];
+
+        foreach ($items as $index => $item) {
+            $grade = trim((string) $item['grade']);
+            $gradeKey = mb_strtolower($grade);
+            $minScore = (int) $item['min_score'];
+            $maxScore = (int) $item['max_score'];
+
+            if ($minScore > $maxScore) {
+                $errors["items.{$index}.min_score"] = __('The minimum score cannot be greater than the maximum score.');
+            }
+
+            if (isset($seenGrades[$gradeKey])) {
+                $errors["items.{$index}.grade"] = __('The grade label ":grade" is already used in this scale.', ['grade' => $grade]);
+            }
+
+            $seenGrades[$gradeKey] = true;
+            $bands[] = [
+                'index' => $index,
+                'grade' => $grade,
+                'min_score' => $minScore,
+                'max_score' => $maxScore,
+            ];
+        }
+
+        usort($bands, fn (array $left, array $right): int => $left['min_score'] <=> $right['min_score']);
+
+        $expectedMin = 0;
+        $previousBand = null;
+
+        foreach ($bands as $band) {
+            if ($previousBand !== null && $band['min_score'] <= $previousBand['max_score']) {
+                $errors["items.{$band['index']}.min_score"] = __('The range :range overlaps with :grade. Please adjust the scores.', [
+                    'range' => "{$band['min_score']}-{$band['max_score']}",
+                    'grade' => $previousBand['grade'],
+                ]);
+            }
+
+            if ($band['min_score'] > $expectedMin) {
+                $missingEnd = $band['min_score'] - 1;
+                $errors['items'] = __('Score ranges must cover every score from 0 to 100. Missing range: :range.', [
+                    'range' => $expectedMin === $missingEnd ? (string) $expectedMin : "{$expectedMin}-{$missingEnd}",
+                ]);
+                break;
+            }
+
+            $expectedMin = max($expectedMin, $band['max_score'] + 1);
+            $previousBand = $band;
+        }
+
+        if (! isset($errors['items']) && $expectedMin <= 100) {
+            $missingEnd = 100;
+            $errors['items'] = __('Score ranges must cover every score from 0 to 100. Missing range: :range.', [
+                'range' => $expectedMin === $missingEnd ? (string) $expectedMin : "{$expectedMin}-{$missingEnd}",
+            ]);
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 }
