@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GradingScale extends Model
@@ -32,5 +33,12 @@ class GradingScale extends Model
     public function items(): HasMany
     {
         return $this->hasMany(GradingScaleItem::class)->orderBy('sort_order');
+    }
+
+    public function levels(): BelongsToMany
+    {
+        return $this->belongsToMany(SchoolLevel::class, 'grading_scale_level', 'grading_scale_id', 'level_id')
+            ->withPivot('school_id')
+            ->orderBy('school_levels.sort_order');
     }
 }

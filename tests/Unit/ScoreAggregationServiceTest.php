@@ -17,6 +17,7 @@ use App\Models\StudentTermReport;
 use App\Models\Subject;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\GradingScaleResolver;
 use App\Services\ScoreAggregationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\WithSchoolContext;
@@ -324,6 +325,124 @@ class ScoreAggregationServiceTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function test_get_grade_uses_level_assigned_scale_before_default(): void
+    {
+        $defaultScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Default Scale',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+        GradingScaleItem::create([
+            'grading_scale_id' => $defaultScale->id,
+            'school_id' => $this->school->id,
+            'grade' => 'A',
+            'label' => 'Default Excellent',
+            'min_score' => 70,
+            'max_score' => 100,
+            'sort_order' => 1,
+        ]);
+
+        $levelScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Primary Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        GradingScaleItem::create([
+            'grading_scale_id' => $levelScale->id,
+            'school_id' => $this->school->id,
+            'grade' => 'E',
+            'label' => 'Excellent Primary',
+            'min_score' => 80,
+            'max_score' => 100,
+            'sort_order' => 1,
+        ]);
+        $levelScale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+
+        $levelGrade = $this->service->getGrade($this->school->id, 85.0, $this->level->id);
+        $defaultGrade = $this->service->getGrade($this->school->id, 85.0);
+
+        $this->assertEquals('E', $levelGrade['grade']);
+        $this->assertEquals('Excellent Primary', $levelGrade['label']);
+        $this->assertEquals($levelScale->id, $levelGrade['grading_scale_id']);
+        $this->assertEquals('A', $defaultGrade['grade']);
+        $this->assertEquals($defaultScale->id, $defaultGrade['grading_scale_id']);
+    }
+
+    public function test_resolver_uses_student_class_level_before_default(): void
+    {
+        $defaultScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Default Scale',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        $levelScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Student Level Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $levelScale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+
+        $resolved = app(GradingScaleResolver::class)->resolveForStudent($this->student);
+
+        $this->assertEquals($levelScale->id, $resolved?->id);
+        $this->assertNotEquals($defaultScale->id, $resolved?->id);
+    }
+
+    public function test_subject_scores_snapshot_uses_class_level_grading_scale(): void
+    {
+        $defaultScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Default Scale',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+        GradingScaleItem::create([
+            'grading_scale_id' => $defaultScale->id,
+            'school_id' => $this->school->id,
+            'grade' => 'A',
+            'label' => 'Default Excellent',
+            'min_score' => 70,
+            'max_score' => 100,
+            'sort_order' => 1,
+        ]);
+
+        $levelScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Primary Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        GradingScaleItem::create([
+            'grading_scale_id' => $levelScale->id,
+            'school_id' => $this->school->id,
+            'grade' => 'P-EX',
+            'label' => 'Primary Excellent',
+            'min_score' => 70,
+            'max_score' => 100,
+            'sort_order' => 1,
+        ]);
+        $levelScale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+
+        $this->createScore($this->student->id, $this->ca1->id, 20);
+        $this->createScore($this->student->id, $this->ca2->id, 20);
+        $this->createScore($this->student->id, $this->examComponent->id, 60);
+
+        $snapshot = $this->service->buildSubjectScoresSnapshot(
+            $this->student->id,
+            $this->class->id,
+            $this->term->id,
+            $this->school->id,
+        );
+
+        $this->assertEquals('P-EX', $snapshot[0]['grade']);
+        $this->assertEquals('Primary Excellent', $snapshot[0]['grade_label']);
+    }
+
     // ── computeSubjectPositions ──
 
     public function test_compute_subject_positions_ranks_students(): void
@@ -426,6 +545,62 @@ class ScoreAggregationServiceTest extends TestCase
         ]);
         $this->assertNotEmpty($report->subject_scores_snapshot);
         $this->assertEquals(1, $report->position);
+    }
+
+    public function test_generated_report_stores_overall_grade_and_scale_snapshot(): void
+    {
+        $this->setUpGradingScale();
+        $this->createScore($this->student->id, $this->ca1->id, 15);
+        $this->createScore($this->student->id, $this->examComponent->id, 48);
+
+        $report = $this->service->generateTermReport(
+            $this->student->id,
+            $this->class->id,
+            $this->session->id,
+            $this->term->id,
+            $this->school->id,
+        );
+
+        $this->assertNotNull($report->grading_scale_id);
+        $this->assertNotEmpty($report->grading_scale_snapshot['items'] ?? []);
+        $this->assertSame('C', $report->overall_grade);
+        $this->assertSame('Good', $report->overall_grade_label);
+    }
+
+    public function test_draft_report_uses_current_scale_until_finalized_then_keeps_snapshot(): void
+    {
+        $this->setUpGradingScale();
+        $this->createScore($this->student->id, $this->ca1->id, 15);
+        $this->createScore($this->student->id, $this->examComponent->id, 48);
+
+        $report = $this->service->generateTermReport(
+            $this->student->id,
+            $this->class->id,
+            $this->session->id,
+            $this->term->id,
+            $this->school->id,
+        );
+
+        $scale = GradingScale::where('school_id', $this->school->id)->where('is_default', true)->firstOrFail();
+        GradingScaleItem::where('grading_scale_id', $scale->id)
+            ->where('grade', 'C')
+            ->update(['label' => 'Current Good']);
+
+        $scale->refresh()->load('items');
+        $report->refresh();
+        $this->assertSame('Current Good', $report->resolvedOverallGradeItem($scale)->label);
+
+        $this->service->finalizeReportGradeSnapshot($report);
+        GradingScaleItem::where('grading_scale_id', $scale->id)
+            ->where('grade', 'C')
+            ->update(['label' => 'Changed After Publish']);
+
+        $scale->refresh()->load('items');
+        $report->refresh();
+
+        $this->assertTrue($report->isFinalized());
+        $this->assertSame('Current Good', $report->resolvedOverallGradeItem($scale)->label);
+        $this->assertSame('Current Good', $report->resolvedGradingItems($scale)->firstWhere('grade', 'C')->label);
     }
 
     // ── generateClassReports ──

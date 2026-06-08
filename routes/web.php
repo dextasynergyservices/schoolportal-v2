@@ -207,6 +207,8 @@ Route::prefix('portal')->group(function () {
             Route::post('grading/scales', [GradingController::class, 'storeScale'])->name('admin.grading.scales.store');
             Route::get('grading/scales/{scale}/edit', [GradingController::class, 'editScale'])->name('admin.grading.scales.edit');
             Route::put('grading/scales/{scale}', [GradingController::class, 'updateScale'])->name('admin.grading.scales.update');
+            Route::post('grading/scales/{scale}/make-default', [GradingController::class, 'makeDefaultScale'])->name('admin.grading.scales.make-default');
+            Route::post('grading/scales/{scale}/levels', [GradingController::class, 'assignScaleLevels'])->name('admin.grading.scales.levels');
             Route::delete('grading/scales/{scale}', [GradingController::class, 'destroyScale'])->name('admin.grading.scales.destroy');
             Route::post('grading/components', [GradingController::class, 'storeComponents'])->name('admin.grading.components.store');
             Route::put('grading/report-card', [GradingController::class, 'updateReportCard'])->name('admin.grading.report-card.update');

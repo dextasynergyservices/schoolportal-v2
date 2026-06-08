@@ -17,8 +17,11 @@ Schedule::command('queue:work --stop-when-empty --max-time=240')
     ->withoutOverlapping()
     ->onOneServer();
 
-// Daily database backup at 2:00 AM
-Schedule::command('db:backup')->dailyAt('02:00')->onOneServer();
+// Weekly database backup to local storage and Google Drive, every Sunday at 2:00 AM
+Schedule::command('db:backup')
+    ->weeklyOn(0, '02:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/db-backup.log'));
 
 // Reset free AI credits on the 1st of each month at midnight
 Schedule::command('credits:reset-free')->monthlyOn(1, '00:00')->onOneServer();

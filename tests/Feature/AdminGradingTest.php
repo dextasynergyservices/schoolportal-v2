@@ -7,7 +7,10 @@ namespace Tests\Feature;
 use App\Models\GradingScale;
 use App\Models\GradingScaleItem;
 use App\Models\ReportCardConfig;
+use App\Models\School;
+use App\Models\SchoolLevel;
 use App\Models\ScoreComponent;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\WithSchoolContext;
 use Tests\TestCase;
@@ -40,6 +43,7 @@ class AdminGradingTest extends TestCase
                 'items' => [
                     ['grade' => 'A1', 'label' => 'Excellent', 'min_score' => 75, 'max_score' => 100],
                     ['grade' => 'B2', 'label' => 'Very Good', 'min_score' => 70, 'max_score' => 74],
+                    ['grade' => 'C6', 'label' => 'Credit', 'min_score' => 40, 'max_score' => 69],
                     ['grade' => 'F9', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
                 ],
             ])
@@ -56,7 +60,7 @@ class AdminGradingTest extends TestCase
             ->where('school_id', $this->school->id)
             ->first();
 
-        $this->assertCount(3, $scale->items);
+        $this->assertCount(4, $scale->items);
     }
 
     public function test_grading_scale_requires_items(): void
@@ -92,6 +96,7 @@ class AdminGradingTest extends TestCase
                 'items' => [
                     ['grade' => 'A', 'label' => 'Excellent', 'min_score' => 80, 'max_score' => 100],
                     ['grade' => 'B', 'label' => 'Good', 'min_score' => 60, 'max_score' => 79],
+                    ['grade' => 'F', 'label' => 'Needs Improvement', 'min_score' => 0, 'max_score' => 59],
                 ],
             ])
             ->assertRedirect(route('admin.grading.index'));
@@ -112,6 +117,279 @@ class AdminGradingTest extends TestCase
             ->assertRedirect(route('admin.grading.index'));
 
         $this->assertDatabaseMissing('grading_scales', ['id' => $scale->id]);
+    }
+
+    public function test_grading_scale_can_be_assigned_to_multiple_levels(): void
+    {
+        $secondaryLevel = SchoolLevel::create([
+            'school_id' => $this->school->id,
+            'name' => 'Secondary',
+            'slug' => 'secondary',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+
+        $scale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Shared Level Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        $scale->levels()->attach([
+            $this->level->id => ['school_id' => $this->school->id],
+            $secondaryLevel->id => ['school_id' => $this->school->id],
+        ]);
+
+        $this->assertCount(2, $scale->fresh()->levels);
+        $this->assertDatabaseHas('grading_scale_level', [
+            'school_id' => $this->school->id,
+            'grading_scale_id' => $scale->id,
+            'level_id' => $this->level->id,
+        ]);
+        $this->assertDatabaseHas('grading_scale_level', [
+            'school_id' => $this->school->id,
+            'grading_scale_id' => $scale->id,
+            'level_id' => $secondaryLevel->id,
+        ]);
+    }
+
+    public function test_level_can_have_only_one_assigned_grading_scale(): void
+    {
+        $primaryScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Primary Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $secondaryScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Secondary Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        $primaryScale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+
+        $this->expectException(QueryException::class);
+
+        $secondaryScale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+    }
+
+    public function test_admin_can_create_grading_scale_with_assigned_levels(): void
+    {
+        $secondaryLevel = SchoolLevel::create([
+            'school_id' => $this->school->id,
+            'name' => 'Secondary',
+            'slug' => 'secondary',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.store'), [
+                'name' => 'Primary Scale',
+                'level_ids' => [$this->level->id, $secondaryLevel->id],
+                'items' => [
+                    ['grade' => 'A', 'label' => 'Excellent', 'min_score' => 70, 'max_score' => 100],
+                    ['grade' => 'B', 'label' => 'Good', 'min_score' => 40, 'max_score' => 69],
+                    ['grade' => 'F', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
+                ],
+            ])
+            ->assertRedirect(route('admin.grading.index'));
+
+        $scale = GradingScale::where('name', 'Primary Scale')->firstOrFail();
+
+        $this->assertTrue($scale->is_default);
+        $this->assertDatabaseHas('grading_scale_level', [
+            'school_id' => $this->school->id,
+            'grading_scale_id' => $scale->id,
+            'level_id' => $this->level->id,
+        ]);
+        $this->assertDatabaseHas('grading_scale_level', [
+            'school_id' => $this->school->id,
+            'grading_scale_id' => $scale->id,
+            'level_id' => $secondaryLevel->id,
+        ]);
+    }
+
+    public function test_admin_can_assign_levels_from_dialog_and_move_existing_assignment(): void
+    {
+        $oldScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Old Scale',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+        $newScale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'New Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $oldScale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.levels', $newScale), [
+                'level_ids' => [$this->level->id],
+            ])
+            ->assertRedirect(route('admin.grading.index', ['tab' => 'scales']));
+
+        $this->assertDatabaseMissing('grading_scale_level', [
+            'grading_scale_id' => $oldScale->id,
+            'level_id' => $this->level->id,
+        ]);
+        $this->assertDatabaseHas('grading_scale_level', [
+            'school_id' => $this->school->id,
+            'grading_scale_id' => $newScale->id,
+            'level_id' => $this->level->id,
+        ]);
+    }
+
+    public function test_admin_can_make_grading_scale_default(): void
+    {
+        $oldDefault = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Old Default',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+        $newDefault = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'New Default',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.make-default', $newDefault))
+            ->assertRedirect(route('admin.grading.index', ['tab' => 'scales']));
+
+        $this->assertFalse($oldDefault->fresh()->is_default);
+        $this->assertTrue($newDefault->fresh()->is_default);
+    }
+
+    public function test_admin_cannot_delete_assigned_grading_scale(): void
+    {
+        $scale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Assigned Scale',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+        $scale->levels()->attach($this->level->id, ['school_id' => $this->school->id]);
+
+        $this->actingAs($this->admin)
+            ->delete(route('admin.grading.scales.destroy', $scale))
+            ->assertRedirect(route('admin.grading.index', ['tab' => 'scales']))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('grading_scales', ['id' => $scale->id]);
+    }
+
+    public function test_grading_scale_rejects_min_score_greater_than_max_score(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.store'), [
+                'name' => 'Invalid Range Scale',
+                'items' => [
+                    ['grade' => 'A', 'label' => 'Excellent', 'min_score' => 90, 'max_score' => 80],
+                    ['grade' => 'B', 'label' => 'Good', 'min_score' => 40, 'max_score' => 89],
+                    ['grade' => 'F', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
+                ],
+            ])
+            ->assertSessionHasErrors('items.0.min_score');
+    }
+
+    public function test_grading_scale_rejects_overlapping_ranges(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.store'), [
+                'name' => 'Overlap Scale',
+                'items' => [
+                    ['grade' => 'A1', 'label' => 'Excellent', 'min_score' => 70, 'max_score' => 100],
+                    ['grade' => 'B2', 'label' => 'Very Good', 'min_score' => 60, 'max_score' => 75],
+                    ['grade' => 'C', 'label' => 'Credit', 'min_score' => 40, 'max_score' => 59],
+                    ['grade' => 'F', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
+                ],
+            ])
+            ->assertSessionHasErrors('items.0.min_score');
+    }
+
+    public function test_grading_scale_rejects_duplicate_grade_labels(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.store'), [
+                'name' => 'Duplicate Grade Scale',
+                'items' => [
+                    ['grade' => 'A', 'label' => 'Excellent', 'min_score' => 70, 'max_score' => 100],
+                    ['grade' => 'A', 'label' => 'Very Good', 'min_score' => 40, 'max_score' => 69],
+                    ['grade' => 'F', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
+                ],
+            ])
+            ->assertSessionHasErrors('items.1.grade');
+    }
+
+    public function test_grading_scale_rejects_incomplete_score_coverage(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.store'), [
+                'name' => 'Incomplete Scale',
+                'items' => [
+                    ['grade' => 'A', 'label' => 'Excellent', 'min_score' => 70, 'max_score' => 100],
+                    ['grade' => 'F', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
+                ],
+            ])
+            ->assertSessionHasErrors('items');
+    }
+
+    public function test_new_default_grading_scale_unsets_previous_default_for_same_school(): void
+    {
+        $oldDefault = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Old Default',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.store'), [
+                'name' => 'New Default',
+                'is_default' => true,
+                'items' => [
+                    ['grade' => 'A', 'label' => 'Excellent', 'min_score' => 70, 'max_score' => 100],
+                    ['grade' => 'B', 'label' => 'Good', 'min_score' => 40, 'max_score' => 69],
+                    ['grade' => 'F', 'label' => 'Fail', 'min_score' => 0, 'max_score' => 39],
+                ],
+            ])
+            ->assertRedirect(route('admin.grading.index'));
+
+        $this->assertFalse($oldDefault->fresh()->is_default);
+        $this->assertTrue(GradingScale::where('name', 'New Default')->firstOrFail()->is_default);
+    }
+
+    public function test_level_assignment_rejects_levels_from_another_school(): void
+    {
+        $otherSchool = School::factory()->create();
+        $otherLevel = SchoolLevel::withoutGlobalScopes()->create([
+            'school_id' => $otherSchool->id,
+            'name' => 'Other Primary',
+            'slug' => 'other-primary',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $scale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => 'Current School Scale',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.grading.scales.levels', $scale), [
+                'level_ids' => [$otherLevel->id],
+            ])
+            ->assertSessionHasErrors('level_ids.0');
     }
 
     // ── Score Components ──

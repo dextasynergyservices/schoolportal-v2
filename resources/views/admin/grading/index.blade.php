@@ -30,8 +30,11 @@
 
             {{-- Grading Scales Tab --}}
             <div x-show="tab === 'scales'" x-transition>
-                <div class="flex items-center justify-between mb-4">
-                    <p class="text-sm text-zinc-500">{{ __('Define grading scales with letter grades and score ranges.') }}</p>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <div>
+                        <p class="text-sm font-medium text-zinc-900 dark:text-white">{{ __('Grading Scales') }}</p>
+                        <p class="text-sm text-zinc-500">{{ __('Define grade bands and optionally assign a scale to one or more levels. Levels without a scale use the school default.') }}</p>
+                    </div>
                     <flux:button variant="primary" size="sm" icon="plus" href="{{ route('admin.grading.scales.create') }}" wire:navigate>
                         {{ __('Add Scale') }}
                     </flux:button>
@@ -43,51 +46,175 @@
                         <p class="text-sm text-zinc-500">{{ __('No grading scales defined yet.') }}</p>
                     </div>
                 @else
-                    <div class="space-y-4">
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         @foreach ($gradingScales as $scale)
+                            @php
+                                $assignedLevels = $scale->levels->sortBy('sort_order')->values();
+                                $canDelete = ! $scale->is_default && $assignedLevels->isEmpty();
+                            @endphp
+
                             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
-                                <div class="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-700/50 border-b border-zinc-200 dark:border-zinc-700">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-sm font-medium text-zinc-900 dark:text-white">{{ $scale->name }}</span>
+                                <div class="px-4 py-4 border-b border-zinc-100 dark:border-zinc-700">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $scale->name }}</h3>
+                                                @if ($scale->is_default)
+                                                    <flux:badge color="indigo" size="sm">{{ __('Default') }}</flux:badge>
+                                                @endif
+                                                <flux:badge :color="$scale->is_active ? 'green' : 'zinc'" size="sm">
+                                                    {{ $scale->is_active ? __('Active') : __('Inactive') }}
+                                                </flux:badge>
+                                            </div>
+                                            <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                                <span>{{ trans_choice(':count grade band|:count grade bands', $scale->items->count(), ['count' => $scale->items->count()]) }}</span>
+                                                <span>{{ trans_choice(':count assigned level|:count assigned levels', $assignedLevels->count(), ['count' => $assignedLevels->count()]) }}</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <flux:modal.trigger :name="'assign-scale-levels-' . $scale->id">
+                                                <flux:button variant="subtle" size="xs" icon="squares-2x2">
+                                                    {{ __('Assign') }}
+                                                </flux:button>
+                                            </flux:modal.trigger>
+                                            <flux:button variant="subtle" size="xs" icon="pencil" href="{{ route('admin.grading.scales.edit', $scale) }}" wire:navigate aria-label="{{ __('Edit') }}" />
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4">
+                                        <p class="text-xs font-medium uppercase tracking-wide text-zinc-400">{{ __('Assigned Levels') }}</p>
+                                        @if ($assignedLevels->isNotEmpty())
+                                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                                @foreach ($assignedLevels as $level)
+                                                    <span class="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                                        {{ $level->name }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                                {{ $scale->is_default
+                                                    ? __('No levels assigned. This default scale is used anywhere no level-specific scale is set.')
+                                                    : __('No levels assigned yet.') }}
+                                            </p>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="px-4 py-3">
+                                    @if ($scale->items->isNotEmpty())
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            @foreach ($scale->items as $item)
+                                                <div class="flex items-center justify-between rounded-md bg-zinc-50 px-3 py-2 dark:bg-zinc-900/50">
+                                                    <div class="min-w-0">
+                                                        <span class="text-sm font-semibold text-zinc-900 dark:text-white">{{ $item->grade }}</span>
+                                                        <span class="ml-1 text-xs text-zinc-500">{{ $item->label }}</span>
+                                                    </div>
+                                                    <span class="text-xs font-medium text-zinc-500">{{ $item->min_score }}-{{ $item->max_score }}%</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <p class="text-sm text-zinc-500">{{ __('No grade bands configured.') }}</p>
+                                    @endif
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 px-4 py-3 dark:border-zinc-700">
+                                    <div class="text-xs text-zinc-500 dark:text-zinc-400">
                                         @if ($scale->is_default)
-                                            <flux:badge color="indigo" size="sm">{{ __('Default') }}</flux:badge>
+                                            {{ __('School fallback scale') }}
+                                        @elseif ($assignedLevels->isNotEmpty())
+                                            {{ __('Remove assigned levels before deleting') }}
+                                        @else
+                                            {{ __('Can be deleted safely') }}
                                         @endif
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <flux:button variant="subtle" size="xs" icon="pencil" href="{{ route('admin.grading.scales.edit', $scale) }}" wire:navigate aria-label="{{ __('Edit') }}" />
                                         @unless ($scale->is_default)
+                                            <form method="POST" action="{{ route('admin.grading.scales.make-default', $scale) }}">
+                                                @csrf
+                                                <flux:button variant="subtle" size="xs" type="submit" icon="star">{{ __('Make Default') }}</flux:button>
+                                            </form>
+                                        @endunless
+
+                                        @if ($canDelete)
                                             <form method="POST" action="{{ route('admin.grading.scales.destroy', $scale) }}" class="inline">
                                                 @csrf @method('DELETE')
                                                 <flux:button variant="subtle" size="xs" icon="trash" type="submit" aria-label="{{ __('Delete') }}" />
                                             </form>
-                                        @endunless
+                                        @else
+                                            <flux:button variant="subtle" size="xs" icon="trash" disabled aria-label="{{ __('Cannot delete') }}" />
+                                        @endif
                                     </div>
                                 </div>
-                                @if ($scale->items->isNotEmpty())
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full text-sm">
-                                            <thead class="text-xs text-zinc-500 uppercase bg-zinc-50/50 dark:bg-zinc-700/30">
-                                                <tr>
-                                                    <th class="px-4 py-2 text-left">{{ __('Grade') }}</th>
-                                                    <th class="px-4 py-2 text-left">{{ __('Label') }}</th>
-                                                    <th class="px-4 py-2 text-right">{{ __('Min') }}</th>
-                                                    <th class="px-4 py-2 text-right">{{ __('Max') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-zinc-100 dark:divide-zinc-700">
-                                                @foreach ($scale->items as $item)
-                                                    <tr>
-                                                        <td class="px-4 py-2 font-semibold text-zinc-900 dark:text-white">{{ $item->grade }}</td>
-                                                        <td class="px-4 py-2 text-zinc-600 dark:text-zinc-400">{{ $item->label }}</td>
-                                                        <td class="px-4 py-2 text-right text-zinc-600 dark:text-zinc-400">{{ $item->min_score }}%</td>
-                                                        <td class="px-4 py-2 text-right text-zinc-600 dark:text-zinc-400">{{ $item->max_score }}%</td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                @endif
                             </div>
+
+                            <flux:modal :name="'assign-scale-levels-' . $scale->id" class="max-w-lg">
+                                <form method="POST" action="{{ route('admin.grading.scales.levels', $scale) }}" class="space-y-5">
+                                    @csrf
+                                    <div>
+                                        <flux:heading size="lg">{{ __('Assign Levels') }}</flux:heading>
+                                        <flux:text class="mt-1">{{ __('Choose the levels that should use ":name".', ['name' => $scale->name]) }}</flux:text>
+                                    </div>
+
+                                    <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400">
+                                        {{ __('If no level is selected, this scale will only be used when set as the school default. Levels without their own scale use the school default scale.') }}
+                                    </div>
+
+                                    @if ($levels->isEmpty())
+                                        <p class="text-sm text-zinc-500">{{ __('No active levels found. Create levels first.') }}</p>
+                                    @else
+                                        <div x-data="{ search: '', selected: @js($assignedLevels->pluck('id')->values()->all()).map(Number) }" class="space-y-3">
+                                            <div class="relative">
+                                                <flux:icon name="magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                                                <input type="search" x-model.debounce.100ms="search" placeholder="{{ __('Search levels...') }}"
+                                                    class="w-full rounded-lg border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 shadow-xs outline-none transition placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500">
+                                            </div>
+
+                                            <div class="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
+                                                @foreach ($levels as $level)
+                                                    @php
+                                                        $assignment = $levelAssignments->get($level->id);
+                                                        $assignedToOther = $assignment && (int) $assignment->grading_scale_id !== (int) $scale->id;
+                                                    @endphp
+                                                    <label
+                                                        x-show="{{ Js::from(Str::lower($level->name)) }}.includes(search.trim().toLowerCase())"
+                                                        class="block rounded-md border border-transparent px-3 py-2 transition hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-900 dark:hover:bg-indigo-950/20">
+                                                        <div class="flex items-start gap-3">
+                                                            <input type="checkbox" name="level_ids[]" value="{{ $level->id }}" x-model.number="selected"
+                                                                class="mt-1 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-800">
+                                                            <div class="min-w-0 flex-1">
+                                                                <div class="text-sm font-medium text-zinc-900 dark:text-white">{{ $level->name }}</div>
+                                                                @if ($assignedToOther)
+                                                                    <p class="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+                                                                        {{ __('Currently using ":scale". Saving will move it to this scale.', ['scale' => $assignment->scale_name]) }}
+                                                                    </p>
+                                                                @elseif ($assignment)
+                                                                    <p class="mt-0.5 text-xs text-green-600 dark:text-green-400">{{ __('Already assigned to this scale.') }}</p>
+                                                                @else
+                                                                    <p class="mt-0.5 text-xs text-zinc-500">{{ __('Uses school default unless assigned.') }}</p>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+
+                                            <p class="text-xs text-zinc-500">
+                                                <span x-text="selected.length"></span> {{ __('selected') }}
+                                            </p>
+                                        </div>
+                                    @endif
+
+                                    <div class="flex justify-end gap-2">
+                                        <flux:modal.close>
+                                            <flux:button variant="ghost" type="button">{{ __('Cancel') }}</flux:button>
+                                        </flux:modal.close>
+                                        <flux:button variant="primary" type="submit">{{ __('Save Assignment') }}</flux:button>
+                                    </div>
+                                </form>
+                            </flux:modal>
                         @endforeach
                     </div>
                 @endif

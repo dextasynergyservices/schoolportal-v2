@@ -444,14 +444,14 @@ class ExamController extends Controller
         }
 
         $exam = $attempt->exam;
-        $exam->load(['questions', 'subject:id,name']);
+        $exam->load(['questions', 'subject:id,name', 'class:id,name,level_id']);
 
         $answers = ExamAnswer::where('attempt_id', $attempt->id)
             ->get()
             ->keyBy('question_id');
 
         $grade = $attempt->percentage !== null
-            ? $this->scoreService->getGrade($student->school_id, (float) $attempt->percentage)
+            ? $this->scoreService->getGrade($student->school_id, (float) $attempt->percentage, $exam->class?->level_id)
             : null;
 
         return view('student.exams.results', [

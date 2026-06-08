@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
 
 class StudentTermReport extends Model
 {
@@ -20,8 +21,12 @@ class StudentTermReport extends Model
         'term_id',
         'report_type',
         'subject_scores_snapshot',
+        'grading_scale_id',
+        'grading_scale_snapshot',
         'total_weighted_score',
         'average_weighted_score',
+        'overall_grade',
+        'overall_grade_label',
         'subjects_count',
         'position',
         'out_of',
@@ -46,7 +51,9 @@ class StudentTermReport extends Model
     {
         return [
             'subject_scores_snapshot' => 'array',
+            'grading_scale_snapshot' => 'array',
             'report_type' => 'string',
+            'grading_scale_id' => 'integer',
             'total_weighted_score' => 'decimal:2',
             'average_weighted_score' => 'decimal:2',
             'subjects_count' => 'integer',
@@ -81,6 +88,11 @@ class StudentTermReport extends Model
     public function term(): BelongsTo
     {
         return $this->belongsTo(Term::class);
+    }
+
+    public function gradingScale(): BelongsTo
+    {
+        return $this->belongsTo(GradingScale::class);
     }
 
     public function teacher(): BelongsTo
@@ -118,6 +130,38 @@ class StudentTermReport extends Model
     public function isFinalized(): bool
     {
         return $this->finalized_at !== null;
+    }
+
+    public function shouldUseStoredGradeSnapshot(): bool
+    {
+        return $this->isFinalized() || $this->isPublished();
+    }
+
+    public function resolvedOverallGradeItem(?GradingScale $currentScale = null): ?object
+    {
+        if ($this->shouldUseStoredGradeSnapshot() && $this->overall_grade) {
+            return (object) [
+                'grade' => $this->overall_grade,
+                'label' => $this->overall_grade_label,
+            ];
+        }
+
+        return $currentScale?->items
+            ->first(fn ($item) => $item->min_score <= ($this->average_weighted_score ?? 0)
+                && $item->max_score >= ($this->average_weighted_score ?? 0));
+    }
+
+    public function resolvedGradingItems(?GradingScale $currentScale = null): Collection
+    {
+        if ($this->shouldUseStoredGradeSnapshot()) {
+            $snapshotItems = $this->grading_scale_snapshot['items'] ?? null;
+
+            if (is_array($snapshotItems) && $snapshotItems !== []) {
+                return collect($snapshotItems)->map(fn (array $item): object => (object) $item);
+            }
+        }
+
+        return $currentScale?->items ?? collect();
     }
 
     // ── Report type checks ──

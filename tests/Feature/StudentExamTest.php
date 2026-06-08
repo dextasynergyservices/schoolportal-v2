@@ -10,6 +10,10 @@ use App\Models\ExamAccessReset;
 use App\Models\ExamAnswer;
 use App\Models\ExamAttempt;
 use App\Models\ExamQuestion;
+use App\Models\GradingScale;
+use App\Models\GradingScaleItem;
+use App\Models\SchoolClass;
+use App\Models\SchoolLevel;
 use App\Models\ScoreComponent;
 use App\Models\StudentProfile;
 use App\Models\Subject;
@@ -325,6 +329,101 @@ class StudentExamTest extends TestCase
             ->get(route('student.exams.results', $attempt))
             ->assertOk()
             ->assertViewIs('student.exams.results');
+    }
+
+    public function test_student_cbt_result_uses_exam_class_level_grading_scale(): void
+    {
+        $secondaryLevel = SchoolLevel::create([
+            'school_id' => $this->school->id,
+            'name' => 'Secondary',
+            'slug' => 'secondary',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $secondaryClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $secondaryLevel->id,
+            'name' => 'Secondary 1',
+            'slug' => 'secondary-1',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+
+        $primaryScale = $this->createGradingScale('Primary Scale', 'Primary Excellent', $this->level->id);
+        $this->createGradingScale('Secondary Scale', 'Secondary A1', $secondaryLevel->id);
+
+        StudentProfile::where('user_id', $this->student->id)->update([
+            'class_id' => $secondaryClass->id,
+        ]);
+        $this->student->update(['level_id' => $secondaryLevel->id]);
+
+        $attempt = ExamAttempt::create([
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'status' => 'graded',
+            'started_at' => now()->subMinutes(5),
+            'submitted_at' => now(),
+            'score' => 8,
+            'total_points' => 10,
+            'percentage' => 82.0,
+            'passed' => true,
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.exams.results', $attempt))
+            ->assertOk()
+            ->assertViewHas('grade', fn (?array $grade): bool => $grade !== null
+                && $grade['label'] === 'Primary Excellent'
+                && $grade['grading_scale_id'] === $primaryScale->id);
+    }
+
+    public function test_student_cbt_results_tab_uses_each_exam_class_level_grading_scale(): void
+    {
+        $secondaryLevel = SchoolLevel::create([
+            'school_id' => $this->school->id,
+            'name' => 'Secondary',
+            'slug' => 'secondary',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $secondaryClass = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'level_id' => $secondaryLevel->id,
+            'name' => 'Secondary 1',
+            'slug' => 'secondary-1',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+
+        $primaryScale = $this->createGradingScale('Primary Scale', 'Primary Excellent', $this->level->id);
+        $this->createGradingScale('Secondary Scale', 'Secondary A1', $secondaryLevel->id);
+
+        StudentProfile::where('user_id', $this->student->id)->update([
+            'class_id' => $secondaryClass->id,
+        ]);
+        $this->student->update(['level_id' => $secondaryLevel->id]);
+
+        $attempt = ExamAttempt::create([
+            'exam_id' => $this->exam->id,
+            'student_id' => $this->student->id,
+            'school_id' => $this->school->id,
+            'attempt_number' => 1,
+            'status' => 'graded',
+            'started_at' => now()->subMinutes(5),
+            'submitted_at' => now(),
+            'score' => 8,
+            'total_points' => 10,
+            'percentage' => 82.0,
+            'passed' => true,
+        ]);
+
+        $this->actingAs($this->student)
+            ->get(route('student.report-cards.index', ['tab' => 'cbt-results']))
+            ->assertOk()
+            ->assertViewHas('grades', fn ($grades): bool => ($grades[$attempt->id]['label'] ?? null) === 'Primary Excellent'
+                && ($grades[$attempt->id]['grading_scale_id'] ?? null) === $primaryScale->id);
     }
 
     public function test_attempt_pages_use_exam_category_label(): void
@@ -749,5 +848,35 @@ class StudentExamTest extends TestCase
             ->where('student_id', $this->student->id)
             ->where('status', 'in_progress')
             ->firstOrFail();
+    }
+
+    private function createGradingScale(string $name, string $excellentLabel, int $levelId): GradingScale
+    {
+        $scale = GradingScale::create([
+            'school_id' => $this->school->id,
+            'name' => $name,
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        foreach ([
+            ['grade' => 'A', 'label' => $excellentLabel, 'min_score' => 80, 'max_score' => 100],
+            ['grade' => 'B', 'label' => 'Good', 'min_score' => 50, 'max_score' => 79],
+            ['grade' => 'F', 'label' => 'Needs Improvement', 'min_score' => 0, 'max_score' => 49],
+        ] as $index => $item) {
+            GradingScaleItem::create([
+                'grading_scale_id' => $scale->id,
+                'school_id' => $this->school->id,
+                'grade' => $item['grade'],
+                'label' => $item['label'],
+                'min_score' => $item['min_score'],
+                'max_score' => $item['max_score'],
+                'sort_order' => $index,
+            ]);
+        }
+
+        $scale->levels()->attach($levelId, ['school_id' => $this->school->id]);
+
+        return $scale;
     }
 }
